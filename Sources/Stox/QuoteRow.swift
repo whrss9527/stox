@@ -72,12 +72,18 @@ struct QuoteRow: View {
                     Text(item.symbol.displayCode)
                         .font(.system(size: 10.5).monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                     if let position {
-                        Text("持仓 " + holdingText(position))
-                            .font(.system(size: 10.5).monospacedDigit())
-                            .foregroundStyle(Theme.priceColor(for: PriceDirection(position.totalProfit), convention: settings.colorConvention))
-                            .lineLimit(1)
-                            .help("持仓盈亏")
+                        // 公文包图标加比例，比“持仓”两个字省地方，窄的时候也不会被截断。
+                        HStack(spacing: 2) {
+                            Image(systemName: "briefcase.fill")
+                                .font(.system(size: 8))
+                            Text(holdingText(position))
+                                .font(.system(size: 10.5).monospacedDigit())
+                        }
+                        .foregroundStyle(Theme.priceColor(for: PriceDirection(position.totalProfit), convention: settings.colorConvention))
+                        .fixedSize()
+                        .help("持仓盈亏")
                     }
                     if let tag = statusTag {
                         Text(tag)
