@@ -123,6 +123,17 @@ public enum TencentMinuteParser {
     }
 }
 
+/// 横轴上的一个刻度：位置（0 到 1）和文字。
+public struct AxisTick: Equatable, Sendable {
+    public var position: Double
+    public var label: String
+
+    public init(position: Double, label: String) {
+        self.position = position
+        self.label = label
+    }
+}
+
 /// 分时图的横轴：只包含连续交易时段，午休不占位置。
 public enum IntradayAxis {
     /// 连续交易时段（交易所当地时间，自零点起的分钟数）。
@@ -137,6 +148,28 @@ public enum IntradayAxis {
     /// 横轴总长度（分钟）：A 股 240、港股 330、美股 390。
     public static func length(for region: MarketRegion) -> Int {
         sessions(for: region).reduce(0) { $0 + $1.upperBound - $1.lowerBound }
+    }
+
+    /// 横轴下面标的时刻：开盘、午休（美股是中间）、收盘，位置是 0 到 1。
+    public static func ticks(for region: MarketRegion) -> [AxisTick] {
+        let length = Double(length(for: region))
+        let sessions = sessions(for: region)
+        guard let first = sessions.first, let last = sessions.last, length > 0 else { return [] }
+        func time(_ minute: Int) -> String { String(format: "%02d:%02d", minute / 60, minute % 60) }
+        var ticks = [AxisTick(position: 0, label: time(first.lowerBound))]
+        if sessions.count > 1 {
+            // 上午收盘和下午开盘在横轴上是同一个位置。
+            let morning = sessions[0]
+            ticks.append(AxisTick(
+                position: Double(morning.upperBound - morning.lowerBound) / length,
+                label: time(morning.upperBound) + "/" + time(sessions[1].lowerBound)
+            ))
+        } else {
+            let middle = first.lowerBound + (first.upperBound - first.lowerBound) / 2
+            ticks.append(AxisTick(position: 0.5, label: time(middle)))
+        }
+        ticks.append(AxisTick(position: 1, label: time(last.upperBound)))
+        return ticks
     }
 
     /// 某个时刻在横轴上的位置（0 到 length）。开盘前的点放在最左边，午休归到上午收盘处，

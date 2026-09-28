@@ -10,8 +10,10 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = Notifier()
     static let routeKey = "route"
     static let aboutRoute = "about"
+    /// 价格提醒的 route 是这个前缀加代码，点了打开面板并展开这一只。
+    static let symbolRoutePrefix = "symbol:"
 
-    /// 点击通知时调用：价格提醒打开面板，新版本通知打开“关于与更新”。
+    /// 点击通知时调用：价格提醒打开面板并展开那一只，收盘小结打开面板，新版本通知打开“关于与更新”。
     var onOpen: ((String?) -> Void)?
 
     /// 通知中心要求进程是一个 .app 包；`swift run` 直接运行可执行文件时调用会崩溃，所以先判断。
@@ -38,6 +40,7 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.title = trigger.title
         content.body = trigger.body
         content.sound = .default
+        content.userInfo = [Self.routeKey: Self.symbolRoutePrefix + trigger.symbol.rawValue]
         let identifier = "\(trigger.symbol.rawValue).\(trigger.condition.rawValue).\(Int(Date().timeIntervalSince1970))"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { _ in }

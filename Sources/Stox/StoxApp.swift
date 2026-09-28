@@ -35,6 +35,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Notifier.shared.onOpen = { [weak self] route in
             if route == Notifier.aboutRoute {
                 SettingsWindowController.shared.show(page: .about)
+            } else if let route, route.hasPrefix(Notifier.symbolRoutePrefix),
+                      let symbol = Symbol(String(route.dropFirst(Notifier.symbolRoutePrefix.count))) {
+                self?.statusController?.reveal(symbol)
             } else {
                 self?.statusController?.openPanel()
             }

@@ -132,6 +132,18 @@ final class StatusItemController: NSObject {
         }
     }
 
+    /// 打开面板并展开这一只（点了价格提醒的通知）。筛选着看不到它时先回到“全部”。
+    func reveal(_ symbol: Symbol) {
+        guard store.contains(symbol) else {
+            openPanel()
+            return
+        }
+        if !WatchlistView.visibleItems(store: store, settings: settings).contains(where: { $0.symbol == symbol }) {
+            settings.listFilter = .all
+        }
+        openPanel(expand: symbol)
+    }
+
     func closePanel() {
         guard let panel, panel.isVisible else { return }
         panel.orderOut(nil)
@@ -474,7 +486,8 @@ final class StatusItemController: NSObject {
         let intraday = store.intraday.values.map(\.points.count).max() ?? 0
         let kline = store.klines.values.map(\.candles.count).max() ?? 0
         let fiveDay = store.fiveDay.values.map(\.pointCount).max() ?? 0
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
+        let summary = HoldingsSummaryView.summaries(store: store, settings: settings).map(\.region.rawValue).joined(separator: ",")
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")

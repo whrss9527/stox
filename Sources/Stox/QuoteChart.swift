@@ -1,13 +1,14 @@
 import SwiftUI
 import StoxCore
 
-/// 展开详情里的走势图：上面一排“分时 日K 周K 月K”，下面是图。鼠标移到图上时，
-/// 那一排换成指着的那一点的价格（分时）或开高低收（K 线）。
+/// 展开详情里的走势图：上面一排“分时 日K 周K 月K”，中间是图，下面是时间或日期。鼠标移到图上时，
+/// 上面那一排换成指着的那一点的价格（分时）或开高低收（K 线）。
 @MainActor
 struct QuoteChartSection: View {
     static let headerHeight: CGFloat = 16
     static let spacing: CGFloat = 4
-    static let height: CGFloat = headerHeight + spacing + IntradayChart.height
+    static let axisHeight: CGFloat = 11
+    static let height: CGFloat = headerHeight + spacing + IntradayChart.height + axisHeight
 
     let item: WatchItem
     let quote: Quote
@@ -27,20 +28,24 @@ struct QuoteChartSection: View {
         VStack(spacing: Self.spacing) {
             header
                 .frame(height: Self.headerHeight)
-            chart
-                .frame(height: IntradayChart.height)
-                .background(GeometryReader { proxy in
-                    Color.clear
-                        .onAppear { chartWidth = proxy.size.width }
-                        .onChange(of: proxy.size.width) { chartWidth = $0 }
-                })
-                .contentShape(Rectangle())
-                .onContinuousHover { phase in
-                    switch phase {
-                    case .active(let location): hoverX = location.x
-                    case .ended: hoverX = nil
+            VStack(spacing: 0) {
+                chart
+                    .frame(height: IntradayChart.height)
+                    .background(GeometryReader { proxy in
+                        Color.clear
+                            .onAppear { chartWidth = proxy.size.width }
+                            .onChange(of: proxy.size.width) { chartWidth = $0 }
+                    })
+                    .contentShape(Rectangle())
+                    .onContinuousHover { phase in
+                        switch phase {
+                        case .active(let location): hoverX = location.x
+                        case .ended: hoverX = nil
+                        }
                     }
-                }
+                ChartAxis(ticks: axisTicks)
+                    .frame(height: Self.axisHeight, alignment: .bottom)
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("\(settings.chartPeriod.title)走势")
@@ -85,7 +90,8 @@ struct QuoteChartSection: View {
                 region: region,
                 color: Theme.priceColor(for: quote.direction, convention: settings.colorConvention),
                 hovered: hoveredPoint,
-                showAverage: settings.showMovingAverages
+                showAverage: settings.showMovingAverages,
+                decimals: quote.priceDecimals
             )
         case .fiveDay:
             FiveDayChart(
@@ -93,7 +99,8 @@ struct QuoteChartSection: View {
                 region: region,
                 color: Theme.priceColor(for: fiveDayDirection, convention: settings.colorConvention),
                 hovered: hoveredFiveDay,
-                showAverage: settings.showMovingAverages
+                showAverage: settings.showMovingAverages,
+                decimals: quote.priceDecimals
             )
         case .day, .week, .month:
             let data = klineData
@@ -104,6 +111,31 @@ struct QuoteChartSection: View {
                 showAverages: settings.showMovingAverages,
                 decimals: quote.priceDecimals
             )
+        }
+    }
+
+    /// 图下面的横轴：分时是开盘、午休、收盘的时刻，五日是每天的日期，K 线是头、中、尾三根的日期。
+    private var axisTicks: [AxisTick] {
+        switch settings.chartPeriod {
+        case .intraday:
+            return IntradayAxis.ticks(for: region)
+        case .fiveDay:
+            guard let days = fiveDaySeries?.days, !days.isEmpty else { return [] }
+            return days.indices.compactMap { index in
+                guard let date = days[index].date, date.count == 8 else { return nil }
+                return AxisTick(
+                    position: (Double(index) + 0.5) / Double(days.count),
+                    label: "\(date.dropFirst(4).prefix(2))-\(date.suffix(2))"
+                )
+            }
+        case .day, .week, .month:
+            guard let data = klineData, !data.candles.isEmpty else { return [] }
+            let layout = CandleLayout(count: data.candles.count, width: 1)
+            let indices = Array(Set([0, data.candles.count / 2, data.candles.count - 1])).sorted()
+            return indices.map { index in
+                let date = data.candles[index].date
+                return AxisTick(position: layout.centerX(of: index), label: data.period == .month ? String(date.prefix(7)) : date)
+            }
         }
     }
 
