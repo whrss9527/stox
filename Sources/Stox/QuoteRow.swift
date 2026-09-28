@@ -7,9 +7,9 @@ import StoxCore
 struct QuoteRow: View {
     static let rowHeight: CGFloat = 46
 
-    /// 展开后详情的高度：三行行情数据，有持仓时再加一行。
+    /// 展开后详情的高度：分时图、三行行情数据，有持仓时再加一行。
     static func detailHeight(for item: WatchItem) -> CGFloat {
-        item.holding == nil ? 129 : 162
+        (item.holding == nil ? 129 : 162) + IntradayChart.height + 6
     }
 
     let item: WatchItem
@@ -177,6 +177,15 @@ struct QuoteDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            IntradayChart(
+                series: store.intraday[item.symbol],
+                previousClose: quote.previousClose,
+                region: item.symbol.market.region,
+                color: Theme.priceColor(for: quote.direction, convention: settings.colorConvention)
+            )
+            .task(id: item.symbol) {
+                await store.trackIntraday(item.symbol)
+            }
             HStack(spacing: 0) {
                 cell("今开", price(quote.open))
                 cell("最高", price(quote.high))

@@ -209,7 +209,7 @@ struct GeneralPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "通用", subtitle: "刷新频率、价格提醒、快捷键和登录时启动")
+            PageHeader(title: "通用", subtitle: "刷新频率、快捷键、价格提醒和登录时启动")
             Form {
                 Section("行情刷新") {
                     Picker("刷新间隔", selection: $settings.refreshInterval) {
@@ -220,16 +220,28 @@ struct GeneralPage: View {
                     Toggle("休市时降低刷新频率", isOn: $settings.slowWhenIdle)
                     FormNote("自选涉及的市场都休市时改为每分钟刷新一次。打开面板时，数据不新鲜就会立即刷新。")
                 }
+                Section("快捷键") {
+                    Toggle("用快捷键打开或关闭行情面板", isOn: $settings.hotKeyEnabled)
+                    HStack {
+                        HotkeyRecorder(binding: $settings.toggleHotkey)
+                            .frame(width: 160, height: 28)
+                        Button("恢复 ⌃⌥S") { settings.toggleHotkey = .defaultToggle }
+                            .disabled(settings.toggleHotkey == .defaultToggle)
+                    }
+                    .disabled(!settings.hotKeyEnabled)
+                    if settings.hotKeyEnabled, settings.hotkeyUnavailable {
+                        Label("\(settings.toggleHotkey.display) 已经被其他程序占用，换一个组合试试", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    FormNote("点方框后按下新的组合键，至少包含 ⌃、⌥、⇧、⌘ 中的一个，按 Esc 取消。在任何 App 里都能用，不需要辅助功能权限。")
+                }
                 Section("价格提醒") {
                     Toggle("到价时发送系统通知", isOn: $settings.alertsEnabled)
                     FormNote("在行情面板里右键某只证券，选“价格提醒与简称…”设置目标价或涨跌幅。每个条件每个交易日最多提醒一次。")
                     Button("打开系统的通知设置") {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!)
                     }
-                }
-                Section("快捷键") {
-                    Toggle("⌃⌥S 打开或关闭行情面板", isOn: $settings.hotKeyEnabled)
-                    FormNote("在任何 App 里都能用，不需要辅助功能权限。")
                 }
                 Section("启动") {
                     Toggle("登录时自动启动", isOn: launchAtLoginBinding)

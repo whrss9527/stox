@@ -195,25 +195,44 @@ struct WatchlistView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 140)
             } else {
-                List {
-                    ForEach(store.items) { item in
-                        QuoteRow(item: item, quote: store.quotes[item.symbol], expanded: router.expanded == item.symbol)
-                            .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
+                ScrollViewReader { proxy in
+                    List {
+                        ForEach(store.items) { item in
+                            QuoteRow(item: item, quote: store.quotes[item.symbol], expanded: router.expanded == item.symbol)
+                                .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .id(item.symbol)
+                        }
+                        .onMove { source, destination in
+                            store.move(fromOffsets: source, toOffset: destination)
+                        }
                     }
-                    .onMove { source, destination in
-                        store.move(fromOffsets: source, toOffset: destination)
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                    .environment(\.defaultMinListRowHeight, 1)
+                    .frame(height: listHeight)
+                    .padding(.vertical, 6)
+                    .onAppear { reveal(router.expanded, with: proxy) }
+                    .onChange(of: router.expanded) { symbol in
+                        reveal(symbol, with: proxy)
                     }
                 }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .environment(\.defaultMinListRowHeight, 1)
-                .frame(height: listHeight)
-                .padding(.vertical, 6)
             }
         }
         .glassCard()
+    }
+
+    /// 展开靠下的一只时，把整行滚到看得见的地方。等展开的动画和布局完成后再滚；
+    /// 不给 anchor，只滚动需要的最小距离，本来就看得见的不会跳。
+    private func reveal(_ symbol: Symbol?, with proxy: ScrollViewProxy) {
+        guard let symbol else { return }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            withAnimation(.easeInOut(duration: 0.2)) {
+                proxy.scrollTo(symbol)
+            }
+        }
     }
 
     private var listHeight: CGFloat {

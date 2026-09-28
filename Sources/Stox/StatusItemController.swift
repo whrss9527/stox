@@ -279,7 +279,8 @@ final class StatusItemController: NSObject {
             print("STOX_DIAG capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
         }
         let holdings = store.items.filter { $0.holding != nil }.count
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) error=\(store.lastError ?? "none")")
+        let intraday = store.intraday.values.map(\.points.count).max() ?? 0
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) error=\(store.lastError ?? "none")")
         fflush(stdout)
     }
 }
