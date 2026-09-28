@@ -1,0 +1,70 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.0-noble
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests
+        run: swift test
+      - name: Live data smoke test
+        # 真实请求腾讯行情接口；数据源偶尔抖动时不阻塞构建。
+        continue-on-error: true
+        run: |
+          swift run stox-cli quote sh000001 sh600519 sz000001 sz399006 sh510300 bj920819 hk00700 hkHSI usAAPL usBRK.B us.IXIC
+          swift run stox-cli search gzmt
+          swift run stox-cli search 腾讯
+
+  app:
+    name: macOS app
+    runs-on: macos-15
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Unit tests
+        run: swift test
+      - name: Build Stox.app (universal)
+        run: UNIVERSAL=1 ./scripts/build-app.sh
+      - name: Inspect bundle
+        run: |
+          plutil -p dist/Stox.app/Contents/Info.plist
+          ls -la dist/Stox.app/Contents/MacOS dist/Stox.app/Contents/Resources
+      - name: Live data smoke test
+        continue-on-error: true
+        run: swift run -c release stox-cli quote sh600519 hk00700 usAAPL us.IXIC
+      - name: Package
+        run: |
+          cd dist
+          ditto -c -k --keepParent Stox.app Stox.zip
+          shasum -a 256 Stox.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Stox-app
+          path: dist/Stox.zip
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/Stox.zip --title "Stox $GITHUB_REF_NAME" --generate-notes
