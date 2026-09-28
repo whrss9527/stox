@@ -8,7 +8,8 @@ import UserNotifications
 @MainActor
 final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     static let shared = Notifier()
-    static let routeKey = "route"
+    /// 通知回调在主线程以外被调用时也要读它，所以不隔离在主线程上。
+    nonisolated static let routeKey = "route"
     static let aboutRoute = "about"
     /// 价格提醒的 route 是这个前缀加代码，点了打开面板并展开这一只。
     static let symbolRoutePrefix = "symbol:"
