@@ -42,6 +42,8 @@ struct PanelView: View {
         .onPreferenceChange(PanelSizeKey.self) { size in
             actions.sizeChanged(size)
         }
+        // 窗口还没跟上内容尺寸的那一瞬间，内容贴着顶部，被裁掉的是底部而不是标题。
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 
@@ -58,6 +60,7 @@ struct WatchlistPanel: View {
             PanelHeader()
             SearchBar()
             if router.trimmedQuery.isEmpty {
+                TipsCards()
                 HoldingsSummaryView()
                 WatchlistView()
             } else if router.batch != nil {
@@ -176,6 +179,7 @@ struct SearchBar: View {
 @MainActor
 struct WatchlistView: View {
     @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
 
     /// 屏幕够高时列表最多这么高；屏幕放不下整个面板时由 PanelRouter.listMaxHeight 再压低。
@@ -197,16 +201,17 @@ struct WatchlistView: View {
             } else {
                 ScrollViewReader { proxy in
                     List {
-                        ForEach(store.items) { item in
+                        ForEach(settings.sortMode.apply(store.items, quotes: store.quotes)) { item in
                             QuoteRow(item: item, quote: store.quotes[item.symbol], expanded: router.expanded == item.symbol)
                                 .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
                                 .id(item.symbol)
                         }
-                        .onMove { source, destination in
+                        // 按涨跌幅排序时不能拖动。
+                        .onMove(perform: settings.sortMode == .custom ? { source, destination in
                             store.move(fromOffsets: source, toOffset: destination)
-                        }
+                        } : nil)
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
@@ -236,11 +241,16 @@ struct WatchlistView: View {
     }
 
     private var listHeight: CGFloat {
+        min(Self.naturalHeight(store: store, expanded: router.expanded), router.listMaxHeight)
+    }
+
+    /// 列表不受屏幕高度限制时的高度：每行固定高度，展开的那一行加上详情，最多 defaultMaxHeight。
+    static func naturalHeight(store: QuoteStore, expanded: Symbol?) -> CGFloat {
         var height = CGFloat(store.items.count) * QuoteRow.rowHeight
-        if let expanded = router.expanded, let item = store.item(for: expanded), store.quotes[expanded] != nil {
+        if let expanded, let item = store.item(for: expanded), store.quotes[expanded] != nil {
             height += QuoteRow.detailHeight(for: item)
         }
-        return min(max(height, QuoteRow.rowHeight * 2), router.listMaxHeight)
+        return min(max(height, QuoteRow.rowHeight * 2), defaultMaxHeight)
     }
 }
 
@@ -354,6 +364,76 @@ struct BatchAddView: View {
         }
         .frame(height: 28)
         .padding(.horizontal, 4)
+    }
+}
+
+/// 列表上方的一次性提示：第一次使用时的小提示，更新后的“已更新到 x.y.z”。都可以关掉。
+@MainActor
+struct TipsCards: View {
+    @EnvironmentObject private var settings: SettingsStore
+
+    var body: some View {
+        if let version = settings.whatsNewVersion {
+            HStack(spacing: 10) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 16))
+                    .foregroundStyle(Color.accentColor)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("已更新到 \(version)")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("自选和设置都还在")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 4)
+                Button("看看更新了什么") {
+                    if let url = URL(string: "https://github.com/\(UpdateCheck.repository)/releases/tag/v\(version)") {
+                        NSWorkspace.shared.open(url)
+                    }
+                    settings.whatsNewVersion = nil
+                }
+                .controlSize(.small)
+                closeButton { settings.whatsNewVersion = nil }
+            }
+            .padding(10)
+            .glassCard()
+        }
+        if !settings.tipsDismissed {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Label("几个小技巧", systemImage: "lightbulb")
+                        .font(.system(size: 12, weight: .semibold))
+                    Spacer()
+                    closeButton { settings.tipsDismissed = true }
+                }
+                tip("右键单击菜单栏图标，在显示行情和只显示图标之间切换")
+                tip("\(settings.toggleHotkey.display) 在任何 App 里打开或关闭这个面板")
+                tip("右键单击一只可以固定到菜单栏，或者填持仓和价格提醒")
+                tip("一次粘贴多个代码，回车全部添加")
+            }
+            .padding(10)
+            .glassCard()
+        }
+    }
+
+    private func tip(_ text: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("•")
+            Text(text)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .font(.system(size: 11))
+        .foregroundStyle(.secondary)
+    }
+
+    private func closeButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.secondary)
+        .help("不再显示")
     }
 }
 
@@ -481,6 +561,24 @@ struct PanelFooter: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             Spacer(minLength: 4)
+            Menu {
+                Picker("排序", selection: $settings.sortMode) {
+                    ForEach(WatchlistSort.allCases, id: \.self) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } label: {
+                Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .fixedSize()
+            .buttonStyle(IconButtonStyle())
+            .frame(width: 30, height: 30)
+            .background(Circle().fill(Color.primary.opacity(0.05)))
+            .help("排序：\(settings.sortMode.title)")
             Button {
                 actions.openSettings(nil)
             } label: {
@@ -506,7 +604,8 @@ struct PanelFooter: View {
         let cadence = store.effectiveInterval > settings.refreshInterval
             ? "休市中每分钟刷新"
             : "每 \(Int(settings.refreshInterval)) 秒刷新"
-        return "\(QuoteFormatter.time(updated)) 更新 · \(cadence) · 拖动排序"
+        let order = settings.sortMode == .custom ? "拖动排序" : settings.sortMode.title
+        return "\(QuoteFormatter.time(updated)) 更新 · \(cadence) · \(order)"
     }
 }
 

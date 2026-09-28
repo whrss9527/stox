@@ -104,3 +104,21 @@ final class SymbolListTests: XCTestCase {
         XCTAssertNil(SymbolInput.parseList("600519 600519"), "去重后只剩一个")
     }
 }
+
+final class WatchlistSortTests: XCTestCase {
+    func testSortsByChangeAndKeepsMissingQuotesLast() {
+        let items = ["sh600519", "hk00700", "usAAPL", "sz000001", "hkHSI"].map { WatchItem(symbol: Symbol($0)!) }
+        func quote(_ raw: String, _ percent: Double) -> (Symbol, Quote) {
+            (Symbol(raw)!, Quote(symbol: Symbol(raw)!, name: raw, price: 10, previousClose: 10, changePercent: percent))
+        }
+        let quotes = Dictionary(uniqueKeysWithValues: [
+            quote("sh600519", 0.56), quote("hk00700", 0.73), quote("usAAPL", -0.16), quote("sz000001", 0.56),
+        ])
+        XCTAssertEqual(WatchlistSort.custom.apply(items, quotes: quotes).map(\.symbol.rawValue),
+                       ["sh600519", "hk00700", "usAAPL", "sz000001", "hkHSI"])
+        XCTAssertEqual(WatchlistSort.gainers.apply(items, quotes: quotes).map(\.symbol.rawValue),
+                       ["hk00700", "sh600519", "sz000001", "usAAPL", "hkHSI"], "涨跌幅相同的保持原来的顺序，没有行情的排最后")
+        XCTAssertEqual(WatchlistSort.losers.apply(items, quotes: quotes).map(\.symbol.rawValue),
+                       ["usAAPL", "sh600519", "sz000001", "hk00700", "hkHSI"])
+    }
+}

@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         workspace.addObserver(self, selector: #selector(systemWillSleep), name: NSWorkspace.willSleepNotification, object: nil)
         workspace.addObserver(self, selector: #selector(systemDidWake), name: NSWorkspace.didWakeNotification, object: nil)
 
+        settings.recordLaunch(version: AppInfo.version)
         Log.info("Stox 已启动，版本 \(AppInfo.version)（\(Bundle.main.bundleURL.path)）")
         handleLaunchArguments()
     }

@@ -17,6 +17,9 @@ final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private var panel: PanelWindow?
     private var hostingView: NSHostingView<AnyView>?
+    /// SwiftUI 最近一次量出的面板内容尺寸。
+    private var contentSize = CGSize.zero
+    private var resizeObserver: NSObjectProtocol?
     /// 面板因为点到别处而关闭的时间：点菜单栏图标关闭面板时，不要紧接着又把它打开。
     private var lastAutoClose = Date.distantPast
     private var rotationTimer: Timer?
@@ -129,6 +132,9 @@ final class StatusItemController: NSObject {
         hostingView = hosting
         let panel = PanelWindow(contentView: hosting)
         panel.appearance = settings.appearance.nsAppearance
+        resizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.keepBelowMenuBar() }
+        }
         panel.onClose = { [weak self] in self?.panelLostFocus() }
         panel.onEscape = { [weak self] in self?.router.handleEscape() ?? false }
         self.panel = panel
@@ -140,22 +146,37 @@ final class StatusItemController: NSObject {
         closePanel()
     }
 
+    /// 按最近一次量到的内容尺寸调整；还没量过时用 fittingSize 估一下。
     private func resizePanel() {
-        guard let hostingView else { return }
-        resizePanel(to: hostingView.fittingSize)
+        if contentSize.width > 0, contentSize.height > 0 {
+            resizePanel(to: contentSize)
+        } else if let hostingView {
+            resizePanel(to: hostingView.fittingSize)
+        }
     }
 
     /// 顶边不动，按内容尺寸调整窗口。屏幕放不下时先把列表压矮，面板永远不盖住菜单栏。
     private func resizePanel(to size: CGSize) {
-        guard let panel, size.width > 0, size.height > 0 else { return }
+        guard size.width > 0, size.height > 0 else { return }
+        // 先记下来：第一次量到尺寸时面板窗口可能还没建好，打开面板时要用到。
+        contentSize = size
+        guard let panel else { return }
         var height = ceil(size.height)
         if let available = availableHeight(), height > available {
+            // 超出多少，列表就矮多少，一步算到位。列表是面板里唯一能伸缩的部分。
             let minimum = QuoteRow.rowHeight * 2
-            if router.listMaxHeight > minimum {
-                let limit = max(minimum, router.listMaxHeight - (height - available))
-                // 在 SwiftUI 量尺寸的回调里，放到下一轮再改，避免在视图更新期间发布变化。
+            let current = min(WatchlistView.naturalHeight(store: store, expanded: router.expanded), router.listMaxHeight)
+            let limit = max(minimum, floor(current - (height - available)))
+            if limit < router.listMaxHeight {
+                // 在 SwiftUI 量尺寸的回调里，放到下一轮再改，避免在视图更新期间发布变化；
+                // 改完再等一轮让 SwiftUI 重新布局，然后主动量一次，不指望它再回调。
                 DispatchQueue.main.async { [weak self] in
                     self?.router.listMaxHeight = limit
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, let hostingView = self.hostingView else { return }
+                        hostingView.layoutSubtreeIfNeeded()
+                        self.resizePanel(to: hostingView.fittingSize)
+                    }
                 }
             }
             height = floor(available)
@@ -164,6 +185,19 @@ final class StatusItemController: NSObject {
         guard rounded != panel.frame.size else { return }
         let origin = NSPoint(x: panel.frame.origin.x, y: panel.frame.maxY - rounded.height)
         panel.setFrame(NSRect(origin: origin, size: rounded), display: true)
+        keepBelowMenuBar()
+    }
+
+    /// SwiftUI 的最小尺寸可能让窗口比我们设的高，这时它会往上长。把顶边挪回菜单栏下面。
+    private func keepBelowMenuBar() {
+        guard let panel, let limit = topLimit(), panel.frame.maxY > limit + 0.5 else { return }
+        panel.setFrameOrigin(NSPoint(x: panel.frame.origin.x, y: limit - panel.frame.height))
+    }
+
+    /// 面板顶边最高能到哪：菜单栏图标下面 2 个点。
+    private func topLimit() -> CGFloat? {
+        guard let button = statusItem.button, let buttonWindow = button.window else { return nil }
+        return buttonWindow.convertToScreen(button.convert(button.bounds, to: nil)).minY - 2
     }
 
     /// 面板最多能有多高：从菜单栏图标下面到屏幕可见区域的底部。
@@ -272,7 +306,8 @@ final class StatusItemController: NSObject {
         }
         let panelFrame = panel?.isVisible == true ? panel?.frame : nil
         if let panelFrame {
-            print("STOX_DIAG panel_frame=\(topLeft(panelFrame))")
+            let fitting = hostingView?.fittingSize ?? .zero
+            print("STOX_DIAG panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) fitting=\(Int(fitting.height)) list_max=\(Int(router.listMaxHeight)) available=\(Int(availableHeight() ?? -1))")
         }
         let frames = [statusFrame, panelFrame].compactMap { $0 }
         if let first = frames.first {

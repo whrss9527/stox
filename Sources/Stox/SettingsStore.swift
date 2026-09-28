@@ -23,6 +23,16 @@ enum ColorConvention: String, CaseIterable, Identifiable {
     }
 }
 
+extension WatchlistSort {
+    var title: String {
+        switch self {
+        case .custom: return "自定义顺序"
+        case .gainers: return "涨幅从高到低"
+        case .losers: return "跌幅从高到低"
+        }
+    }
+}
+
 /// 面板和设置窗口的深浅色。菜单栏始终跟随系统。
 enum AppearanceMode: String, CaseIterable, Identifiable {
     case system, light, dark
@@ -110,6 +120,22 @@ final class SettingsStore: ObservableObject {
     @Published var appearance: AppearanceMode {
         didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) }
     }
+    /// 列表的排序方式。
+    @Published var sortMode: WatchlistSort {
+        didSet { defaults.set(sortMode.rawValue, forKey: Keys.sortMode) }
+    }
+    /// 价格变动时让价格闪一下。
+    @Published var flashOnChange: Bool {
+        didSet { defaults.set(flashOnChange, forKey: Keys.flashOnChange) }
+    }
+    /// 第一次打开面板时的使用提示，看过就不再显示。
+    @Published var tipsDismissed: Bool {
+        didSet { defaults.set(tipsDismissed, forKey: Keys.tipsDismissed) }
+    }
+    /// 刚更新到的版本，面板里显示“已更新到 x.y.z”，关掉后清空。
+    @Published var whatsNewVersion: String? {
+        didSet { defaults.set(whatsNewVersion, forKey: Keys.whatsNewVersion) }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -129,6 +155,18 @@ final class SettingsStore: ObservableObject {
         autoCheckUpdates = defaults.object(forKey: Keys.autoCheckUpdates) as? Bool ?? true
         syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
         appearance = defaults.string(forKey: Keys.appearance).flatMap(AppearanceMode.init(rawValue:)) ?? .system
+        sortMode = defaults.string(forKey: Keys.sortMode).flatMap(WatchlistSort.init(rawValue:)) ?? .custom
+        flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
+        tipsDismissed = defaults.object(forKey: Keys.tipsDismissed) as? Bool ?? false
+        whatsNewVersion = defaults.string(forKey: Keys.whatsNewVersion)
+    }
+
+    /// 启动时记下这次运行的版本；比上次运行的新，就在面板里提示一次“已更新”。
+    func recordLaunch(version: String) {
+        if let last = defaults.string(forKey: Keys.lastRunVersion), UpdateCheck.isNewer(version, than: last) {
+            whatsNewVersion = version
+        }
+        defaults.set(version, forKey: Keys.lastRunVersion)
     }
 
     var tickerOptions: TickerOptions {
@@ -180,5 +218,10 @@ final class SettingsStore: ObservableObject {
         static let autoCheckUpdates = "update.autoCheck"
         static let syncEnabled = "sync.enabled"
         static let appearance = "appearance"
+        static let sortMode = "list.sort"
+        static let flashOnChange = "list.flash"
+        static let tipsDismissed = "tips.dismissed"
+        static let whatsNewVersion = "update.whatsNew"
+        static let lastRunVersion = "app.lastVersion"
     }
 }
