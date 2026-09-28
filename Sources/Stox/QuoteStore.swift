@@ -13,6 +13,11 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var isRefreshing = false
     /// 展开过的证券的分时走势。
     @Published private(set) var intraday: [Symbol: IntradaySeries] = [:]
+    /// 看过的 K 线，按证券和周期存。
+    @Published private(set) var klines: [KlineKey: KlineSeries] = [:]
+
+    /// 每张 K 线图最多显示多少根。
+    static let klineCount = 60
 
     /// 价格提醒触发时回调（由 AppDelegate 转成系统通知）。
     var onAlert: ((AlertTrigger) -> Void)?
@@ -142,6 +147,26 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 切到 K 线时调用：先取一次，之后交易时段内每分钟刷新，休市时半小时一次，直到收起或换周期（任务被取消）。
+    /// 两次请求之间最后一根 K 线由实时行情更新（见 KlineSeries.merging）。
+    func trackKline(_ symbol: Symbol, period: KlinePeriod) async {
+        let key = KlineKey(symbol: symbol, period: period)
+        while !Task.isCancelled {
+            do {
+                let series = try await provider.fetchKline(
+                    for: symbol, period: period, count: Self.klineCount, exchangeCode: quotes[symbol]?.exchangeCode
+                )
+                if let series, !Task.isCancelled {
+                    klines[key] = series
+                }
+            } catch {
+                // 和分时一样，失败时保留上一次的，下一轮再试。
+            }
+            let live = phase(for: symbol.market.region).isLive
+            try? await Task.sleep(nanoseconds: (live ? 60 : 1800) * 1_000_000_000)
+        }
+    }
+
     // MARK: - 市场状态
 
     /// 自选里出现过的市场，按 A 股、港股、美股排序。
@@ -196,6 +221,7 @@ final class QuoteStore: ObservableObject {
         items.removeAll { $0.symbol == symbol }
         quotes[symbol] = nil
         intraday[symbol] = nil
+        klines = klines.filter { $0.key.symbol != symbol }
         alertEngine.reset(symbol)
         save()
         saveAlertState()
@@ -292,4 +318,10 @@ final class QuoteStore: ObservableObject {
         static let watchlist = "watchlist.v1"
         static let alertState = "alerts.fired.v1"
     }
+}
+
+/// K 线缓存的键：哪只证券、哪个周期。
+struct KlineKey: Hashable {
+    var symbol: Symbol
+    var period: KlinePeriod
 }

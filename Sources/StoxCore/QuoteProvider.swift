@@ -8,10 +8,14 @@ public protocol QuoteProvider: Sendable {
     func search(_ query: String) async throws -> [SearchResult]
     /// 当天的分时走势；数据源不支持时返回 nil。
     func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries?
+    /// 最近 count 根 K 线；数据源不支持时返回 nil。
+    /// exchangeCode 是行情里带的交易所代码（例如 `AAPL.OQ`），有的数据源查美股 K 线要用到。
+    func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries?
 }
 
 extension QuoteProvider {
     public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? { nil }
+    public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? { nil }
 }
 
 public enum ProviderError: Error, LocalizedError, Equatable {
@@ -53,6 +57,27 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     public static func minuteURL(for symbol: Symbol) -> URL? {
         let endpoint = symbol.market.region == .us ? usMinuteEndpoint : minuteEndpoint
         return URL(string: endpoint + symbol.rawValue)
+    }
+
+    public static let klineEndpoints: [MarketRegion: String] = [
+        .cn: "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=",
+        .hk: "https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get?param=",
+        .us: "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=",
+    ]
+
+    /// K 线接口（前复权）：沪深北、港股、美股各用一个地址。美股个股要带交易所后缀，
+    /// 用行情里的交易所代码补上（`AAPL.OQ`、`BRK.B.N`）；指数的代码（`.IXIC`）本身就是这个样子。
+    public static func klineURL(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String? = nil) -> URL? {
+        let region = symbol.market.region
+        guard let endpoint = klineEndpoints[region] else { return nil }
+        var code = symbol.rawValue
+        if region == .us, let exchangeCode, exchangeCode.contains(".") {
+            code = "us" + exchangeCode
+        }
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: ".")
+        guard let encoded = code.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+        return URL(string: "\(endpoint)\(encoded),\(period.rawValue),,,\(max(count, 1)),qfq")
     }
 
     public static func searchURL(for query: String) -> URL? {
@@ -98,6 +123,16 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? {
         guard let url = Self.minuteURL(for: symbol) else { throw URLError(.badURL) }
         return TencentMinuteParser.parse(try await get(url), symbol: symbol)
+    }
+
+    public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? {
+        var code = exchangeCode
+        // 美股个股不带交易所后缀时取不到正确的 K 线，调用方没给就先查一次行情。
+        if code == nil, symbol.market.region == .us, !symbol.isIndex {
+            code = try await fetchQuotes(for: [symbol])[symbol]?.exchangeCode
+        }
+        guard let url = Self.klineURL(for: symbol, period: period, count: count, exchangeCode: code) else { throw URLError(.badURL) }
+        return TencentKlineParser.parse(try await get(url), symbol: symbol, period: period)
     }
 
     private func fetchBatch(_ symbols: [Symbol]) async throws -> [Symbol: Quote] {

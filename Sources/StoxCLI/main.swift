@@ -6,6 +6,7 @@ import StoxCore
 //   stox-cli quote sh600519 700 AAPL us.IXIC   解析并打印行情
 //   stox-cli raw sh600519 hk00700              打印接口原始返回
 //   stox-cli search 茅台                       搜索证券
+//   stox-cli kline sh600519 week               打印最近几根 K 线（day、week、month）
 //   stox-cli latest-release 0.1.0              查询 GitHub 上的最新发布，并和给定版本比较
 //
 // 有代码取不到行情、或搜索无结果时以非零状态退出，方便在 CI 里做冒烟测试。
@@ -16,6 +17,7 @@ func printUsage() {
       stox-cli quote <代码>...    例如 stox-cli quote sh600519 700 AAPL us.IXIC
       stox-cli raw <代码>...      打印接口原始返回
       stox-cli search <关键词>    例如 stox-cli search gzmt
+      stox-cli kline <代码> [day|week|month]   打印最近几根 K 线
       stox-cli latest-release [当前版本]   查询最新发布
     """)
 }
@@ -81,6 +83,25 @@ do {
             print("\(pad(r.symbol.rawValue, 12)) \(pad(r.name, 24)) \(r.typeLabel)")
         }
         exit(results.isEmpty ? 1 : 0)
+
+    case "kline":
+        guard let symbol = parseSymbols(arguments.dropFirst().prefix(1)).first else {
+            printUsage()
+            exit(2)
+        }
+        let period = arguments.dropFirst(2).first.flatMap(KlinePeriod.init(rawValue:)) ?? .day
+        guard let series = try await provider.fetchKline(for: symbol, period: period, count: 60, exchangeCode: nil),
+              !series.candles.isEmpty
+        else {
+            print("\(symbol.rawValue) 没有 K 线数据")
+            exit(1)
+        }
+        print("\(symbol.rawValue) \(period.rawValue) 共 \(series.candles.count) 根，\(series.candles[0].date) 到 \(series.candles[series.candles.count - 1].date)")
+        for index in series.candles.indices.suffix(5) {
+            let c = series.candles[index]
+            let change = series.changePercent(at: index).map(QuoteFormatter.percent) ?? "--"
+            print("  \(c.date)  开 \(c.open)  收 \(c.close)  高 \(c.high)  低 \(c.low)  \(change)")
+        }
 
     case "latest-release":
         let current = arguments.dropFirst().first ?? "0.0.0"

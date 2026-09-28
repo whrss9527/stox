@@ -83,6 +83,22 @@ smoke() {
   grep -q "intraday=[1-9]" shots/detail.log || echo "::warning::展开详情时没有取到分时数据"
   grep -q "settings_page=display" shots/settings-display.log || fail "设置窗口没有打开"
 
+  # K 线：A 股日 K，美股月 K（美股个股要带交易所后缀才取得到完整的 K 线）。
+  run_case kline --show-panel --expand sh600519 --chart day
+  run_case kline-us --show-panel --expand usAAPL --chart month
+  defaults delete "$DOMAIN" chart.period
+  grep -q "chart=day" shots/kline.log || fail "没有切到日 K"
+  grep -Eq "kline=([2-9][0-9])" shots/kline.log || echo "::warning::日 K 没有取到数据"
+  grep -Eq "kline=([2-9][0-9])" shots/kline-us.log || echo "::warning::美股月 K 没有取到足够的数据"
+
+  # 键盘：搜索结果里按 ↓ 选下一条；列表里 ↓ ↓ 回车展开第二只，再按 → 切到日 K。
+  run_case keys-search --show-panel --search 腾讯 --keys down
+  run_case keys-list --show-panel --keys down,down,enter,right
+  defaults delete "$DOMAIN" chart.period 2>/dev/null || true
+  grep -Eq 'highlight=[a-z]' shots/keys-search.log || fail "方向键没有选中搜索结果"
+  grep -q 'highlight=sz399001 expanded=sz399001' shots/keys-list.log || fail "方向键和回车没有展开第二只"
+  grep -q 'chart=day' shots/keys-list.log || fail "右方向键没有切到日 K"
+
   # 右键单击切换的“只显示图标”：菜单栏只剩图标，左键照样能打开面板。
   defaults write "$DOMAIN" ticker.hidden -bool true
   run_case hidden --show-panel

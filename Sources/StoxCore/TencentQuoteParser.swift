@@ -8,6 +8,7 @@ import Foundation
 /// | 下标 | 含义 |
 /// |---|---|
 /// | 1 | 名称 |
+/// | 2 | 交易所代码（`600519`、`00700`、`AAPL.OQ`、`.IXIC`） |
 /// | 3 / 4 / 5 | 现价 / 昨收 / 今开 |
 /// | 6 | 成交量（A 股单位为手，港美股为股） |
 /// | 30 | 时间（`20260928141019`、`2026/09/28 13:55:11`、`2026-09-25 16:00:01`） |
@@ -115,7 +116,8 @@ public enum TencentQuoteParser {
             high52Week: positive(isCN ? 67 : 48),
             low52Week: positive(isCN ? 68 : 49),
             timestamp: parseTimestamp(fields[30], timeZone: region.timeZone),
-            priceDecimals: isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4])
+            priceDecimals: isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4]),
+            exchangeCode: fields[2].isEmpty ? nil : fields[2]
         )
     }
 
