@@ -11,11 +11,14 @@ public protocol QuoteProvider: Sendable {
     /// 最近 count 根 K 线；数据源不支持时返回 nil。
     /// exchangeCode 是行情里带的交易所代码（例如 `AAPL.OQ`），有的数据源查美股 K 线要用到。
     func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries?
+    /// 港币、美元兑人民币的汇率，用来把持仓折合成人民币；数据源不支持时返回 nil。
+    func fetchExchangeRates() async throws -> ExchangeRates?
 }
 
 extension QuoteProvider {
     public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? { nil }
     public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? { nil }
+    public func fetchExchangeRates() async throws -> ExchangeRates? { nil }
 }
 
 public enum ProviderError: Error, LocalizedError, Equatable {
@@ -133,6 +136,10 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
         }
         guard let url = Self.klineURL(for: symbol, period: period, count: count, exchangeCode: code) else { throw URLError(.badURL) }
         return TencentKlineParser.parse(try await get(url), symbol: symbol, period: period)
+    }
+
+    public func fetchExchangeRates() async throws -> ExchangeRates? {
+        TencentFXParser.parse(Self.decodeText(try await get(TencentFXParser.url)))
     }
 
     private func fetchBatch(_ symbols: [Symbol]) async throws -> [Symbol: Quote] {

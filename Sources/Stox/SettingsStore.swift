@@ -33,6 +33,26 @@ extension WatchlistSort {
     }
 }
 
+/// 列表每一行右边色块里显示什么，点一下色块依次切换。
+enum ChangeDisplay: String, CaseIterable, Identifiable {
+    case percent, change, marketCap
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .percent: return "涨跌幅"
+        case .change: return "涨跌额"
+        case .marketCap: return "总市值"
+        }
+    }
+
+    var next: ChangeDisplay {
+        let all = Self.allCases
+        return all[((all.firstIndex(of: self) ?? 0) + 1) % all.count]
+    }
+}
+
 /// 展开详情里走势图的周期。
 enum ChartPeriod: String, CaseIterable, Identifiable {
     case intraday, day, week, month
@@ -157,6 +177,10 @@ final class SettingsStore: ObservableObject {
     @Published var sortMode: WatchlistSort {
         didSet { defaults.set(sortMode.rawValue, forKey: Keys.sortMode) }
     }
+    /// 列表右边色块里显示涨跌幅、涨跌额还是总市值。
+    @Published var changeDisplay: ChangeDisplay {
+        didSet { defaults.set(changeDisplay.rawValue, forKey: Keys.changeDisplay) }
+    }
     /// 价格变动时让价格闪一下。
     @Published var flashOnChange: Bool {
         didSet { defaults.set(flashOnChange, forKey: Keys.flashOnChange) }
@@ -217,6 +241,7 @@ final class SettingsStore: ObservableObject {
         syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
         appearance = defaults.string(forKey: Keys.appearance).flatMap(AppearanceMode.init(rawValue:)) ?? .system
         sortMode = defaults.string(forKey: Keys.sortMode).flatMap(WatchlistSort.init(rawValue:)) ?? .custom
+        changeDisplay = defaults.string(forKey: Keys.changeDisplay).flatMap(ChangeDisplay.init(rawValue:)) ?? .percent
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
@@ -283,6 +308,7 @@ final class SettingsStore: ObservableObject {
         static let syncEnabled = "sync.enabled"
         static let appearance = "appearance"
         static let sortMode = "list.sort"
+        static let changeDisplay = "list.pill"
         static let flashOnChange = "list.flash"
         static let showDayProfit = "ticker.dayProfit"
         static let panelPinned = "panel.pinned"

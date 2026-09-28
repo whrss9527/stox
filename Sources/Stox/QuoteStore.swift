@@ -16,6 +16,11 @@ final class QuoteStore: ObservableObject {
     /// 看过的 K 线，按证券和周期存。
     @Published private(set) var klines: [KlineKey: KlineSeries] = [:]
 
+    /// 港币、美元兑人民币的汇率。持仓有两种以上货币时才去取，用来折合成人民币。
+    @Published private(set) var rates: ExchangeRates?
+    /// 上一次取汇率的时间。
+    private var ratesFetched = Date.distantPast
+
     /// 每张 K 线图最多显示多少根。
     static let klineCount = 60
 
@@ -120,9 +125,24 @@ final class QuoteStore: ObservableObject {
             lastError = result.isEmpty ? "没有取到行情数据" : nil
             cacheNames(from: result)
             evaluateAlerts()
+            await refreshRatesIfNeeded()
         } catch {
             guard current == generation else { return }
             lastError = error.localizedDescription
+        }
+    }
+
+    /// 持仓涉及两种以上货币时，每 10 分钟取一次汇率；取不到时一分钟后再试，这期间照旧按货币分开显示。
+    private func refreshRatesIfNeeded() async {
+        let currencies = Set(items.filter { $0.holding != nil }.map { $0.symbol.market.region })
+        guard currencies.count > 1, Date().timeIntervalSince(ratesFetched) > 600 else { return }
+        ratesFetched = Date()
+        do {
+            if let value = try await provider.fetchExchangeRates() {
+                rates = value
+            }
+        } catch {
+            ratesFetched = Date().addingTimeInterval(-540)
         }
     }
 

@@ -350,7 +350,7 @@ final class StatusItemController: NSObject {
         // 今日盈亏总是跟在最后，轮流显示时也不参与轮换。
         let profit = settings.hideTicker || !settings.showDayProfit
             ? []
-            : MenuBarTicker.dayProfitParts(Portfolio.summaries(items: store.items, quotes: store.quotes))
+            : MenuBarTicker.dayProfitParts(Portfolio.summaries(items: store.items, quotes: store.quotes), rates: store.rates)
 
         guard !entries.isEmpty || !profit.isEmpty else {
             button.attributedTitle = NSAttributedString(string: "")
@@ -441,6 +441,8 @@ final class StatusItemController: NSObject {
         let intraday = store.intraday.values.map(\.points.count).max() ?? 0
         let kline = store.klines.values.map(\.candles.count).max() ?? 0
         print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) error=\(store.lastError ?? "none")")
+        let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
+        print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue)")
         print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }

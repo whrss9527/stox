@@ -56,6 +56,16 @@ struct QuoteRow: View {
 
     private var direction: PriceDirection { quote?.direction ?? .flat }
 
+    /// 色块里的文字：涨跌幅、涨跌额或者总市值（指数没有市值）。
+    private var pillText: String {
+        guard let quote else { return "--" }
+        switch settings.changeDisplay {
+        case .percent: return QuoteFormatter.percent(quote.changePercent)
+        case .change: return QuoteFormatter.change(quote.change, decimals: quote.priceDecimals)
+        case .marketCap: return quote.marketCap.map { QuoteFormatter.largeNumber($0) } ?? "--"
+        }
+    }
+
     private var color: Color { Theme.priceColor(for: direction, convention: settings.colorConvention) }
 
     private var summary: some View {
@@ -124,16 +134,23 @@ struct QuoteRow: View {
                     .help("持仓盈亏")
                 }
             }
-            Text(quote.map { QuoteFormatter.percent($0.changePercent) } ?? "--")
-                .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(Theme.pillForeground(convention: settings.colorConvention))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(width: 70, height: 24)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Theme.pillBackground(for: direction, convention: settings.colorConvention))
-                )
+            Button {
+                settings.changeDisplay = settings.changeDisplay.next
+            } label: {
+                Text(pillText)
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(Theme.pillForeground(convention: settings.colorConvention))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(width: 70, height: 24)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Theme.pillBackground(for: direction, convention: settings.colorConvention))
+                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .help("\(settings.changeDisplay.title)。点一下切换涨跌幅、涨跌额、总市值")
         }
         .padding(.horizontal, 10)
         .frame(height: Self.rowHeight)
