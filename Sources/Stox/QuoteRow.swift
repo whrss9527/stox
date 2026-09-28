@@ -315,8 +315,10 @@ struct QuoteDetailView: View {
             }
             HStack(spacing: 10) {
                 Text(timeText)
-                    .font(.system(size: 10))
+                    .font(.system(size: 10).monospacedDigit())
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Spacer()
                 Button(item.symbol.isIndex ? "提醒" : "持仓与提醒") { router.route = .edit(item.symbol) }
                 Button("雪球") {
@@ -360,12 +362,15 @@ struct QuoteDetailView: View {
 
     private var timeText: String {
         let region = item.symbol.market.region
+        // 美股不在常规交易时，这一行换成盘前盘后价和它的成交时间；行情时间这时总是收盘那一刻，不用再写。
+        if let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
+            var text = "\(extended.label) \(extended.priceText) \(QuoteFormatter.percent(extended.percent))"
+            if let time = extended.timeText { text += " · 美东 \(time)" }
+            return text
+        }
         guard let timestamp = quote.timestamp else { return "" }
         var text = "\(region.displayName)时间 \(QuoteFormatter.time(timestamp, timeZone: region.timeZone))"
         if region == .hk { text += " · 延时约 15 分钟" }
-        if let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
-            text += " · \(extended.label) \(extended.priceText)（\(QuoteFormatter.percent(extended.percent))）"
-        }
         return text
     }
 }
@@ -391,12 +396,15 @@ struct ExtendedQuote {
 
     var priceText: String { QuoteFormatter.price(price, decimals: decimals) }
 
+    /// 成交时间，美东时间的时和分。
+    var timeText: String? {
+        time.map { String(QuoteFormatter.time($0, timeZone: MarketRegion.us.timeZone).prefix(5)) }
+    }
+
     /// 鼠标停在标签上时的说明：价格、相对收盘的涨跌和成交时间。
     var helpText: String {
         var text = "\(label) \(priceText)，相对收盘 \(QuoteFormatter.percent(percent))"
-        if let time {
-            text += "，美东时间 \(QuoteFormatter.time(time, timeZone: MarketRegion.us.timeZone).prefix(5))"
-        }
+        if let timeText { text += "，美东时间 \(timeText)" }
         return text
     }
 }
