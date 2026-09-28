@@ -27,9 +27,6 @@ final class QuoteStore: ObservableObject {
     /// 上一次取汇率的时间。
     private var ratesFetched = Date.distantPast
 
-    /// 每张 K 线图最多显示多少根。
-    static let klineCount = 60
-
     /// 价格提醒触发时回调（由 AppDelegate 转成系统通知）。
     var onAlert: ((AlertTrigger) -> Void)?
     /// 收盘小结要发的时候回调（由 AppDelegate 转成系统通知）。
@@ -75,12 +72,13 @@ final class QuoteStore: ObservableObject {
             alertEngine = AlertEngine()
         }
 
-        // 刷新相关设置变化后立刻按新节奏重新开始轮询。
-        Publishers.Merge(
+        // 刷新相关设置变化后立刻按新节奏重新开始轮询；打开盘前盘后价时马上去取。
+        Publishers.Merge3(
             settings.$refreshInterval.removeDuplicates().map { _ in () },
-            settings.$slowWhenIdle.removeDuplicates().map { _ in () }
+            settings.$slowWhenIdle.removeDuplicates().map { _ in () },
+            settings.$showExtendedHours.removeDuplicates().map { _ in () }
         )
-        .dropFirst(2)
+        .dropFirst(3)
         .receive(on: RunLoop.main)
         .sink { [weak self] _ in self?.restart() }
         .store(in: &cancellables)
@@ -172,17 +170,18 @@ final class QuoteStore: ObservableObject {
     }
 
     /// 美股不在常规交易时取自选里美股个股的盘前盘后价，每只一个请求：盘前盘后至少隔 15 秒取一次，
-    /// 休市时价格不会再变，半小时一次；自选里多了美股个股时马上取。常规交易时段里清空，也不去取。
+    /// 美股多时按每只 2 秒放慢；休市时价格不会再变，半小时一次；自选里多了美股个股时马上取。
+    /// 常规交易时段里、设置里关掉时清空，也不去取。
     private func refreshExtendedHoursIfNeeded() async {
         let symbols = items.map(\.symbol).filter { $0.market.region == .us && !$0.isIndex }
         let usPhase = self.phase(for: .us)
-        guard !symbols.isEmpty, usPhase != .trading, usPhase != .lunchBreak else {
+        guard settings.showExtendedHours, !symbols.isEmpty, usPhase != .trading, usPhase != .lunchBreak else {
             if !extendedHours.isEmpty { extendedHours = [:] }
             extendedHoursFetched = (.distantPast, [])
             return
         }
         let wanted = Set(symbols)
-        let interval: TimeInterval = usPhase.isLive ? max(settings.refreshInterval, 15) : 1800
+        let interval: TimeInterval = usPhase.isLive ? max(settings.refreshInterval, 15, Double(symbols.count) * 2) : 1800
         guard !wanted.isSubset(of: extendedHoursFetched.symbols)
             || Date().timeIntervalSince(extendedHoursFetched.date) >= interval
         else { return }
@@ -205,9 +204,9 @@ final class QuoteStore: ObservableObject {
             for await result in group { all.append(result) }
             return all
         }
-        // 取的时候进了常规交易，就不要这次的结果了。
+        // 取的时候进了常规交易或者关掉了，就不要这次的结果了。
         let phaseNow = self.phase(for: .us)
-        guard phaseNow != .trading, phaseNow != .lunchBreak else { return }
+        guard settings.showExtendedHours, phaseNow != .trading, phaseNow != .lunchBreak else { return }
         let current = Set(items.map(\.symbol))
         var updated = extendedHours.filter { current.contains($0.key) }
         for (symbol, value, ok) in results where ok && current.contains(symbol) {
@@ -244,8 +243,9 @@ final class QuoteStore: ObservableObject {
         let key = KlineKey(symbol: symbol, period: period)
         while !Task.isCancelled {
             do {
+                // 比图上显示的多要一些，均线从图的最左边就有。
                 let series = try await provider.fetchKline(
-                    for: symbol, period: period, count: Self.klineCount, exchangeCode: quotes[symbol]?.exchangeCode
+                    for: symbol, period: period, count: KlineChartData.fetchCount, exchangeCode: quotes[symbol]?.exchangeCode
                 )
                 if let series, !Task.isCancelled {
                     klines[key] = series

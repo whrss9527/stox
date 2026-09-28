@@ -216,3 +216,60 @@ final class ChartLayoutTests: XCTestCase {
         XCTAssertNil(IntradaySeries(symbol: Symbol("sh600519")!, date: nil, points: []).point(nearest: 10, region: .cn))
     }
 }
+
+final class MovingAverageTests: XCTestCase {
+    /// 收盘价依次是 closes 的日 K，开盘比收盘低 1，最高高 2，最低低 3。
+    private func series(closes: [Double]) -> KlineSeries {
+        let candles = closes.enumerated().map { index, close in
+            Candle(date: String(format: "2026-%02d-%02d", 1 + index / 28, 1 + index % 28),
+                   open: close - 1, close: close, high: close + 2, low: close - 3)
+        }
+        return KlineSeries(symbol: Symbol("sh600519")!, period: .day, candles: candles)
+    }
+
+    func testAveragesCoverTheVisibleCandles() throws {
+        // 80 根，收盘价 1、2、…、80：显示最后 60 根（21…80），三条均线在第一根就都有值。
+        let data = KlineChartData(series: series(closes: (1...80).map(Double.init)))
+        XCTAssertEqual(KlineChartData.fetchCount, 80)
+        XCTAssertEqual(data.period, .day)
+        XCTAssertEqual(data.candles.count, 60)
+        XCTAssertEqual(data.candles.first?.close, 21)
+        XCTAssertEqual(data.averages.count, 3)
+        XCTAssertEqual(data.averages[0].first ?? nil, 19, "17 到 21 的平均")
+        XCTAssertEqual(data.averages[1].first ?? nil, 16.5, "12 到 21 的平均")
+        XCTAssertEqual(data.averages[2].first ?? nil, 11.5, "2 到 21 的平均")
+        XCTAssertEqual(data.averages[0].last ?? nil, 78)
+        XCTAssertTrue(data.averages.allSatisfy { $0.count == 60 && !$0.contains(where: { $0 == nil }) })
+        XCTAssertEqual(data.changes.count, 60)
+        XCTAssertEqual(try XCTUnwrap(data.changes.first ?? nil), 5, accuracy: 1e-9, "第一根的前一根来自多取的历史：20 到 21")
+        XCTAssertEqual(try XCTUnwrap(data.totalChangePercent), 300, accuracy: 1e-9, "第一根开盘 20，最后收盘 80")
+    }
+
+    func testShortHistory() {
+        // 新股只有 12 根：全都显示，MA5 从第 5 根开始有，MA20 一直没有。
+        let data = KlineChartData(series: series(closes: (1...12).map(Double.init)))
+        XCTAssertEqual(data.candles.count, 12)
+        XCTAssertNil(data.changes[0])
+        XCTAssertTrue(data.averages[0].prefix(4).allSatisfy { $0 == nil })
+        XCTAssertEqual(data.averages[0][4], 3)
+        XCTAssertTrue(data.averages[2].allSatisfy { $0 == nil })
+
+        let empty = KlineChartData(series: series(closes: []))
+        XCTAssertTrue(empty.candles.isEmpty)
+        XCTAssertEqual(empty.averages.map(\.count), [0, 0, 0])
+        XCTAssertNil(empty.priceRange(includingAverages: true))
+        XCTAssertNil(empty.totalChangePercent)
+    }
+
+    func testRangeIncludesAverages() throws {
+        // 前 20 根在 100，后 60 根跌到 10：MA20 开头还在高处，画均线时纵轴要容下它。
+        let closes = Array(repeating: 100.0, count: 20) + Array(repeating: 10.0, count: 60)
+        let data = KlineChartData(series: series(closes: closes))
+        let candlesOnly = try XCTUnwrap(data.priceRange(includingAverages: false))
+        XCTAssertEqual(candlesOnly.low, 7)
+        XCTAssertEqual(candlesOnly.high, 12)
+        let withAverages = try XCTUnwrap(data.priceRange(includingAverages: true))
+        XCTAssertEqual(withAverages.low, 7)
+        XCTAssertEqual(withAverages.high, (19 * 100 + 10) / 20, accuracy: 1e-9)
+    }
+}

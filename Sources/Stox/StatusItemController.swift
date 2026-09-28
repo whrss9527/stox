@@ -480,7 +480,11 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG \(extendedHoursDiagnostics)")
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
         print("STOX_DIAG filter=\(filter.rawValue) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count)")
-        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
+        // 展开的那只在 K 线图上有几根有 MA20。
+        let ma20 = router.expanded
+            .flatMap { symbol in settings.chartPeriod.klinePeriod.flatMap { store.klines[KlineKey(symbol: symbol, period: $0)] } }
+            .map { KlineChartData(series: $0).averages.last?.compactMap { $0 }.count ?? 0 } ?? 0
+        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) ma20=\(ma20) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }
 

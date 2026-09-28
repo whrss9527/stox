@@ -314,8 +314,14 @@ struct DisplayPage: View {
                         .disabled(settings.hideTicker)
                     Toggle("在菜单栏显示今日盈亏", isOn: $settings.showDayProfit)
                         .disabled(settings.hideTicker)
-                    Toggle("价格变动时在面板里闪一下", isOn: $settings.flashOnChange)
                     FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。轮流显示时每 5 秒换一只，适合刘海屏。今日盈亏只算填了持仓的证券，几种货币都有时按汇率折成人民币显示一个数，不参与轮流。")
+                }
+                Section("行情面板") {
+                    Toggle("价格变动时闪一下", isOn: $settings.flashOnChange)
+                    Toggle("K 线上画均线", isOn: $settings.showMovingAverages)
+                    FormNote("日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。")
+                    Toggle("美股盘前盘后价", isOn: $settings.showExtendedHours)
+                    FormNote("美股个股不在常规交易时段时，代码旁边显示盘前或盘后的最新价相对收盘的涨跌，详情里有价格和成交时间。每只美股个股要多发一个请求。")
                 }
                 Section("涨跌颜色") {
                     Picker("涨跌颜色", selection: $settings.colorConvention) {

@@ -4,7 +4,7 @@ import StoxCore
 /// 展开后的分时图：当天的价格走势，虚线是昨收。横轴按交易时段排，午休不占位置，
 /// 所以上午收盘和下午开盘接在一起，还没到的时间留空。鼠标指着的点画一条竖线和一个圆点。
 struct IntradayChart: View {
-    static let height: CGFloat = 44
+    static let height: CGFloat = 56
 
     let series: IntradaySeries?
     let previousClose: Double

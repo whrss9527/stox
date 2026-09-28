@@ -211,6 +211,14 @@ final class SettingsStore: ObservableObject {
     @Published var flashOnChange: Bool {
         didSet { defaults.set(flashOnChange, forKey: Keys.flashOnChange) }
     }
+    /// K 线上画 5、10、20 根的收盘价均线。
+    @Published var showMovingAverages: Bool {
+        didSet { defaults.set(showMovingAverages, forKey: Keys.showMovingAverages) }
+    }
+    /// 美股个股不在常规交易时段时显示盘前盘后价。
+    @Published var showExtendedHours: Bool {
+        didSet { defaults.set(showExtendedHours, forKey: Keys.showExtendedHours) }
+    }
     /// 菜单栏里显示今日盈亏（按货币分别显示，只算填了持仓的）。
     @Published var showDayProfit: Bool {
         didSet { defaults.set(showDayProfit, forKey: Keys.showDayProfit) }
@@ -272,6 +280,8 @@ final class SettingsStore: ObservableObject {
         listFilter = defaults.string(forKey: Keys.listFilter).flatMap(WatchlistFilter.init(rawValue:)) ?? .all
         changeDisplay = defaults.string(forKey: Keys.changeDisplay).flatMap(ChangeDisplay.init(rawValue:)) ?? .percent
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
+        showMovingAverages = defaults.object(forKey: Keys.showMovingAverages) as? Bool ?? true
+        showExtendedHours = defaults.object(forKey: Keys.showExtendedHours) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
         chartPeriod = defaults.string(forKey: Keys.chartPeriod).flatMap(ChartPeriod.init(rawValue:)) ?? .intraday
@@ -342,6 +352,8 @@ final class SettingsStore: ObservableObject {
         static let listFilter = "list.filter"
         static let changeDisplay = "list.pill"
         static let flashOnChange = "list.flash"
+        static let showMovingAverages = "chart.movingAverages"
+        static let showExtendedHours = "list.extendedHours"
         static let showDayProfit = "ticker.dayProfit"
         static let panelPinned = "panel.pinned"
         static let pinnedX = "panel.pinnedX"
