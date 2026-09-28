@@ -84,6 +84,11 @@ public enum Watchlist {
         item("usAAPL", "苹果"),
     ]
 
+    /// 常用指数：默认自选里的几个指数，自选删空以后一键加回来。
+    public static var commonIndices: [WatchItem] {
+        defaults.filter { $0.symbol.isIndex }
+    }
+
     private static func item(_ raw: String, _ name: String, alias: String? = nil, pinned: Bool = false) -> WatchItem {
         WatchItem(symbol: Symbol(raw)!, name: name, alias: alias, pinned: pinned)
     }

@@ -469,6 +469,8 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
+        let extended = store.quotes.values.filter { $0.extendedPrice != nil }.count
+        print("STOX_DIAG us_phase=\(store.phase(for: .us)) extended=\(extended)")
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
         print("STOX_DIAG filter=\(filter.rawValue) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count)")
         print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")

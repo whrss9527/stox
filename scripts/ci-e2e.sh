@@ -198,7 +198,15 @@ smoke() {
   run_case settings-dark --show-settings display
   defaults delete "$DOMAIN" appearance
   grep -q "panel_frame=" shots/panel-dark.log || fail "深色模式下面板没有打开"
+
+  # 自选删空了：空列表里有“添加常用指数”。
+  write_watchlist '[]'
+  run_case empty --show-panel
+  grep -q "items=0 " shots/empty.log || fail "自选应该是空的"
   defaults delete "$DOMAIN" watchlist.v1
+
+  # 美股盘前盘后价：什么时候跑都能检查一致，交易中不显示，其他时候显示（有数据时）。
+  grep -q "us_phase=" shots/panel.log || fail "没有打印美股的时段"
 }
 
 sync_test() {

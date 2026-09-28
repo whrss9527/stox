@@ -202,9 +202,14 @@ struct WatchlistView: View {
                     Text("还没有自选，在上面的搜索框里添加")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                    Button("添加常用指数") {
+                        store.add(Watchlist.commonIndices)
+                    }
+                    .controlSize(.small)
+                    .help(Watchlist.commonIndices.map(\.name).joined(separator: "、"))
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 140)
+                .frame(height: 160)
             } else {
                 let filters = WatchlistFilter.available(for: store.items)
                 let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)

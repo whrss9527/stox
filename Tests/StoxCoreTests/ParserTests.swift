@@ -183,3 +183,26 @@ final class TencentSearchParserTests: XCTestCase {
         )
     }
 }
+
+final class ExtendedHoursTests: XCTestCase {
+    func testUSStocksCarryTheExtendedPrice() throws {
+        let quotes = TencentQuoteParser.parse(Fixtures.unitedStates)
+        // 抓取时是周一凌晨（美东），第 67 位是上周五的盘后价。
+        let apple = try XCTUnwrap(quotes[Symbol("usAAPL")!])
+        XCTAssertEqual(apple.extendedPrice, 339.28)
+        let change = try XCTUnwrap(apple.extendedChange)
+        XCTAssertEqual(change.change, 339.28 - 341.07, accuracy: 1e-9)
+        XCTAssertEqual(change.percent, (339.28 - 341.07) / 341.07 * 100, accuracy: 1e-9)
+        XCTAssertEqual(quotes[Symbol("usBRK.B")!]?.extendedPrice, 504.77)
+        XCTAssertNil(quotes[Symbol("us.IXIC")!]?.extendedPrice, "指数没有盘前盘后")
+        XCTAssertNil(TencentQuoteParser.parse(Fixtures.aShares)[Symbol("sh600519")!]?.extendedPrice, "A 股的第 67 位是 52 周最高")
+    }
+
+    func testLabels() {
+        XCTAssertEqual(MarketPhase.preMarket.extendedLabel, "盘前")
+        XCTAssertEqual(MarketPhase.afterHours.extendedLabel, "盘后")
+        XCTAssertEqual(MarketPhase.closed.extendedLabel, "盘后")
+        XCTAssertNil(MarketPhase.trading.extendedLabel)
+        XCTAssertNil(Quote(symbol: Symbol("usAAPL")!, name: "", price: 0, previousClose: 1, extendedPrice: 2).extendedChange)
+    }
+}

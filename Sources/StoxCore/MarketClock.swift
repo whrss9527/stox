@@ -13,6 +13,15 @@ public enum MarketPhase: Sendable, Equatable {
         }
     }
 
+    /// 美股盘前盘后价的标签：盘前时是“盘前”；收盘以后（含夜里和周末）显示最近的盘后价；交易中不显示。
+    public var extendedLabel: String? {
+        switch self {
+        case .preMarket: return "盘前"
+        case .afterHours, .closed: return "盘后"
+        case .trading, .lunchBreak: return nil
+        }
+    }
+
     /// 价格还可能变动的时段，按设置的间隔刷新。
     public var isLive: Bool {
         switch self {

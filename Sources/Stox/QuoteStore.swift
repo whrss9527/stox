@@ -255,6 +255,15 @@ final class QuoteStore: ObservableObject {
         restart()
     }
 
+    /// 一次加几只已知的（比如常用指数），已经在自选里的跳过。
+    func add(_ newItems: [WatchItem]) {
+        let fresh = newItems.filter { !contains($0.symbol) }
+        guard !fresh.isEmpty else { return }
+        items.append(contentsOf: fresh)
+        save()
+        restart()
+    }
+
     /// 批量添加：先查一次行情，只添加查得到的代码，名称也一并取回。返回查不到（不存在）的代码。
     func addMany(_ symbols: [Symbol]) async throws -> [Symbol] {
         let wanted = symbols.filter { !contains($0) }
