@@ -6,6 +6,11 @@ on:
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "发布版本号，例如 v0.1.0。留空则只构建不发布"
+        required: false
+        default: ""
 
 concurrency:
   group: build-${{ github.ref }}
@@ -46,7 +51,18 @@ jobs:
       - name: Unit tests
         run: swift test
       - name: Build Stox.app (universal)
-        run: UNIVERSAL=1 ./scripts/build-app.sh
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          # 手动发布时用输入的版本号；推送 v* 标签时由脚本从标签读取。
+          if [ -n "$RELEASE_TAG" ]; then
+            if ! [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "::error::版本号格式应为 v主版本.次版本.修订号，例如 v0.1.0"
+              exit 1
+            fi
+            export VERSION="${RELEASE_TAG#v}"
+          fi
+          UNIVERSAL=1 ./scripts/build-app.sh
       - name: Inspect bundle
         run: |
           plutil -p dist/Stox.app/Contents/Info.plist
@@ -134,12 +150,19 @@ jobs:
           name: Stox-app
           path: dist/Stox.zip
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
+        # 两种发布方式：推送 v* 标签；或在 Actions 页面手动运行 build 并填写版本号，
+        # 这时由 CI 在当前提交上创建标签。已存在同名 release 时只上传或替换安装包。
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         env:
           GH_TOKEN: ${{ github.token }}
-        # 安装说明放在前面，后面接 GitHub 自动生成的变更列表。
+          TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/Stox.zip \
-            --title "Stox $GITHUB_REF_NAME" \
-            --notes-file .github/release-notes.md \
-            --generate-notes
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/Stox.zip --clobber
+          else
+            gh release create "$TAG" dist/Stox.zip \
+              --target "$GITHUB_SHA" \
+              --title "Stox $TAG" \
+              --notes-file .github/release-notes.md \
+              --generate-notes
+          fi
