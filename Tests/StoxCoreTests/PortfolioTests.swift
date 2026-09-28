@@ -122,3 +122,36 @@ final class WatchlistSortTests: XCTestCase {
                        ["usAAPL", "sh600519", "sz000001", "hk00700", "hkHSI"])
     }
 }
+
+final class MenuBarProfitTests: XCTestCase {
+    func testDayProfitParts() {
+        let summaries = [
+            PortfolioSummary(region: .cn, marketValue: 147_000, costValue: 145_000, dayProfit: 688, count: 2),
+            PortfolioSummary(region: .hk, marketValue: 87_960, costValue: 76_000, dayProfit: -12_345.6, count: 1),
+            PortfolioSummary(region: .us, marketValue: 3_404, costValue: 3_000, dayProfit: 0.001, count: 1),
+        ]
+        let parts = MenuBarTicker.dayProfitParts(summaries)
+        XCTAssertEqual(parts.map(\.text), ["今日", "+¥688", "-HK$1.23万", "$0.00"])
+        XCTAssertEqual(parts.map(\.direction), [.flat, .up, .down, .flat], "颜色和正负号一致，不到一分钱的算平")
+        XCTAssertEqual(parts.first?.role, .name)
+        XCTAssertTrue(MenuBarTicker.dayProfitParts([]).isEmpty)
+    }
+
+    func testCompactMoney() {
+        XCTAssertEqual(QuoteFormatter.compactMoney(12.9), "12.90")
+        XCTAssertEqual(QuoteFormatter.compactMoney(688.4), "688")
+        XCTAssertEqual(QuoteFormatter.compactMoney(11_960), "1.20万")
+        XCTAssertEqual(QuoteFormatter.compactMoney(250_000_000), "2.50亿")
+    }
+
+    func testNoteIsSavedAndEmptyNotesAreDropped() throws {
+        let item = WatchItem(symbol: Symbol("sh600519")!, name: "贵州茅台", note: "等回调到 1200 再加仓")
+        let data = try XCTUnwrap(Watchlist.encode([item]))
+        XCTAssertEqual(Watchlist.decode(data), [item])
+        let json = #"[{"symbol":"hk00700","note":""},{"symbol":"usAAPL","note":42}]"#
+        let decoded = try XCTUnwrap(Watchlist.decode(Data(json.utf8)))
+        XCTAssertEqual(decoded.map(\.symbol.rawValue), ["hk00700", "usAAPL"])
+        XCTAssertNil(decoded[0].note)
+        XCTAssertNil(decoded[1].note, "备注读不懂时只丢掉备注")
+    }
+}

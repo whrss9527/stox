@@ -128,6 +128,30 @@ final class SettingsStore: ObservableObject {
     @Published var flashOnChange: Bool {
         didSet { defaults.set(flashOnChange, forKey: Keys.flashOnChange) }
     }
+    /// 菜单栏里显示今日盈亏（按货币分别显示，只算填了持仓的）。
+    @Published var showDayProfit: Bool {
+        didSet { defaults.set(showDayProfit, forKey: Keys.showDayProfit) }
+    }
+    /// 面板钉住：点别处时不关闭，可以拖到任何位置。
+    @Published var panelPinned: Bool {
+        didSet { defaults.set(panelPinned, forKey: Keys.panelPinned) }
+    }
+    /// 钉住时面板左上角的位置（屏幕坐标），下次打开放回这里。
+    var pinnedTopLeft: CGPoint? {
+        get {
+            guard defaults.object(forKey: Keys.pinnedX) != nil, defaults.object(forKey: Keys.pinnedY) != nil else { return nil }
+            return CGPoint(x: defaults.double(forKey: Keys.pinnedX), y: defaults.double(forKey: Keys.pinnedY))
+        }
+        set {
+            if let newValue {
+                defaults.set(Double(newValue.x), forKey: Keys.pinnedX)
+                defaults.set(Double(newValue.y), forKey: Keys.pinnedY)
+            } else {
+                defaults.removeObject(forKey: Keys.pinnedX)
+                defaults.removeObject(forKey: Keys.pinnedY)
+            }
+        }
+    }
     /// 第一次打开面板时的使用提示，看过就不再显示。
     @Published var tipsDismissed: Bool {
         didSet { defaults.set(tipsDismissed, forKey: Keys.tipsDismissed) }
@@ -157,6 +181,8 @@ final class SettingsStore: ObservableObject {
         appearance = defaults.string(forKey: Keys.appearance).flatMap(AppearanceMode.init(rawValue:)) ?? .system
         sortMode = defaults.string(forKey: Keys.sortMode).flatMap(WatchlistSort.init(rawValue:)) ?? .custom
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
+        showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
+        panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
         tipsDismissed = defaults.object(forKey: Keys.tipsDismissed) as? Bool ?? false
         whatsNewVersion = defaults.string(forKey: Keys.whatsNewVersion)
     }
@@ -220,6 +246,10 @@ final class SettingsStore: ObservableObject {
         static let appearance = "appearance"
         static let sortMode = "list.sort"
         static let flashOnChange = "list.flash"
+        static let showDayProfit = "ticker.dayProfit"
+        static let panelPinned = "panel.pinned"
+        static let pinnedX = "panel.pinnedX"
+        static let pinnedY = "panel.pinnedY"
         static let tipsDismissed = "tips.dismissed"
         static let whatsNewVersion = "update.whatsNew"
         static let lastRunVersion = "app.lastVersion"

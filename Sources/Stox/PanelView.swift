@@ -113,6 +113,13 @@ struct PanelHeader: View {
                     .help("刷新失败：\(error)")
             }
             Button {
+                settings.panelPinned.toggle()
+            } label: {
+                Image(systemName: settings.panelPinned ? "pin.fill" : "pin")
+            }
+            .buttonStyle(IconButtonStyle())
+            .help(settings.panelPinned ? "取消钉住：点别处时自动关闭" : "钉住：点别处时不关闭，可以拖到任何位置")
+            Button {
                 store.restart()
             } label: {
                 Image(systemName: "arrow.clockwise")
@@ -410,6 +417,7 @@ struct TipsCards: View {
                 tip("\(settings.toggleHotkey.display) 在任何 App 里打开或关闭这个面板")
                 tip("右键单击一只可以固定到菜单栏，或者填持仓和价格提醒")
                 tip("一次粘贴多个代码，回车全部添加")
+                tip("点右上角的图钉，面板就一直显示，可以拖到任何位置")
             }
             .padding(10)
             .glassCard()

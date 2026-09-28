@@ -12,10 +12,12 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
     public var alert: PriceAlert
     /// 持仓；没有填写时为 nil。
     public var holding: Holding?
+    /// 备注，比如关注的理由；没有填写时为 nil。
+    public var note: String?
 
     public init(
         symbol: Symbol, name: String = "", alias: String? = nil, pinned: Bool = false,
-        alert: PriceAlert = PriceAlert(), holding: Holding? = nil
+        alert: PriceAlert = PriceAlert(), holding: Holding? = nil, note: String? = nil
     ) {
         self.symbol = symbol
         self.name = name
@@ -23,6 +25,7 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
         self.pinned = pinned
         self.alert = alert
         self.holding = holding
+        self.note = note
     }
 
     public var id: String { symbol.rawValue }
@@ -41,7 +44,7 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
 // 手写 Codable：新增字段时旧数据也能正常读出。
 extension WatchItem: Codable {
     enum CodingKeys: String, CodingKey {
-        case symbol, name, alias, pinned, alert, holding
+        case symbol, name, alias, pinned, alert, holding, note
     }
 
     public init(from decoder: Decoder) throws {
@@ -53,6 +56,7 @@ extension WatchItem: Codable {
         alert = try c.decodeIfPresent(PriceAlert.self, forKey: .alert) ?? PriceAlert()
         // 持仓读不懂时当作没有，不影响这一项的其他内容。
         holding = (try? c.decodeIfPresent(Holding.self, forKey: .holding)).flatMap { $0.isValid ? $0 : nil }
+        note = (try? c.decodeIfPresent(String.self, forKey: .note)).flatMap { $0.isEmpty ? nil : $0 }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -63,6 +67,7 @@ extension WatchItem: Codable {
         try c.encode(pinned, forKey: .pinned)
         try c.encode(alert, forKey: .alert)
         try c.encodeIfPresent(holding, forKey: .holding)
+        try c.encodeIfPresent(note, forKey: .note)
     }
 }
 
@@ -139,6 +144,21 @@ public struct TickerOptions: Sendable, Equatable {
 }
 
 public enum MenuBarTicker {
+    /// 菜单栏上的今日盈亏，例如“今日 +¥688 -HK$120”，每种货币一段。没有持仓时返回空数组。
+    public static func dayProfitParts(_ summaries: [PortfolioSummary]) -> [TickerPart] {
+        guard !summaries.isEmpty else { return [] }
+        var parts = [TickerPart(role: .name, text: "今日", direction: .flat)]
+        for summary in summaries {
+            let value = summary.dayProfit
+            // 颜色和正负号一致：不到一分钱的算平。
+            let direction: PriceDirection = value >= 0.005 ? .up : (value <= -0.005 ? .down : .flat)
+            let sign = direction == .up ? "+" : (direction == .down ? "-" : "")
+            let text = sign + summary.region.currencySymbol + QuoteFormatter.compactMoney(abs(value))
+            parts.append(TickerPart(role: .percent, text: text, direction: direction))
+        }
+        return parts
+    }
+
     /// 每只“显示在菜单栏”的证券对应一组文字片段；没有固定项或全部选项关闭时返回空数组。
     public static func entries(items: [WatchItem], quotes: [Symbol: Quote], options: TickerOptions) -> [[TickerPart]] {
         guard !options.isEmpty else { return [] }
