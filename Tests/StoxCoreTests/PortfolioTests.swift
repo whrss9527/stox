@@ -121,6 +121,20 @@ final class WatchlistSortTests: XCTestCase {
         XCTAssertEqual(WatchlistSort.losers.apply(items, quotes: quotes).map(\.symbol.rawValue),
                        ["usAAPL", "sh600519", "sz000001", "hk00700", "hkHSI"])
     }
+
+    func testSortsByHoldingProfit() {
+        let symbols = ["sh600519", "hk00700", "usAAPL", "sz000001"].map { Symbol($0)! }
+        var items = symbols.map { WatchItem(symbol: $0) }
+        items[0].holding = Holding(shares: 100, cost: 1200)   // +3.66%
+        items[1].holding = Holding(shares: 200, cost: 380)    // +15.74%
+        items[3].holding = Holding(shares: 2000, cost: 12.5)  // -9.60%
+        let prices = [1243.88, 439.8, 340.1, 11.3]
+        let quotes = Dictionary(uniqueKeysWithValues: zip(symbols, prices).map { symbol, price in
+            (symbol, Quote(symbol: symbol, name: "", price: price, previousClose: price))
+        })
+        XCTAssertEqual(WatchlistSort.holdingProfit.apply(items, quotes: quotes).map(\.symbol.rawValue),
+                       ["hk00700", "sh600519", "sz000001", "usAAPL"], "没有持仓的排在最后")
+    }
 }
 
 final class MenuBarProfitTests: XCTestCase {

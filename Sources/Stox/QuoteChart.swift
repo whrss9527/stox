@@ -42,6 +42,9 @@ struct QuoteChartSection: View {
                     }
                 }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("\(settings.chartPeriod.title)走势")
+        .accessibilityValue(summary ?? "")
         .task(id: TrackID(symbol: item.symbol, period: settings.chartPeriod)) {
             switch settings.chartPeriod {
             case .intraday:

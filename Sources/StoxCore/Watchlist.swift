@@ -205,14 +205,28 @@ public enum QuoteLinks {
 
 /// 自选列表的显示顺序。自定义顺序可以拖动；按涨跌幅排序时没有行情的排在最后，涨跌幅相同的保持原来的顺序。
 public enum WatchlistSort: String, CaseIterable, Sendable {
-    case custom, gainers, losers
+    case custom, gainers, losers, holdingProfit
+
+    /// 排序用的数：涨跌幅，或者持仓盈亏比例。没有的（没有行情、没有持仓）排在最后，保持原来的顺序。
+    func key(_ item: WatchItem, quotes: [Symbol: Quote]) -> Double? {
+        switch self {
+        case .custom:
+            return nil
+        case .gainers, .losers:
+            return quotes[item.symbol]?.changePercent
+        case .holdingProfit:
+            guard let holding = item.holding, let quote = quotes[item.symbol] else { return nil }
+            return Portfolio.position(holding, quote: quote)?.totalProfitPercent
+        }
+    }
 
     public func apply(_ items: [WatchItem], quotes: [Symbol: Quote]) -> [WatchItem] {
         guard self != .custom else { return items }
+        let descending = self != .losers
         return items.enumerated().sorted { a, b in
-            switch (quotes[a.element.symbol]?.changePercent, quotes[b.element.symbol]?.changePercent) {
+            switch (key(a.element, quotes: quotes), key(b.element, quotes: quotes)) {
             case let (x?, y?) where x != y:
-                return self == .gainers ? x > y : x < y
+                return descending ? x > y : x < y
             case (nil, _?):
                 return false
             case (_?, nil):

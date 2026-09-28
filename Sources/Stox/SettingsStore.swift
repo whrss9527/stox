@@ -29,6 +29,7 @@ extension WatchlistSort {
         case .custom: return "自定义顺序"
         case .gainers: return "涨幅从高到低"
         case .losers: return "跌幅从高到低"
+        case .holdingProfit: return "持仓盈亏从高到低"
         }
     }
 }

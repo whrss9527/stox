@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
 # 探测行情数据源是否可用，并打印解码后的原始返回，方便排查接口格式变化。
 # 用法: ./scripts/check-datasources.sh
+#       ONLY='US|pandata' ./scripts/check-datasources.sh   只跑标题里匹配这个正则的几项
 set -uo pipefail
+
+ONLY="${ONLY:-}"
+# 设置了 ONLY 时跳过标题不匹配的探测。
+wanted() {
+  [[ -z "$ONLY" || "$1" =~ $ONLY ]]
+}
 
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
 fetch() {
   local title="$1" url="$2" enc="${3:-GB18030}" referer="${4:-}"
+  wanted "$title" || return 0
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
@@ -38,6 +46,7 @@ done
 # 分时数据（面板里的分时图用）：返回很长，只打印条数、日期和首尾几条。
 minute() {
   local title="$1" url="$2"
+  wanted "$title" || return 0
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
@@ -75,6 +84,7 @@ done
 # 美股盘前盘后：逐个字段打印美股行情，找盘前盘后价格在哪几位；再看 K 线接口里的 pandata。
 fields() {
   local title="$1" url="$2"
+  wanted "$title" || return 0
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
@@ -99,6 +109,7 @@ fetch "tencent smartbox: usdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=
 fetch "tencent smartbox: hkdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=hkdcny" "UTF-8"
 pandata() {
   local title="$1" url="$2"
+  wanted "$title" || return 0
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
@@ -132,6 +143,7 @@ fetch "sina fx (fallback candidate)" "https://hq.sinajs.cn/list=fx_susdcny,fx_sh
 # 五日分时：打印返回的结构（各层的键、列表长度），找每天的分时在哪里。
 shape() {
   local title="$1" url="$2"
+  wanted "$title" || return 0
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
@@ -174,6 +186,7 @@ fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030
 # K 线（面板里的日 K、周 K、月 K 用）：只打印每个序列的条数和首尾几条，并检查字段顺序。
 kline() {
   local title="$1" url="$2"
+  wanted "$title" || return 0
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
