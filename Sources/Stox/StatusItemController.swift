@@ -344,13 +344,35 @@ final class StatusItemController: NSObject {
 
     // MARK: - 菜单栏文字
 
+    /// 菜单栏上显示的行情涉及的市场：固定到菜单栏的证券，以及显示今日盈亏时有持仓的市场。
+    private var tickerRegions: Set<MarketRegion> {
+        var regions = Set(store.items.filter(\.pinned).map { $0.symbol.market.region })
+        if settings.showDayProfit {
+            regions.formUnion(store.items.filter { $0.holding != nil }.map { $0.symbol.market.region })
+        }
+        return regions
+    }
+
+    /// 这些市场里有没有正在交易（含盘前盘后）的。
+    private var tickerMarketsLive: Bool {
+        tickerRegions.contains { store.phase(for: $0).isLive }
+    }
+
+    /// 只显示图标：手动隐藏了，或者选了“休市时只显示图标”并且菜单栏上的市场都休市了。
+    private var tickerHidden: Bool {
+        if settings.hideTicker { return true }
+        guard settings.hideTickerWhenClosed, !tickerRegions.isEmpty else { return false }
+        return !tickerMarketsLive
+    }
+
     private func updateButton() {
         guard let button = statusItem.button else { return }
-        let entries = settings.hideTicker
+        let hidden = tickerHidden
+        let entries = hidden
             ? []
             : MenuBarTicker.entries(items: store.items, quotes: store.quotes, options: settings.tickerOptions)
         // 今日盈亏总是跟在最后，轮流显示时也不参与轮换。
-        let profit = settings.hideTicker || !settings.showDayProfit
+        let profit = hidden || !settings.showDayProfit
             ? []
             : MenuBarTicker.dayProfitParts(Portfolio.summaries(items: store.items, quotes: store.quotes), rates: store.rates)
 
@@ -394,7 +416,7 @@ final class StatusItemController: NSObject {
     }
 
     private func updateRotationTimer() {
-        let shouldRotate = settings.rotateTicker && !settings.hideTicker && store.items.filter(\.pinned).count > 1
+        let shouldRotate = settings.rotateTicker && !tickerHidden && store.items.filter(\.pinned).count > 1
         if shouldRotate, rotationTimer == nil {
             rotationTimer = Timer.scheduledTimer(
                 timeInterval: 5, target: self, selector: #selector(rotateTicker), userInfo: nil, repeats: true
@@ -426,6 +448,7 @@ final class StatusItemController: NSObject {
         }
         let title = statusItem.button?.attributedTitle.string ?? ""
         print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil) color=\(settings.colorConvention.rawValue) pinned=\(settings.panelPinned)")
+        print("STOX_DIAG ticker_hidden=\(tickerHidden) ticker_live=\(tickerMarketsLive) when_closed=\(settings.hideTickerWhenClosed)")
         let statusFrame = statusItem.button?.window?.frame
         if let statusFrame {
             print("STOX_DIAG status_frame=\(topLeft(statusFrame))")

@@ -168,6 +168,10 @@ final class SettingsStore: ObservableObject {
     @Published var hideTicker: Bool {
         didSet { defaults.set(hideTicker, forKey: Keys.hideTicker) }
     }
+    /// 菜单栏上的市场都休市时只显示图标，开盘后自动恢复。
+    @Published var hideTickerWhenClosed: Bool {
+        didSet { defaults.set(hideTickerWhenClosed, forKey: Keys.hideTickerWhenClosed) }
+    }
     @Published var hotKeyEnabled: Bool {
         didSet { defaults.set(hotKeyEnabled, forKey: Keys.hotKeyEnabled) }
     }
@@ -256,6 +260,7 @@ final class SettingsStore: ObservableObject {
         alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
         closeSummary = defaults.object(forKey: Keys.closeSummary) as? Bool ?? false
         hideTicker = defaults.object(forKey: Keys.hideTicker) as? Bool ?? false
+        hideTickerWhenClosed = defaults.object(forKey: Keys.hideTickerWhenClosed) as? Bool ?? false
         hotKeyEnabled = defaults.object(forKey: Keys.hotKeyEnabled) as? Bool ?? true
         toggleHotkey = defaults.data(forKey: Keys.toggleHotkey)
             .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) } ?? .defaultToggle
@@ -324,6 +329,7 @@ final class SettingsStore: ObservableObject {
         static let showPercent = "ticker.showPercent"
         static let rotateTicker = "ticker.rotate"
         static let hideTicker = "ticker.hidden"
+        static let hideTickerWhenClosed = "ticker.hideWhenClosed"
         static let hotKeyEnabled = "hotKeyEnabled"
         static let toggleHotkey = "hotkey.toggle"
         static let alertsEnabled = "alertsEnabled"

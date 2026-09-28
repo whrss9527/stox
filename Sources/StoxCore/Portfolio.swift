@@ -121,6 +121,32 @@ extension MarketRegion {
     }
 }
 
+extension Portfolio {
+    /// 持仓表格，制表符分隔，粘贴到 Numbers、Excel 就是一张表。金额不用万、亿，保留两位小数，方便再计算。
+    public static func tableText(items: [WatchItem], quotes: [Symbol: Quote]) -> String {
+        var lines = ["名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏"]
+        for item in items {
+            guard let holding = item.holding, let quote = quotes[item.symbol],
+                  let position = position(holding, quote: quote)
+            else { continue }
+            let name = quote.name.isEmpty ? item.displayName : quote.name
+            lines.append([
+                name,
+                item.symbol.displayCode,
+                item.symbol.market.region.currency,
+                QuoteFormatter.plain(holding.shares),
+                QuoteFormatter.plain(holding.cost),
+                QuoteFormatter.fixed(quote.price, decimals: quote.priceDecimals),
+                QuoteFormatter.fixed(position.marketValue, decimals: 2),
+                QuoteFormatter.fixed(position.totalProfit, decimals: 2),
+                position.totalProfitPercent.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "",
+                QuoteFormatter.fixed(position.dayProfit, decimals: 2),
+            ].joined(separator: "\t"))
+        }
+        return lines.count > 1 ? lines.joined(separator: "\n") : ""
+    }
+}
+
 /// 收盘后发的今日盈亏小结。
 public struct CloseSummaryNote: Equatable, Sendable {
     public var region: MarketRegion
