@@ -113,4 +113,12 @@ swift run stox-cli search 茅台
 swift run stox-cli raw hk00700
 ```
 
+调试界面时，可以让 App 启动后直接打开面板，并在终端打印菜单栏文字和面板位置：
+
+```bash
+dist/Stox.app/Contents/MacOS/Stox --show-panel      # 或 --show-settings
+```
+
+CI 会在 macOS 上启动打包好的 App，确认启动不崩溃，并把面板截图作为构建产物上传。
+
 设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。

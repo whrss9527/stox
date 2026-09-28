@@ -399,8 +399,7 @@ final class PanelRouter: ObservableObject {
         if resultsQuery == query {
             return searchResults.first { !contains($0.symbol) }
         }
-        let isExplicitCode = query.contains(where: \.isNumber) || query.hasPrefix("us") || query.hasPrefix("hk")
-        guard isExplicitCode else { return nil }
+        guard SymbolInput.isExplicitCode(query) else { return nil }
         return directCandidate(for: query).first { !contains($0.symbol) }
     }
 

@@ -42,6 +42,15 @@ final class SymbolTests: XCTestCase {
         XCTAssertEqual(try JSONDecoder().decode([Symbol].self, from: data), [symbol])
     }
 
+    func testExplicitCode() {
+        for input in ["600519", "sh600519", "700", "0700.HK", "usAAPL", "us.IXIC", "hkHSI", "AAPL.US"] {
+            XCTAssertTrue(SymbolInput.isExplicitCode(input), input)
+        }
+        for input in ["gzmt", "aapl", "AAPL", "茅台", "", "1234567", "hk"] {
+            XCTAssertFalse(SymbolInput.isExplicitCode(input), input)
+        }
+    }
+
     func testUserInput() {
         let cases: [(String, String?)] = [
             ("sh600519", "sh600519"),

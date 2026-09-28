@@ -142,6 +142,20 @@ public enum SymbolInput {
         return Symbol(market: .us, code: text)
     }
 
+    /// 输入是否明确是证券代码，而不是名称或拼音缩写：含数字，或带 `us`/`hk` 等市场前缀、`.SH` 等后缀。
+    /// 纯字母（如 `gzmt`、`aapl`）既可能是美股代码也可能是拼音，需要交给搜索判断。
+    public static func isExplicitCode(_ input: String) -> Bool {
+        let text = input.filter { !$0.isWhitespace }
+        guard !text.isEmpty, parse(text) != nil else { return false }
+        if text.contains(where: \.isASCIIDigit) { return true }
+        if text.count > 2, text.hasPrefix("us") || text.hasPrefix("hk") { return true }
+        if let dot = text.lastIndex(of: ".") {
+            let suffix = text[text.index(after: dot)...].uppercased()
+            return ["SH", "SS", "SZ", "BJ", "HK", "US"].contains(suffix)
+        }
+        return false
+    }
+
     /// 按号段推断 6 位代码所属交易所。000001 这类沪深重号的代码按股票处理（深市）。
     static func inferAShareMarket(_ code: String) -> Market {
         if code.hasPrefix("92") || code.hasPrefix("4") || code.hasPrefix("8") { return .bj }
