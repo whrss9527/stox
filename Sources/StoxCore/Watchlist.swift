@@ -127,6 +127,21 @@ public enum Watchlist {
         return items.compactMap(\.group).filter { seen.insert($0).inserted }
     }
 
+    /// 编辑分组：members 里的都放进 name 这个分组（原来在别的分组里的也移过来，每只只能在一个分组里）；
+    /// 原来在 old 这个分组、这次没勾上的移出分组。改名时 old 是原来的名字。name 为空时相当于解散 old。
+    public static func settingGroup(_ name: String, members: Set<Symbol>, replacing old: String?, in items: [WatchItem]) -> [WatchItem] {
+        let group = WatchItem.normalizedGroup(name)
+        return items.map { item in
+            var updated = item
+            if group != nil, members.contains(item.symbol) {
+                updated.group = group
+            } else if let old, item.group == old {
+                updated.group = nil
+            }
+            return updated
+        }
+    }
+
     /// 复制出去的代码，用空格分开，粘贴到搜索框就能一次全部加回来（见 SymbolInput.parseList）。
     public static func exportText(_ items: [WatchItem]) -> String {
         items.map(\.symbol.rawValue).joined(separator: " ")

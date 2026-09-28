@@ -312,6 +312,26 @@ final class FilterTests: XCTestCase {
         XCTAssertNil(item.group)
     }
 
+    func testEditingAGroup() {
+        let moutai = Symbol("sh600519")!, tencent = Symbol("hk00700")!, apple = Symbol("usAAPL")!
+        let items = [
+            WatchItem(symbol: moutai, group: "白酒"),
+            WatchItem(symbol: tencent, group: "科技"),
+            WatchItem(symbol: apple),
+        ]
+        // 新建“科技股”：腾讯从“科技”搬过来，苹果加进来。
+        let created = Watchlist.settingGroup(" 科技股 ", members: [tencent, apple], replacing: nil, in: items)
+        XCTAssertEqual(created.map(\.group), ["白酒", "科技股", "科技股"])
+
+        // 把“科技”改名成“互联网”，顺便去掉腾讯、加上茅台。
+        let renamed = Watchlist.settingGroup("互联网", members: [moutai], replacing: "科技", in: items)
+        XCTAssertEqual(renamed.map(\.group), ["互联网", nil, nil])
+
+        // 组名为空相当于解散。
+        let dissolved = Watchlist.settingGroup("  ", members: [tencent], replacing: "科技", in: items)
+        XCTAssertEqual(dissolved.map(\.group), ["白酒", nil, nil])
+    }
+
     func testGroupsSurviveEncoding() throws {
         let item = WatchItem(symbol: Symbol("sh600519")!, name: "贵州茅台", group: "白酒")
         let data = try XCTUnwrap(Watchlist.encode([item]))

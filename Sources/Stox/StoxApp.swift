@@ -129,6 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///   Stox --show-panel [--expand sh600519] [--search 腾讯]   打开面板并打印诊断信息
     ///        [--chart intraday|fiveDay|day|week|month] [--keys down,down,enter]   走势图的周期、依次模拟的按键
     ///        [--edit sh600519]                                  直接打开这只的持仓、提醒与简称页
+    ///        [--group 科技]                                      直接打开这个分组的编辑页
     ///   Stox --show-settings [general|display|sync|about]      打开设置窗口并打印窗口位置
     ///   Stox --check-update                                    先检查一次更新再打开上面两者
     ///   Stox --install-update                                  检查并直接安装新版本
@@ -149,6 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let search = value(after: "--search")
         let chart = value(after: "--chart").flatMap(ChartPeriod.init(rawValue:))
         let edit = value(after: "--edit").flatMap { Symbol($0) }
+        let group = value(after: "--group")
         let keys = (value(after: "--keys") ?? "").split(separator: ",").compactMap { PanelKey(rawValue: String($0)) }
         if let chart {
             settings.chartPeriod = chart
@@ -170,7 +172,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 SettingsWindowController.shared.printDiagnostics()
             } else if showPanel {
                 self.statusController?.openPanel(
-                    route: edit.map { .edit($0) } ?? .list, expand: expand, search: search, keys: keys, printDiagnostics: true
+                    route: edit.map { PanelRoute.edit($0) } ?? group.map { PanelRoute.group($0, member: nil) } ?? .list,
+                    expand: expand, search: search, keys: keys, printDiagnostics: true
                 )
             }
         }

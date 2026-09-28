@@ -257,7 +257,7 @@ struct QuoteRow: View {
                 Divider()
             }
             Button("新建分组…") {
-                router.route = .edit(item.symbol)
+                router.route = .group(nil, member: item.symbol)
             }
             if item.group != nil {
                 Button("移出分组") {

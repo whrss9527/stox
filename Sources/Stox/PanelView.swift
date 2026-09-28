@@ -30,6 +30,8 @@ struct PanelView: View {
                 WatchlistPanel(actions: actions)
             case .edit(let symbol):
                 StockEditorPanel(symbol: symbol)
+            case .group(let name, let member):
+                GroupEditorPanel(original: name, member: member)
             }
         }
         .padding(12)
@@ -295,6 +297,7 @@ struct WatchlistView: View {
 struct WatchlistFilterBar: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var router: PanelRouter
     let filters: [WatchlistFilter]
     let active: WatchlistFilter
     let count: Int
@@ -316,15 +319,16 @@ struct WatchlistFilterBar: View {
         }
     }
 
-    /// 分组右键可以解散。
+    /// 分组右键可以编辑或解散。
     @ViewBuilder
     private func chip(_ filter: WatchlistFilter) -> some View {
         if case .group(let name) = filter {
             chipButton(filter)
                 .contextMenu {
+                    Button("编辑分组…") { router.route = .group(name, member: nil) }
                     Button("解散“\(name)”分组") { store.dissolveGroup(name) }
                 }
-                .help("分组“\(name)”，右键可以解散")
+                .help("分组“\(name)”，右键可以编辑或解散")
         } else {
             chipButton(filter)
         }
@@ -741,6 +745,7 @@ struct SearchResultRow: View {
 struct PanelFooter: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var router: PanelRouter
     let actions: PanelActions
     /// 刚复制了东西：底部的状态文字换成提示，几秒后恢复。
     @State private var copiedMessage: String?
@@ -776,6 +781,9 @@ struct PanelFooter: View {
                     .disabled(store.items.isEmpty)
                 Button("复制持仓表格") { copyHoldings() }
                     .disabled(!store.items.contains { $0.holding != nil })
+                Divider()
+                Button("新建分组…") { router.route = .group(nil, member: nil) }
+                    .disabled(store.items.isEmpty)
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
             }
