@@ -10,13 +10,19 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
     /// 是否显示在菜单栏。
     public var pinned: Bool
     public var alert: PriceAlert
+    /// 持仓；没有填写时为 nil。
+    public var holding: Holding?
 
-    public init(symbol: Symbol, name: String = "", alias: String? = nil, pinned: Bool = false, alert: PriceAlert = PriceAlert()) {
+    public init(
+        symbol: Symbol, name: String = "", alias: String? = nil, pinned: Bool = false,
+        alert: PriceAlert = PriceAlert(), holding: Holding? = nil
+    ) {
         self.symbol = symbol
         self.name = name
         self.alias = alias
         self.pinned = pinned
         self.alert = alert
+        self.holding = holding
     }
 
     public var id: String { symbol.rawValue }
@@ -35,7 +41,7 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
 // 手写 Codable：新增字段时旧数据也能正常读出。
 extension WatchItem: Codable {
     enum CodingKeys: String, CodingKey {
-        case symbol, name, alias, pinned, alert
+        case symbol, name, alias, pinned, alert, holding
     }
 
     public init(from decoder: Decoder) throws {
@@ -45,6 +51,8 @@ extension WatchItem: Codable {
         alias = try c.decodeIfPresent(String.self, forKey: .alias)
         pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
         alert = try c.decodeIfPresent(PriceAlert.self, forKey: .alert) ?? PriceAlert()
+        // 持仓读不懂时当作没有，不影响这一项的其他内容。
+        holding = (try? c.decodeIfPresent(Holding.self, forKey: .holding)).flatMap { $0.isValid ? $0 : nil }
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -54,6 +62,7 @@ extension WatchItem: Codable {
         try c.encodeIfPresent(alias, forKey: .alias)
         try c.encode(pinned, forKey: .pinned)
         try c.encode(alert, forKey: .alert)
+        try c.encodeIfPresent(holding, forKey: .holding)
     }
 }
 

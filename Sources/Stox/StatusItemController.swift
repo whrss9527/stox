@@ -254,7 +254,8 @@ final class StatusItemController: NSObject {
         if let first = frames.first {
             print("STOX_DIAG capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
         }
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) error=\(store.lastError ?? "none")")
+        let holdings = store.items.filter { $0.holding != nil }.count
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) error=\(store.lastError ?? "none")")
         fflush(stdout)
     }
 }
@@ -275,9 +276,18 @@ final class PanelRouter: ObservableObject {
     private var resultsQuery = ""
     @Published private(set) var isSearching = false
     @Published private(set) var searchError: String?
+    /// 批量添加时查过行情、确认不存在的代码。
+    @Published private(set) var batchMissing: Set<Symbol> = []
+    @Published private(set) var isAddingBatch = false
+    @Published private(set) var batchError: String?
 
     var trimmedQuery: String {
         searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// 粘贴了多个代码时的批量添加内容；普通搜索时为 nil。
+    var batch: (symbols: [Symbol], rejected: [String])? {
+        SymbolInput.parseList(trimmedQuery)
     }
 
     /// 返回 true 表示 Esc 已被面板内部消化，不需要关闭面板。
@@ -306,6 +316,27 @@ final class PanelRouter: ObservableObject {
         resultsQuery = ""
         searchError = nil
         isSearching = false
+        batchMissing = []
+        batchError = nil
+    }
+
+    /// 批量添加：先查一次行情确认代码存在，查到的全部加进自选。全部成功时清空搜索框，否则留着让用户看哪些没找到。
+    func addBatch(using store: QuoteStore) async {
+        guard let batch, !isAddingBatch else { return }
+        let pending = batch.symbols.filter { !store.contains($0) && !batchMissing.contains($0) }
+        guard !pending.isEmpty else { return }
+        isAddingBatch = true
+        batchError = nil
+        defer { isAddingBatch = false }
+        do {
+            let missing = try await store.addMany(pending)
+            batchMissing.formUnion(missing)
+            if missing.isEmpty, batch.rejected.isEmpty {
+                clearSearch()
+            }
+        } catch {
+            batchError = "查询行情失败：\(error.localizedDescription)"
+        }
     }
 
     func toggleExpanded(_ symbol: Symbol) {
@@ -315,7 +346,10 @@ final class PanelRouter: ObservableObject {
     /// 由 `.task(id: searchText)` 调用：输入变化时上一次搜索会被取消，相当于 250ms 防抖。
     func runSearch(using store: QuoteStore) async {
         let query = trimmedQuery
-        guard !query.isEmpty else {
+        batchMissing = []
+        batchError = nil
+        // 粘贴了多个代码：不用搜索接口，由批量添加处理。
+        guard !query.isEmpty, batch == nil else {
             searchResults = []
             searchError = nil
             isSearching = false

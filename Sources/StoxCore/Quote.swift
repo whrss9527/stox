@@ -37,6 +37,9 @@ public struct Quote: Sendable, Equatable {
     /// 涨停价 / 跌停价（仅 A 股）。
     public var limitUp: Double?
     public var limitDown: Double?
+    /// 52 周最高 / 最低价。
+    public var high52Week: Double?
+    public var low52Week: Double?
     /// 行情时间（交易所当地时间）。
     public var timestamp: Date?
     /// 价格显示的小数位数，沿用交易所的报价精度。
@@ -59,6 +62,8 @@ public struct Quote: Sendable, Equatable {
         marketCap: Double? = nil,
         limitUp: Double? = nil,
         limitDown: Double? = nil,
+        high52Week: Double? = nil,
+        low52Week: Double? = nil,
         timestamp: Date? = nil,
         priceDecimals: Int = 2
     ) {
@@ -79,6 +84,8 @@ public struct Quote: Sendable, Equatable {
         self.marketCap = marketCap
         self.limitUp = limitUp
         self.limitDown = limitDown
+        self.high52Week = high52Week
+        self.low52Week = low52Week
         self.timestamp = timestamp
         self.priceDecimals = priceDecimals
     }

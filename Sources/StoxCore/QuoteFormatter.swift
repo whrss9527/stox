@@ -26,6 +26,29 @@ public enum QuoteFormatter {
         return fixed(value, decimals: 0)
     }
 
+    /// 金额（市值、盈亏）：10 万以内保留两位小数，更大的用万、亿表示：`3958.00`、`12.40万`。
+    public static func money(_ value: Double) -> String {
+        let magnitude = abs(value)
+        if magnitude >= 1e8 { return fixed(value / 1e8, decimals: 2) + "亿" }
+        if magnitude >= 1e5 { return fixed(value / 1e4, decimals: 2) + "万" }
+        return fixed(value, decimals: 2)
+    }
+
+    /// 带正负号的金额，用于盈亏：`+3958.00`、`-12.40万`、`0.00`。
+    public static func signedMoney(_ value: Double) -> String {
+        if abs(value) < 0.005 { return fixed(0, decimals: 2) }
+        return (value > 0 ? "+" : "") + money(value)
+    }
+
+    /// 不带多余零的数字，用于股数和输入框里的价格：`100`、`2.5`、`1234.5678`，最多 4 位小数。
+    public static func plain(_ value: Double) -> String {
+        if value == value.rounded() { return String(format: "%.0f", value) }
+        var text = String(format: "%.4f", value)
+        while text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        return text
+    }
+
     /// 成交量：A 股按“手”显示，港美股按“股”显示。
     public static func volume(_ shares: Double, market: Market) -> String {
         guard shares > 0 else { return "--" }

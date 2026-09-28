@@ -23,7 +23,7 @@ jobs:
     container: swift:6.0-noble
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Unit tests
         run: swift test
       - name: Live data smoke test
@@ -42,7 +42,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Toolchain
@@ -98,7 +98,7 @@ jobs:
             "$RUNNER_TEMP/crop" "shots/$name-full.png" "shots/$name-preview.jpg" $frame 640 0.45
           done
           ls -la shots
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: always()
         with:
           name: screenshots
@@ -149,7 +149,7 @@ jobs:
           ditto -c -k --keepParent Stox.app Stox.zip
           shasum -a 256 Stox.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: Stox-app
           path: |

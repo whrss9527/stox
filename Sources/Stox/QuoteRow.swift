@@ -6,7 +6,11 @@ import StoxCore
 @MainActor
 struct QuoteRow: View {
     static let rowHeight: CGFloat = 46
-    static let detailHeight: CGFloat = 96
+
+    /// 展开后详情的高度：三行行情数据，有持仓时再加一行。
+    static func detailHeight(for item: WatchItem) -> CGFloat {
+        item.holding == nil ? 129 : 162
+    }
 
     let item: WatchItem
     let quote: Quote?
@@ -22,7 +26,7 @@ struct QuoteRow: View {
             summary
             if expanded, let quote {
                 QuoteDetailView(item: item, quote: quote)
-                    .frame(height: Self.detailHeight)
+                    .frame(height: Self.detailHeight(for: item))
             }
         }
         .background(
@@ -68,6 +72,13 @@ struct QuoteRow: View {
                     Text(item.symbol.displayCode)
                         .font(.system(size: 10.5).monospacedDigit())
                         .foregroundStyle(.secondary)
+                    if let position {
+                        Text("持仓 " + holdingText(position))
+                            .font(.system(size: 10.5).monospacedDigit())
+                            .foregroundStyle(Theme.priceColor(for: PriceDirection(position.totalProfit), convention: settings.colorConvention))
+                            .lineLimit(1)
+                            .help("持仓盈亏")
+                    }
                     if let tag = statusTag {
                         Text(tag)
                             .font(.system(size: 9.5))
@@ -97,6 +108,19 @@ struct QuoteRow: View {
         .frame(height: Self.rowHeight)
     }
 
+    private var position: PositionValue? {
+        guard let holding = item.holding, let quote else { return nil }
+        return Portfolio.position(holding, quote: quote)
+    }
+
+    /// 列表里的持仓盈亏：有成本时显示比例，成本为 0 时显示金额。
+    private func holdingText(_ position: PositionValue) -> String {
+        if let percent = position.totalProfitPercent {
+            return QuoteFormatter.percent(percent)
+        }
+        return QuoteFormatter.signedMoney(position.totalProfit)
+    }
+
     /// 停牌、涨停、跌停等状态标签。
     private var statusTag: String? {
         guard let quote else { return nil }
@@ -112,7 +136,7 @@ struct QuoteRow: View {
         Button(item.pinned ? "不在菜单栏显示" : "显示在菜单栏") {
             store.togglePinned(item.symbol)
         }
-        Button("价格提醒与简称…") {
+        Button(item.symbol.isIndex ? "价格提醒与简称…" : "持仓、提醒与简称…") {
             router.route = .edit(item.symbol)
         }
         Button("在雪球中查看") {
@@ -140,6 +164,7 @@ struct QuoteDetailView: View {
     let quote: Quote
 
     @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
 
     var body: some View {
@@ -154,10 +179,29 @@ struct QuoteDetailView: View {
                 cell("涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
                 cell("成交量", QuoteFormatter.volume(quote.volume, market: item.symbol.market))
                 cell("成交额", quote.amount > 0 ? QuoteFormatter.largeNumber(quote.amount) : "--")
+                cell("换手率", quote.turnoverRate.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+            }
+            HStack(spacing: 0) {
                 if let marketCap = quote.marketCap {
                     cell("市值", QuoteFormatter.largeNumber(marketCap))
                 } else {
                     cell("振幅", quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                }
+                cell("市盈率", peText)
+                cell("52周最高", quote.high52Week.map(price) ?? "--")
+                cell("52周最低", quote.low52Week.map(price) ?? "--")
+            }
+            if let holding = item.holding {
+                HStack(spacing: 0) {
+                    cell("持有", QuoteFormatter.plain(holding.shares) + "股")
+                    cell("成本", QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))
+                    if let position = Portfolio.position(holding, quote: quote) {
+                        cell("持仓盈亏", QuoteFormatter.signedMoney(position.totalProfit), color: profitColor(position.totalProfit))
+                        cell("今日盈亏", QuoteFormatter.signedMoney(position.dayProfit), color: profitColor(position.dayProfit))
+                    } else {
+                        cell("持仓盈亏", "--")
+                        cell("今日盈亏", "--")
+                    }
                 }
             }
             HStack(spacing: 10) {
@@ -165,7 +209,7 @@ struct QuoteDetailView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                 Spacer()
-                Button("提醒") { router.route = .edit(item.symbol) }
+                Button(item.symbol.isIndex ? "提醒" : "持仓与提醒") { router.route = .edit(item.symbol) }
                 Button("雪球") {
                     if let url = QuoteLinks.xueqiu(item.symbol) { NSWorkspace.shared.open(url) }
                 }
@@ -181,13 +225,24 @@ struct QuoteDetailView: View {
         QuoteFormatter.price(value, decimals: quote.priceDecimals)
     }
 
-    private func cell(_ title: String, _ value: String) -> some View {
+    /// 亏损公司的市盈率是负数，和券商软件一样显示“亏损”。
+    private var peText: String {
+        guard let pe = quote.peRatio else { return "--" }
+        return pe < 0 ? "亏损" : QuoteFormatter.fixed(pe, decimals: 2)
+    }
+
+    private func profitColor(_ value: Double) -> Color {
+        Theme.priceColor(for: PriceDirection(value), convention: settings.colorConvention)
+    }
+
+    private func cell(_ title: String, _ value: String, color: Color = .primary) -> some View {
         VStack(alignment: .leading, spacing: 1) {
             Text(title)
                 .font(.system(size: 9.5))
                 .foregroundStyle(.secondary)
             Text(value)
                 .font(.system(size: 11.5).monospacedDigit())
+                .foregroundStyle(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }

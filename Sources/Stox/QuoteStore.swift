@@ -157,6 +157,24 @@ final class QuoteStore: ObservableObject {
         restart()
     }
 
+    /// 批量添加：先查一次行情，只添加查得到的代码，名称也一并取回。返回查不到（不存在）的代码。
+    func addMany(_ symbols: [Symbol]) async throws -> [Symbol] {
+        let wanted = symbols.filter { !contains($0) }
+        guard !wanted.isEmpty else { return [] }
+        let result = try await provider.fetchQuotes(for: wanted)
+        var added = false
+        for symbol in wanted where result[symbol] != nil && !contains(symbol) {
+            items.append(WatchItem(symbol: symbol, name: result[symbol]?.name ?? ""))
+            quotes[symbol] = result[symbol]
+            added = true
+        }
+        if added {
+            save()
+            restart()
+        }
+        return wanted.filter { result[$0] == nil }
+    }
+
     func remove(_ symbol: Symbol) {
         items.removeAll { $0.symbol == symbol }
         quotes[symbol] = nil

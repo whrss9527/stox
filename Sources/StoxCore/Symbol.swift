@@ -156,6 +156,27 @@ public enum SymbolInput {
         return false
     }
 
+    /// 一次粘贴的多个代码，用空白、逗号、顿号、分号或竖线分开。
+    /// 至少能认出两个代码时返回结果（去重、保持顺序），否则返回 nil，按普通搜索处理。
+    /// 这时纯字母按美股代码处理，是否真的存在由调用方再查一次行情确认。
+    public static func parseList(_ input: String) -> (symbols: [Symbol], rejected: [String])? {
+        let separators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",，、;；|"))
+        let tokens = input.components(separatedBy: separators).filter { !$0.isEmpty }
+        guard tokens.count >= 2 else { return nil }
+        var symbols: [Symbol] = []
+        var rejected: [String] = []
+        for token in tokens {
+            if let symbol = parse(token) {
+                if !symbols.contains(symbol) {
+                    symbols.append(symbol)
+                }
+            } else {
+                rejected.append(token)
+            }
+        }
+        return symbols.count >= 2 ? (symbols, rejected) : nil
+    }
+
     /// 按号段推断 6 位代码所属交易所。000001 这类沪深重号的代码按股票处理（深市）。
     static func inferAShareMarket(_ code: String) -> Market {
         if code.hasPrefix("92") || code.hasPrefix("4") || code.hasPrefix("8") { return .bj }

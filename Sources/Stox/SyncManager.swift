@@ -28,7 +28,19 @@ final class SyncManager: ObservableObject {
 
     private let store: QuoteStore
     private let settings: SettingsStore
-    private var lastSynced: SyncContent?
+    private let defaults: UserDefaults
+    private static let lastSyncedKey = "sync.lastSynced"
+    /// 上次和 iCloud 一致时的内容。保存下来，重新启动后才能分清是本机改了还是 iCloud 改了：
+    /// 改完马上退出、没来得及写上去的本机改动，下次启动时写上去，而不是被 iCloud 里的旧内容覆盖。
+    private var lastSynced: SyncContent? {
+        didSet {
+            if let lastSynced, let data = try? JSONEncoder().encode(lastSynced) {
+                defaults.set(data, forKey: Self.lastSyncedKey)
+            } else {
+                defaults.removeObject(forKey: Self.lastSyncedKey)
+            }
+        }
+    }
     private var lastStamp: String?
     private var lastPull = Date.distantPast
     private var watcher: DispatchSourceFileSystemObject?
@@ -38,9 +50,10 @@ final class SyncManager: ObservableObject {
     /// 正在应用云端内容：这期间本机的“改动”不是用户改的，不要再写回去。
     private var isApplyingRemote = false
 
-    init(store: QuoteStore, settings: SettingsStore) {
+    init(store: QuoteStore, settings: SettingsStore, defaults: UserDefaults = .standard) {
         self.store = store
         self.settings = settings
+        self.defaults = defaults
         store.onLocalEdit = { [weak self] in self?.localChanged() }
         settings.onSyncedSettingChange = { [weak self] in self?.localChanged() }
     }
@@ -59,6 +72,7 @@ final class SyncManager: ObservableObject {
     func start() {
         guard settings.syncEnabled else { return }
         enabled = true
+        lastSynced = defaults.data(forKey: Self.lastSyncedKey).flatMap { try? JSONDecoder().decode(SyncContent.self, from: $0) }
         guard available else {
             status = .unavailable
             return
@@ -141,6 +155,20 @@ final class SyncManager: ObservableObject {
         await pull()
         if SyncRules.shouldPush(local: currentContent, lastSynced: lastSynced) {
             await push()
+        }
+    }
+
+    /// 退出前把还没写上去的本机改动写到 iCloud。文件很小，直接在主线程上写完再退出。
+    func flushBeforeQuit() {
+        guard enabled, let url = fileURL, SyncRules.shouldPush(local: currentContent, lastSynced: lastSynced) else { return }
+        pushTask?.cancel()
+        let document = SyncDocument(updatedAt: Date(), device: CloudFile.deviceName, content: currentContent)
+        do {
+            try CloudFile.write(document, to: url)
+            lastSynced = document.content
+            Log.info("iCloud 同步：退出前写入了本机的改动（\(document.content.watchlist.count) 只）")
+        } catch {
+            Log.error("iCloud 同步：退出前写入失败：\(error.localizedDescription)")
         }
     }
 
@@ -239,6 +267,10 @@ final class SyncManager: ObservableObject {
             }
             lastSynced = remote.content
             status = .synced(remote.updatedAt, remote.device)
+            // iCloud 没变而本机变了（上次改完没来得及写上去），或者云端文件缺了一些设置：把本机的写上去。
+            if SyncRules.shouldPush(local: currentContent, lastSynced: lastSynced) {
+                await push()
+            }
         } catch {
             status = .error("读取 iCloud 失败：\(error.localizedDescription)")
             Log.error("iCloud 同步：读取失败：\(error.localizedDescription)")

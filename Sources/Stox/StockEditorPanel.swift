@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 import StoxCore
 
-/// 单只证券的设置：菜单栏显示、简称、价格提醒。在面板里打开，Esc 返回列表。
+/// 单只证券的设置：菜单栏显示、简称、持仓、价格提醒。在面板里打开，Esc 返回列表。
 @MainActor
 struct StockEditorPanel: View {
     let symbol: Symbol
@@ -15,6 +15,8 @@ struct StockEditorPanel: View {
     @State private var priceBelow = ""
     @State private var riseAbove = ""
     @State private var fallBelow = ""
+    @State private var shares = ""
+    @State private var cost = ""
     @State private var loaded = false
 
     var body: some View {
@@ -38,6 +40,21 @@ struct StockEditorPanel: View {
                 .font(.system(size: 12.5))
                 .padding(.horizontal, 12)
                 .glassCard()
+
+                if !symbol.isIndex {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("持仓")
+                            .font(.system(size: 12.5, weight: .semibold))
+                        numberField("持有数量", text: $shares, unit: "股", placeholder: "没有持仓")
+                        numberField("成本价", text: $cost, unit: currency, placeholder: "每股成本", allowZero: true)
+                        Text(holdingFooter)
+                            .font(.system(size: 11))
+                            .foregroundStyle(holdingState == .invalid ? Color.orange : Color.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(12)
+                    .glassCard()
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("价格提醒")
@@ -115,16 +132,52 @@ struct StockEditorPanel: View {
         return text
     }
 
-    private func numberField(_ title: String, text: Binding<String>, unit: String) -> some View {
+    private var holdingFooter: String {
+        switch holdingState {
+        case .invalid:
+            return "持有数量和成本价要一起填写，数量大于 0，成本价不小于 0。"
+        case .none:
+            return "填写后在列表和详情里显示持仓盈亏，面板上方按币种合计。只保存在本机和你的 iCloud 里。"
+        case .valid(let holding):
+            guard let quote = store.quotes[symbol], let position = Portfolio.position(holding, quote: quote) else {
+                return "按现价计算持仓盈亏。"
+            }
+            var text = "按现价 \(QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))，"
+                + "市值 \(QuoteFormatter.money(position.marketValue))，持仓盈亏 \(QuoteFormatter.signedMoney(position.totalProfit))"
+            if let percent = position.totalProfitPercent {
+                text += "（\(QuoteFormatter.percent(percent))）"
+            }
+            return text + "。"
+        }
+    }
+
+    private enum HoldingState: Equatable {
+        case none
+        case valid(Holding)
+        case invalid
+    }
+
+    /// 两项都空表示没有持仓；只填一项或者数字不对都算无效。
+    private var holdingState: HoldingState {
+        switch (parse(shares), parse(cost, allowZero: true)) {
+        case (.empty, .empty): return .none
+        case (.value(let count), .value(let price)): return .valid(Holding(shares: count, cost: price))
+        default: return .invalid
+        }
+    }
+
+    private func numberField(
+        _ title: String, text: Binding<String>, unit: String, placeholder: String = "不提醒", allowZero: Bool = false
+    ) -> some View {
         HStack {
             Text(title)
                 .font(.system(size: 12.5))
             Spacer()
-            TextField("", text: text, prompt: Text("不提醒"))
+            TextField("", text: text, prompt: Text(placeholder))
                 .textFieldStyle(.roundedBorder)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 110)
-                .foregroundStyle(parse(text.wrappedValue) == .invalid ? Color.red : Color.primary)
+                .foregroundStyle(parse(text.wrappedValue, allowZero: allowZero) == .invalid ? Color.red : Color.primary)
             Text(unit)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
@@ -136,10 +189,10 @@ struct StockEditorPanel: View {
         case empty, value(Double), invalid
     }
 
-    private func parse(_ text: String) -> ParsedNumber {
-        let trimmed = text.trimmingCharacters(in: .whitespaces)
+    private func parse(_ text: String, allowZero: Bool = false) -> ParsedNumber {
+        let trimmed = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "")
         if trimmed.isEmpty { return .empty }
-        guard let value = Double(trimmed), value > 0 else { return .invalid }
+        guard let value = Double(trimmed), value.isFinite, allowZero ? value >= 0 : value > 0 else { return .invalid }
         return .value(value)
     }
 
@@ -149,7 +202,7 @@ struct StockEditorPanel: View {
     }
 
     private var isValid: Bool {
-        [priceAbove, priceBelow, riseAbove, fallBelow].allSatisfy { parse($0) != .invalid }
+        [priceAbove, priceBelow, riseAbove, fallBelow].allSatisfy { parse($0) != .invalid } && holdingState != .invalid
     }
 
     private func load() {
@@ -161,11 +214,13 @@ struct StockEditorPanel: View {
         priceBelow = format(item.alert.priceBelow)
         riseAbove = format(item.alert.riseAbove)
         fallBelow = format(item.alert.fallBelow)
+        shares = item.holding.map { QuoteFormatter.plain($0.shares) } ?? ""
+        cost = format(item.holding?.cost)
     }
 
+    /// 输入框里显示的数字。不用 %g：它只保留 6 位有效数字，大数还会变成科学计数法。
     private func format(_ value: Double?) -> String {
-        guard let value else { return "" }
-        return String(format: "%g", value)
+        value.map(QuoteFormatter.plain) ?? ""
     }
 
     private func save(_ item: WatchItem) {
@@ -179,6 +234,11 @@ struct StockEditorPanel: View {
             riseAbove: value(riseAbove),
             fallBelow: value(fallBelow)
         )
+        if case .valid(let holding) = holdingState {
+            updated.holding = holding
+        } else {
+            updated.holding = nil
+        }
         if !updated.alert.isEmpty {
             Notifier.shared.requestAuthorization()
         }
