@@ -209,7 +209,12 @@ struct WatchlistView: View {
                 ScrollViewReader { proxy in
                     List {
                         ForEach(settings.sortMode.apply(store.items, quotes: store.quotes)) { item in
-                            QuoteRow(item: item, quote: store.quotes[item.symbol], expanded: router.expanded == item.symbol)
+                            QuoteRow(
+                                item: item,
+                                quote: store.quotes[item.symbol],
+                                expanded: router.expanded == item.symbol,
+                                highlighted: router.highlighted == item.symbol
+                            )
                                 .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
@@ -228,6 +233,10 @@ struct WatchlistView: View {
                     .onAppear { reveal(router.expanded, with: proxy) }
                     .onChange(of: router.expanded) { symbol in
                         reveal(symbol, with: proxy)
+                    }
+                    .onChange(of: router.highlighted) { symbol in
+                        // 方向键移动时马上滚到看得见的地方，不等动画。
+                        if let symbol { proxy.scrollTo(symbol) }
                     }
                 }
             }
@@ -275,18 +284,29 @@ struct SearchResultsView: View {
                     .frame(maxWidth: .infinity)
                     .frame(height: 80)
             } else {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(router.searchResults) { result in
-                            SearchResultRow(result: result, added: store.contains(result.symbol)) {
-                                store.add(result.symbol, name: result.isDirect ? "" : result.name)
-                                router.clearSearch()
+                let highlighted = router.highlighted ?? router.defaultSearchHighlight(excluding: { store.contains($0) })
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            ForEach(router.searchResults) { result in
+                                SearchResultRow(
+                                    result: result,
+                                    added: store.contains(result.symbol),
+                                    highlighted: highlighted == result.symbol
+                                ) {
+                                    store.add(result.symbol, name: result.isDirect ? "" : result.name)
+                                    router.clearSearch()
+                                }
+                                .id(result.symbol)
                             }
                         }
+                        .padding(6)
                     }
-                    .padding(6)
+                    .frame(height: min(CGFloat(router.searchResults.count) * SearchResultRow.height + 12, 360))
+                    .onChange(of: router.highlighted) { symbol in
+                        if let symbol { proxy.scrollTo(symbol) }
+                    }
                 }
-                .frame(height: min(CGFloat(router.searchResults.count) * SearchResultRow.height + 12, 360))
             }
         }
         .glassCard()
@@ -417,6 +437,7 @@ struct TipsCards: View {
                 tip("\(settings.toggleHotkey.display) 在任何 App 里打开或关闭这个面板")
                 tip("右键单击一只可以固定到菜单栏，或者填持仓和价格提醒")
                 tip("一次粘贴多个代码，回车全部添加")
+                tip("↑ ↓ 选择，回车添加或展开；展开后 ← → 切换分时和 K 线")
                 tip("点右上角的图钉，面板就一直显示，可以拖到任何位置")
             }
             .padding(10)
@@ -520,6 +541,8 @@ struct SearchResultRow: View {
 
     let result: SearchResult
     let added: Bool
+    /// 回车会添加这一条（默认第一条，也可以用上下方向键选）。
+    var highlighted = false
     let add: () -> Void
 
     var body: some View {
@@ -549,6 +572,10 @@ struct SearchResultRow: View {
             }
             .padding(.horizontal, 10)
             .frame(height: Self.height)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.accentColor.opacity(highlighted ? 0.14 : 0))
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(HoverRowStyle())

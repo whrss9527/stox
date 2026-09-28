@@ -33,6 +33,39 @@ extension WatchlistSort {
     }
 }
 
+/// 展开详情里走势图的周期。
+enum ChartPeriod: String, CaseIterable, Identifiable {
+    case intraday, day, week, month
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .intraday: return "分时"
+        case .day: return "日K"
+        case .week: return "周K"
+        case .month: return "月K"
+        }
+    }
+
+    /// K 线的周期；分时图为 nil。
+    var klinePeriod: KlinePeriod? {
+        switch self {
+        case .intraday: return nil
+        case .day: return .day
+        case .week: return .week
+        case .month: return .month
+        }
+    }
+
+    /// 左右方向键切换：到头了不循环。
+    func moved(by step: Int) -> ChartPeriod {
+        let all = Self.allCases
+        let index = all.firstIndex(of: self) ?? 0
+        return all[min(max(index + step, 0), all.count - 1)]
+    }
+}
+
 /// 面板和设置窗口的深浅色。菜单栏始终跟随系统。
 enum AppearanceMode: String, CaseIterable, Identifiable {
     case system, light, dark
@@ -152,6 +185,10 @@ final class SettingsStore: ObservableObject {
             }
         }
     }
+    /// 展开详情时显示分时还是 K 线，记住上次选的。
+    @Published var chartPeriod: ChartPeriod {
+        didSet { defaults.set(chartPeriod.rawValue, forKey: Keys.chartPeriod) }
+    }
     /// 第一次打开面板时的使用提示，看过就不再显示。
     @Published var tipsDismissed: Bool {
         didSet { defaults.set(tipsDismissed, forKey: Keys.tipsDismissed) }
@@ -183,6 +220,7 @@ final class SettingsStore: ObservableObject {
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
+        chartPeriod = defaults.string(forKey: Keys.chartPeriod).flatMap(ChartPeriod.init(rawValue:)) ?? .intraday
         tipsDismissed = defaults.object(forKey: Keys.tipsDismissed) as? Bool ?? false
         whatsNewVersion = defaults.string(forKey: Keys.whatsNewVersion)
     }
@@ -250,6 +288,7 @@ final class SettingsStore: ObservableObject {
         static let panelPinned = "panel.pinned"
         static let pinnedX = "panel.pinnedX"
         static let pinnedY = "panel.pinnedY"
+        static let chartPeriod = "chart.period"
         static let tipsDismissed = "tips.dismissed"
         static let whatsNewVersion = "update.whatsNew"
         static let lastRunVersion = "app.lastVersion"

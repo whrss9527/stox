@@ -7,14 +7,16 @@ import StoxCore
 struct QuoteRow: View {
     static let rowHeight: CGFloat = 46
 
-    /// 展开后详情的高度：分时图、三行行情数据，有持仓时再加一行。
+    /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。
     static func detailHeight(for item: WatchItem) -> CGFloat {
-        (item.holding == nil ? 129 : 162) + IntradayChart.height + 6 + (item.note == nil ? 0 : 20)
+        (item.holding == nil ? 129 : 162) + QuoteChartSection.height + 6 + (item.note == nil ? 0 : 20)
     }
 
     let item: WatchItem
     let quote: Quote?
     let expanded: Bool
+    /// 键盘上下方向键选中了这一行。
+    var highlighted = false
 
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
@@ -36,9 +38,15 @@ struct QuoteRow: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.primary.opacity(expanded ? 0.06 : (hovering ? 0.07 : 0)))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(highlighted ? 0.8 : 0), lineWidth: 1.5)
+        )
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture {
+            // 用鼠标点了以后，方向键从展开的这一行接着走。
+            router.highlighted = nil
             withAnimation(.easeInOut(duration: 0.15)) {
                 router.toggleExpanded(item.symbol)
             }
@@ -228,15 +236,7 @@ struct QuoteDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            IntradayChart(
-                series: store.intraday[item.symbol],
-                previousClose: quote.previousClose,
-                region: item.symbol.market.region,
-                color: Theme.priceColor(for: quote.direction, convention: settings.colorConvention)
-            )
-            .task(id: item.symbol) {
-                await store.trackIntraday(item.symbol)
-            }
+            QuoteChartSection(item: item, quote: quote)
             HStack(spacing: 0) {
                 cell("今开", price(quote.open))
                 cell("最高", price(quote.high))

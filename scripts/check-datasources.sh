@@ -73,3 +73,68 @@ for c in usAAPL.OQ usBRK.B.N us.IXIC us.DJI us.INX usAAPL; do
 done
 
 fetch "sina quote (fallback candidate)" "https://hq.sinajs.cn/list=sh600519,hk00700,gb_aapl" "GB18030" "https://finance.sina.com.cn/"
+
+# K 线（面板里的日 K、周 K、月 K 用）：只打印每个序列的条数和首尾几条，并检查字段顺序。
+kline() {
+  local title="$1" url="$2"
+  echo "=================================================================="
+  echo "## ${title}"
+  echo "## ${url}"
+  if curl -sS -m 15 -A "$UA" "$url" -o /tmp/stox-body.bin; then
+    python3 - /tmp/stox-body.bin <<'PY'
+import json, sys
+raw = open(sys.argv[1], "rb").read()
+try:
+    body = json.loads(raw)
+except Exception as error:
+    print("not json:", error, raw[:300])
+    sys.exit(0)
+print("code:", body.get("code"), "msg:", body.get("msg"))
+data = body.get("data")
+if not isinstance(data, dict):
+    print("data:", str(data)[:300])
+    sys.exit(0)
+for key, value in data.items():
+    if not isinstance(value, dict):
+        print(f"key={key} value={str(value)[:200]}")
+        continue
+    print(f"key={key} fields={sorted(value.keys())}")
+    for name, rows in value.items():
+        if not isinstance(rows, list) or not rows or not isinstance(rows[0], list):
+            continue
+        print(f"  {name}: {len(rows)} rows, widths={sorted(set(len(r) for r in rows))}")
+        print("    first:", rows[:2])
+        print("    last:", rows[-2:])
+        # 猜字段顺序：[日期, 开, 收, 高, 低, 量] 时每行的高 >= 开收、低 <= 开收。
+        ok_occl = ok_ohlc = 0
+        for r in rows:
+            try:
+                a, b, c, d = (float(x) for x in r[1:5])
+            except Exception:
+                continue
+            if c >= max(a, b) and d <= min(a, b): ok_occl += 1
+            if b >= max(a, d) and c <= min(a, d): ok_ohlc += 1
+        print(f"    order check: open-close-high-low {ok_occl}/{len(rows)}, open-high-low-close {ok_ohlc}/{len(rows)}")
+    qt = value.get("qt")
+    if isinstance(qt, dict):
+        print("  qt keys:", list(qt.keys())[:6])
+PY
+  else
+    echo "!! request failed"
+  fi
+}
+
+K="https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param="
+for p in sh600519,day,,,5,qfq sz000001,day,,,5,qfq sh000001,day,,,5,qfq bj920819,day,,,5,qfq sh510300,day,,,5,qfq \
+         sh600519,week,,,3,qfq sh600519,month,,,3,qfq sh600519,day,,,320,qfq \
+         hk00700,day,,,5,qfq hkHSI,day,,,5,qfq \
+         usAAPL,day,,,5,qfq usAAPL.OQ,day,,,5,qfq us.IXIC,day,,,5,qfq usBRK.B,day,,,5,qfq; do
+  kline "tencent fqkline: ${p}" "${K}${p}"
+done
+kline "tencent hkfqkline: hk00700" "https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get?param=hk00700,day,,,5,qfq"
+kline "tencent hkfqkline: hk00700 week" "https://web.ifzq.gtimg.cn/appstock/app/hkfqkline/get?param=hk00700,week,,,3,qfq"
+kline "tencent usfqkline: usAAPL" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL,day,,,5,qfq"
+kline "tencent usfqkline: usAAPL.OQ" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL.OQ,day,,,5,qfq"
+kline "tencent usfqkline: us.IXIC" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=us.IXIC,day,,,5,qfq"
+kline "tencent usfqkline: usAAPL month" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL,month,,,3,qfq"
+kline "tencent kline (no adjust): sh600519" "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh600519,day,,,5"
