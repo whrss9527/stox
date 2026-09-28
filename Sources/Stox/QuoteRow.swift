@@ -73,18 +73,6 @@ struct QuoteRow: View {
                         .font(.system(size: 10.5).monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
-                    if let position {
-                        // 公文包图标加比例，比“持仓”两个字省地方，窄的时候也不会被截断。
-                        HStack(spacing: 2) {
-                            Image(systemName: "briefcase.fill")
-                                .font(.system(size: 8))
-                            Text(holdingText(position))
-                                .font(.system(size: 10.5).monospacedDigit())
-                        }
-                        .foregroundStyle(Theme.priceColor(for: PriceDirection(position.totalProfit), convention: settings.colorConvention))
-                        .fixedSize()
-                        .help("持仓盈亏")
-                    }
                     if let tag = statusTag {
                         Text(tag)
                             .font(.system(size: 9.5))
@@ -95,10 +83,24 @@ struct QuoteRow: View {
                 }
             }
             Spacer(minLength: 6)
-            Text(quote.map { QuoteFormatter.price($0.price, decimals: $0.priceDecimals) } ?? "--")
-                .font(.system(size: 14, weight: .medium).monospacedDigit())
-                .foregroundStyle(color)
-                .lineLimit(1)
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(quote.map { QuoteFormatter.price($0.price, decimals: $0.priceDecimals) } ?? "--")
+                    .font(.system(size: 14, weight: .medium).monospacedDigit())
+                    .foregroundStyle(color)
+                    .lineLimit(1)
+                if let position {
+                    // 有持仓时在现价下面显示持仓盈亏：公文包图标加比例，不占名称和代码的地方。
+                    HStack(spacing: 2) {
+                        Image(systemName: "briefcase.fill")
+                            .font(.system(size: 8))
+                        Text(holdingText(position))
+                            .font(.system(size: 10.5).monospacedDigit())
+                    }
+                    .foregroundStyle(Theme.priceColor(for: PriceDirection(position.totalProfit), convention: settings.colorConvention))
+                    .lineLimit(1)
+                    .help("持仓盈亏")
+                }
+            }
             Text(quote.map { QuoteFormatter.percent($0.changePercent) } ?? "--")
                 .font(.system(size: 12, weight: .semibold).monospacedDigit())
                 .foregroundStyle(Theme.pillForeground(convention: settings.colorConvention))
