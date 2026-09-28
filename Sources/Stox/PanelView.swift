@@ -629,6 +629,8 @@ struct PanelFooter: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
     let actions: PanelActions
+    /// 刚复制了全部代码：底部的状态文字换成提示，几秒后恢复。
+    @State private var copiedCount: Int?
 
     var body: some View {
         HStack(spacing: 6) {
@@ -656,6 +658,9 @@ struct PanelFooter: View {
                 }
                 .pickerStyle(.inline)
                 .labelsHidden()
+                Divider()
+                Button("复制全部代码") { copyCodes() }
+                    .disabled(store.items.isEmpty)
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
             }
@@ -686,14 +691,32 @@ struct PanelFooter: View {
         .padding(.horizontal, 4)
     }
 
+    /// 复制出去的代码粘贴到另一台 Mac（或者重装后）的搜索框里，回车就能全部加回来。
+    private func copyCodes() {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(Watchlist.exportText(store.items), forType: .string)
+        let count = store.items.count
+        copiedCount = count
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 3_000_000_000)
+            if copiedCount == count { copiedCount = nil }
+        }
+    }
+
     private var statusText: String {
+        if let copiedCount {
+            return "已复制 \(copiedCount) 个代码，粘贴到搜索框就能全部加回来"
+        }
         guard let updated = store.lastUpdated else { return "正在获取行情…" }
         let cadence = store.effectiveInterval > settings.refreshInterval
             ? "休市中每分钟刷新"
             : "每 \(Int(settings.refreshInterval)) 秒刷新"
+        // 用新浪行情时地方不够，省掉排序方式，标出行情来源。
+        if store.usingBackup {
+            return "\(QuoteFormatter.time(updated)) 更新 · 新浪行情 · \(cadence)"
+        }
         let order = settings.sortMode == .custom ? "拖动排序" : settings.sortMode.title
-        let source = store.usingBackup ? "（新浪）" : ""
-        return "\(QuoteFormatter.time(updated)) 更新\(source) · \(cadence) · \(order)"
+        return "\(QuoteFormatter.time(updated)) 更新 · \(cadence) · \(order)"
     }
 }
 

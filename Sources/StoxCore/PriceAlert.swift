@@ -10,16 +10,25 @@ public struct PriceAlert: Codable, Hashable, Sendable {
     public var riseAbove: Double?
     /// 跌幅达到（%，正数）。
     public var fallBelow: Double?
+    /// 持仓盈利达到（%，相对成本，正数），用来止盈。没有持仓或成本为 0 时不提醒。
+    public var profitAbove: Double?
+    /// 持仓亏损达到（%，相对成本，正数），用来止损。
+    public var lossBelow: Double?
 
-    public init(priceAbove: Double? = nil, priceBelow: Double? = nil, riseAbove: Double? = nil, fallBelow: Double? = nil) {
+    public init(
+        priceAbove: Double? = nil, priceBelow: Double? = nil, riseAbove: Double? = nil, fallBelow: Double? = nil,
+        profitAbove: Double? = nil, lossBelow: Double? = nil
+    ) {
         self.priceAbove = priceAbove
         self.priceBelow = priceBelow
         self.riseAbove = riseAbove
         self.fallBelow = fallBelow
+        self.profitAbove = profitAbove
+        self.lossBelow = lossBelow
     }
 
     public var isEmpty: Bool {
-        priceAbove == nil && priceBelow == nil && riseAbove == nil && fallBelow == nil
+        AlertCondition.allCases.allSatisfy { threshold(for: $0) == nil }
     }
 
     public func threshold(for condition: AlertCondition) -> Double? {
@@ -28,19 +37,24 @@ public struct PriceAlert: Codable, Hashable, Sendable {
         case .priceBelow: return priceBelow
         case .riseAbove: return riseAbove
         case .fallBelow: return fallBelow
+        case .profitAbove: return profitAbove
+        case .lossBelow: return lossBelow
         }
     }
 }
 
 public enum AlertCondition: String, Codable, CaseIterable, Sendable {
-    case priceAbove, priceBelow, riseAbove, fallBelow
+    case priceAbove, priceBelow, riseAbove, fallBelow, profitAbove, lossBelow
 
-    func isMet(by quote: Quote, threshold: Double) -> Bool {
+    func isMet(by quote: Quote, holding: Holding?, threshold: Double) -> Bool {
         switch self {
         case .priceAbove: return quote.price >= threshold
         case .priceBelow: return quote.price <= threshold
         case .riseAbove: return quote.changePercent >= abs(threshold)
         case .fallBelow: return quote.changePercent <= -abs(threshold)
+        case .profitAbove, .lossBelow:
+            guard let percent = holding.flatMap({ Portfolio.position($0, quote: quote)?.totalProfitPercent }) else { return false }
+            return self == .profitAbove ? percent >= abs(threshold) : percent <= -abs(threshold)
         }
     }
 }
@@ -51,6 +65,8 @@ public struct AlertTrigger: Sendable, Equatable {
     public let condition: AlertCondition
     public let threshold: Double
     public let quote: Quote
+    /// 触发时的持仓，止盈止损提醒的正文里用。
+    public var holding: Holding?
 
     public var title: String {
         switch condition {
@@ -62,11 +78,25 @@ public struct AlertTrigger: Sendable, Equatable {
             return "\(name) 涨幅达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
         case .fallBelow:
             return "\(name) 跌幅达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+        case .profitAbove:
+            return "\(name) 持仓盈利达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+        case .lossBelow:
+            return "\(name) 持仓亏损达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
         }
     }
 
     public var body: String {
-        "现价 \(QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))，"
+        let price = "现价 \(QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))，"
+        if condition == .profitAbove || condition == .lossBelow, let holding,
+           let position = Portfolio.position(holding, quote: quote) {
+            var text = price + "成本 \(QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))，"
+                + "持仓盈亏 \(QuoteFormatter.signedMoney(position.totalProfit))"
+            if let percent = position.totalProfitPercent {
+                text += "（\(QuoteFormatter.percent(percent))）"
+            }
+            return text
+        }
+        return price
             + "涨跌 \(QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))"
             + "（\(QuoteFormatter.percent(quote.changePercent))）"
     }
@@ -88,13 +118,15 @@ public struct AlertEngine: Codable, Sendable, Equatable {
             let day = Self.dayKey(quote.timestamp ?? now, region: item.symbol.market.region)
             for condition in AlertCondition.allCases {
                 guard let threshold = item.alert.threshold(for: condition),
-                      condition.isMet(by: quote, threshold: threshold)
+                      condition.isMet(by: quote, holding: item.holding, threshold: threshold)
                 else { continue }
                 let key = Self.key(item.symbol, condition)
                 guard firedDays[key] != day else { continue }
                 firedDays[key] = day
                 let name = quote.name.isEmpty ? item.displayName : quote.name
-                triggers.append(AlertTrigger(symbol: item.symbol, name: name, condition: condition, threshold: threshold, quote: quote))
+                triggers.append(AlertTrigger(
+                    symbol: item.symbol, name: name, condition: condition, threshold: threshold, quote: quote, holding: item.holding
+                ))
             }
         }
         return triggers

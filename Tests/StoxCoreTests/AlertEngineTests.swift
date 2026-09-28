@@ -70,3 +70,48 @@ final class AlertEngineTests: XCTestCase {
         XCTAssertEqual(decoded.firedDays["sh600519|priceAbove"], "2026-09-28")
     }
 }
+
+final class HoldingAlertTests: XCTestCase {
+    private let symbol = Symbol("sh600519")!
+
+    private func quote(price: Double) -> Quote {
+        let time = MarketRegion.cn.calendar.date(from: DateComponents(year: 2026, month: 9, day: 28, hour: 10))!
+        return Quote(symbol: symbol, name: "贵州茅台", price: price, previousClose: price, open: price, volume: 100, timestamp: time)
+    }
+
+    func testTakeProfitAndStopLoss() throws {
+        var engine = AlertEngine()
+        let holding = Holding(shares: 100, cost: 1000)
+        let items = [WatchItem(symbol: symbol, name: "贵州茅台", alert: PriceAlert(profitAbove: 20, lossBelow: 10), holding: holding)]
+
+        XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: quote(price: 1100)], now: Date()).isEmpty, "赚 10% 还不到")
+        let profit = engine.evaluate(items: items, quotes: [symbol: quote(price: 1200)], now: Date())
+        XCTAssertEqual(profit.map(\.condition), [.profitAbove])
+        let trigger = try XCTUnwrap(profit.first)
+        XCTAssertEqual(trigger.title, "贵州茅台 持仓盈利达到 20.00%")
+        XCTAssertEqual(trigger.body, "现价 1200.00，成本 1000.00，持仓盈亏 +20000.00（+20.00%）")
+
+        var fresh = AlertEngine()
+        let loss = fresh.evaluate(items: items, quotes: [symbol: quote(price: 899)], now: Date())
+        XCTAssertEqual(loss.map(\.condition), [.lossBelow])
+        XCTAssertEqual(loss.first?.title, "贵州茅台 持仓亏损达到 10.00%")
+    }
+
+    func testNeedsAHoldingWithCost() {
+        var engine = AlertEngine()
+        let alert = PriceAlert(profitAbove: 5, lossBelow: 5)
+        let noHolding = [WatchItem(symbol: symbol, name: "贵州茅台", alert: alert)]
+        XCTAssertTrue(engine.evaluate(items: noHolding, quotes: [symbol: quote(price: 5000)], now: Date()).isEmpty)
+        let free = [WatchItem(symbol: symbol, name: "贵州茅台", alert: alert, holding: Holding(shares: 100, cost: 0))]
+        XCTAssertTrue(engine.evaluate(items: free, quotes: [symbol: quote(price: 5000)], now: Date()).isEmpty, "成本为 0 没有比例")
+        XCTAssertFalse(alert.isEmpty)
+        XCTAssertTrue(PriceAlert().isEmpty)
+    }
+
+    func testOldAlertsStillDecode() throws {
+        let json = #"{"priceAbove":105,"fallBelow":3}"#
+        let alert = try JSONDecoder().decode(PriceAlert.self, from: Data(json.utf8))
+        XCTAssertEqual(alert, PriceAlert(priceAbove: 105, fallBelow: 3))
+        XCTAssertNil(alert.profitAbove)
+    }
+}

@@ -15,6 +15,8 @@ struct StockEditorPanel: View {
     @State private var priceBelow = ""
     @State private var riseAbove = ""
     @State private var fallBelow = ""
+    @State private var profitAbove = ""
+    @State private var lossBelow = ""
     @State private var shares = ""
     @State private var cost = ""
     @State private var note = ""
@@ -74,6 +76,11 @@ struct StockEditorPanel: View {
                     numberField("价格低于", text: $priceBelow, unit: currency)
                     numberField("涨幅达到", text: $riseAbove, unit: "%")
                     numberField("跌幅达到", text: $fallBelow, unit: "%")
+                    // 止盈止损按持仓成本算，填了持仓才有。
+                    if case .valid(let holding) = holdingState, holding.cost > 0 {
+                        numberField("持仓盈利达到", text: $profitAbove, unit: "%")
+                        numberField("持仓亏损达到", text: $lossBelow, unit: "%")
+                    }
                     Text(alertFooter)
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
@@ -213,7 +220,8 @@ struct StockEditorPanel: View {
     }
 
     private var isValid: Bool {
-        [priceAbove, priceBelow, riseAbove, fallBelow].allSatisfy { parse($0) != .invalid } && holdingState != .invalid
+        [priceAbove, priceBelow, riseAbove, fallBelow, profitAbove, lossBelow].allSatisfy { parse($0) != .invalid }
+            && holdingState != .invalid
     }
 
     private func load() {
@@ -225,6 +233,8 @@ struct StockEditorPanel: View {
         priceBelow = format(item.alert.priceBelow)
         riseAbove = format(item.alert.riseAbove)
         fallBelow = format(item.alert.fallBelow)
+        profitAbove = format(item.alert.profitAbove)
+        lossBelow = format(item.alert.lossBelow)
         shares = item.holding.map { QuoteFormatter.plain($0.shares) } ?? ""
         note = item.note ?? ""
         cost = format(item.holding?.cost)
@@ -242,17 +252,22 @@ struct StockEditorPanel: View {
         updated.alias = trimmedAlias.isEmpty ? nil : trimmedAlias
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.note = trimmedNote.isEmpty ? nil : trimmedNote
+        // 没有持仓（或者成本为 0）时止盈止损没有意义，一起清掉。
+        var hasCost = false
+        if case .valid(let holding) = holdingState {
+            updated.holding = holding
+            hasCost = holding.cost > 0
+        } else {
+            updated.holding = nil
+        }
         updated.alert = PriceAlert(
             priceAbove: value(priceAbove),
             priceBelow: value(priceBelow),
             riseAbove: value(riseAbove),
-            fallBelow: value(fallBelow)
+            fallBelow: value(fallBelow),
+            profitAbove: hasCost ? value(profitAbove) : nil,
+            lossBelow: hasCost ? value(lossBelow) : nil
         )
-        if case .valid(let holding) = holdingState {
-            updated.holding = holding
-        } else {
-            updated.holding = nil
-        }
         if !updated.alert.isEmpty {
             Notifier.shared.requestAuthorization()
         }
