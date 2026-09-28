@@ -39,8 +39,8 @@ public struct PriceAlert: Codable, Hashable, Sendable {
         case .fallBelow: return fallBelow
         case .profitAbove: return profitAbove
         case .lossBelow: return lossBelow
-        // 涨停跌停不是每只单独设的，由设置里的总开关管（见 AlertEngine.evaluate）。
-        case .limitUp, .limitDown: return nil
+        // 涨停跌停、异动不是每只单独设的，由设置里的总开关管（见 AlertEngine.evaluate、RapidMoveDetector）。
+        case .limitUp, .limitDown, .rapidRise, .rapidFall: return nil
         }
     }
 }
@@ -49,6 +49,8 @@ public enum AlertCondition: String, Codable, CaseIterable, Sendable {
     case priceAbove, priceBelow, riseAbove, fallBelow, profitAbove, lossBelow
     /// A 股封涨停、跌停。
     case limitUp, limitDown
+    /// 几分钟内快速拉升、下跌（异动），由 RapidMoveDetector 判断。
+    case rapidRise, rapidFall
 
     func isMet(by quote: Quote, holding: Holding?, threshold: Double) -> Bool {
         switch self {
@@ -61,6 +63,7 @@ public enum AlertCondition: String, Codable, CaseIterable, Sendable {
             return self == .profitAbove ? percent >= abs(threshold) : percent <= -abs(threshold)
         case .limitUp: return quote.isLimitUp
         case .limitDown: return quote.isLimitDown
+        case .rapidRise, .rapidFall: return false
         }
     }
 }
@@ -92,6 +95,10 @@ public struct AlertTrigger: Sendable, Equatable {
             return "\(name) 涨停"
         case .limitDown:
             return "\(name) 跌停"
+        case .rapidRise:
+            return "\(name) \(Int(RapidMoveDetector.window / 60)) 分钟内拉升 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+        case .rapidFall:
+            return "\(name) \(Int(RapidMoveDetector.window / 60)) 分钟内下跌 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
         }
     }
 

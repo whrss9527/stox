@@ -138,3 +138,61 @@ final class HoldingAlertTests: XCTestCase {
         XCTAssertNil(alert.profitAbove)
     }
 }
+
+final class RapidMoveTests: XCTestCase {
+    private let symbol = Symbol("sh600519")!
+    private let start = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func quote(_ price: Double) -> Quote {
+        Quote(symbol: symbol, name: "贵州茅台", price: price, previousClose: 100)
+    }
+
+    func testRiseWithinTheWindow() throws {
+        var detector = RapidMoveDetector()
+        XCTAssertNil(detector.record(quote(100), at: start, threshold: 2))
+        XCTAssertNil(detector.record(quote(101), at: start.addingTimeInterval(60), threshold: 2))
+        let move = try XCTUnwrap(detector.record(quote(102.5), at: start.addingTimeInterval(120), threshold: 2))
+        XCTAssertEqual(move.direction, .up)
+        XCTAssertEqual(move.percent, 2.5, accuracy: 1e-9)
+        // 还在涨，但冷却中，不再提醒。
+        XCTAssertNil(detector.record(quote(104), at: start.addingTimeInterval(180), threshold: 2))
+
+        let trigger = AlertTrigger(symbol: symbol, name: "贵州茅台", condition: .rapidRise, threshold: move.percent, quote: quote(102.5))
+        XCTAssertEqual(trigger.title, "贵州茅台 5 分钟内拉升 2.50%")
+    }
+
+    func testSlowMovesDoNotCount() {
+        var detector = RapidMoveDetector()
+        // 每 4 分钟涨 1%，窗口里最多差 1%，不算异动。
+        for step in 0..<6 {
+            let price = 100 * pow(1.01, Double(step))
+            XCTAssertNil(detector.record(quote(price), at: start.addingTimeInterval(Double(step) * 240), threshold: 2))
+        }
+    }
+
+    func testFallAfterFlatAndCooldown() throws {
+        var detector = RapidMoveDetector()
+        // 一直不动，然后一次刷新跌了 3%。
+        for step in 0..<10 {
+            XCTAssertNil(detector.record(quote(100), at: start.addingTimeInterval(Double(step) * 30), threshold: 2))
+        }
+        let fall = try XCTUnwrap(detector.record(quote(97), at: start.addingTimeInterval(300), threshold: 2))
+        XCTAssertEqual(fall.direction, .down)
+        XCTAssertEqual(fall.percent, -3, accuracy: 1e-9)
+        XCTAssertEqual(
+            AlertTrigger(symbol: symbol, name: "贵州茅台", condition: .rapidFall, threshold: fall.percent, quote: quote(97)).title,
+            "贵州茅台 5 分钟内下跌 3.00%"
+        )
+
+        // 冷却过了以后再跌才会再提醒。
+        XCTAssertNil(detector.record(quote(94), at: start.addingTimeInterval(600), threshold: 2), "冷却中")
+        let later = start.addingTimeInterval(300 + RapidMoveDetector.cooldown)
+        XCTAssertNil(detector.record(quote(94), at: later, threshold: 2), "前面的记录已经出了窗口，只有这一笔")
+        XCTAssertNotNil(detector.record(quote(91), at: later.addingTimeInterval(60), threshold: 2))
+
+        // 阈值为 0 表示关闭；删掉以后记录清空。
+        XCTAssertNil(detector.record(quote(50), at: start.addingTimeInterval(5000), threshold: 0))
+        detector.forget(symbol)
+        XCTAssertNil(detector.record(quote(80), at: start.addingTimeInterval(5010), threshold: 2), "清空以后只有一笔，没有比较的对象")
+    }
+}

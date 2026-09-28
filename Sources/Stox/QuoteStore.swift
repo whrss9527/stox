@@ -44,6 +44,8 @@ final class QuoteStore: ObservableObject {
     private let settings: SettingsStore
     private let defaults: UserDefaults
     private var alertEngine: AlertEngine
+    /// 异动提醒用的最近几分钟的价格。
+    private var rapidMoves = RapidMoveDetector()
     private var loopTask: Task<Void, Never>?
     /// 每次刷新递增；较早发出、较晚返回的请求结果会被丢弃。
     private var generation = 0
@@ -146,6 +148,7 @@ final class QuoteStore: ObservableObject {
                 cacheNames(from: result)
             }
             evaluateAlerts()
+            checkRapidMoves(result)
             checkCloseSummaries()
             await refreshRatesIfNeeded()
             await refreshExtendedHoursIfNeeded()
@@ -380,6 +383,7 @@ final class QuoteStore: ObservableObject {
         klines = klines.filter { $0.key.symbol != symbol }
         fiveDay[symbol] = nil
         extendedHours[symbol] = nil
+        rapidMoves.forget(symbol)
         alertEngine.reset(symbol)
         save()
         saveAlertState()
@@ -498,6 +502,25 @@ final class QuoteStore: ObservableObject {
             defaults.set(note.day, forKey: key)
             closeSummaryCount += 1
             onCloseSummary?(note)
+        }
+    }
+
+    /// 异动提醒：交易时段里每次刷新把新行情记一笔，几分钟内涨跌超过设置的幅度时提醒（见 RapidMoveDetector）。
+    private func checkRapidMoves(_ fresh: [Symbol: Quote]) {
+        let threshold = settings.rapidMoveThreshold
+        guard settings.alertsEnabled, threshold > 0 else { return }
+        let now = Date()
+        for item in items {
+            guard let quote = fresh[item.symbol], quote.hasTraded,
+                  phase(for: item.symbol.market.region) == .trading,
+                  let move = rapidMoves.record(quote, at: now, threshold: threshold)
+            else { continue }
+            firedAlertCount += 1
+            let name = quote.name.isEmpty ? item.displayName : quote.name
+            onAlert?(AlertTrigger(
+                symbol: item.symbol, name: name, condition: move.direction == .up ? .rapidRise : .rapidFall,
+                threshold: move.percent, quote: quote
+            ))
         }
     }
 

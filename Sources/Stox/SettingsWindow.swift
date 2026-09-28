@@ -249,6 +249,15 @@ struct GeneralPage: View {
                             if enabled { Notifier.shared.requestAuthorization() }
                         }
                     FormNote("自选里的 A 股个股（不含指数）封涨停或跌停时发一条通知，开板再封板当天不再重复。")
+                    Picker("异动提醒", selection: $settings.rapidMoveThreshold) {
+                        ForEach(SettingsStore.rapidMoveOptions, id: \.self) { value in
+                            Text(value == 0 ? "关闭" : "5 分钟内涨跌 \(Int(value))%").tag(value)
+                        }
+                    }
+                    .onChange(of: settings.rapidMoveThreshold) { value in
+                        if value > 0 { Notifier.shared.requestAuthorization() }
+                    }
+                    FormNote("交易时段里，自选里的证券相对最近 5 分钟的最低点涨了、或者相对最高点跌了超过这个幅度时提醒，同一只同一个方向 15 分钟内只提醒一次。")
                     Button("打开系统的通知设置") {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!)
                     }
