@@ -54,6 +54,7 @@ jobs:
           fi
           xcodebuild -version
           swift --version
+          echo "::notice title=toolchain::$(xcodebuild -version | head -1), $(swift --version 2>&1 | head -1)"
       - name: Unit tests
         run: swift test
       - name: Build Stox.app (universal)
