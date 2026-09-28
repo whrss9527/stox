@@ -12,9 +12,10 @@ on:
         required: false
         default: ""
 
+# 同一分支上新的推送会取消还在跑的旧构建；手动发布单独一组，不会被合并时的推送构建取消。
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'workflow_dispatch' && format('release-{0}', inputs.release_tag) || format('build-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
   core:
@@ -170,9 +171,11 @@ jobs:
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" dist/Stox.zip dist/SHA256SUMS.txt --clobber
           else
+            # 发布说明最前面是 CHANGELOG.md 里这个版本的一节，App 的“关于与更新”页显示的就是它。
+            scripts/release-notes.sh "$TAG" > "$RUNNER_TEMP/release-notes.md"
             gh release create "$TAG" dist/Stox.zip dist/SHA256SUMS.txt \
               --target "$GITHUB_SHA" \
               --title "Stox $TAG" \
-              --notes-file .github/release-notes.md \
+              --notes-file "$RUNNER_TEMP/release-notes.md" \
               --generate-notes
           fi

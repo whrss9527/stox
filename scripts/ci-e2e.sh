@@ -133,6 +133,12 @@ smoke() {
   defaults delete "$DOMAIN" list.pill
   grep -q "pill=marketCap" shots/sorted.log || fail "色块没有切到总市值"
 
+  # 只看港股：列表上方选了“港股”，默认自选里有两只。
+  defaults write "$DOMAIN" list.filter -string hk
+  run_case filtered --show-panel
+  defaults delete "$DOMAIN" list.filter
+  grep -q "filter=hk visible=2" shots/filtered.log || fail "筛选港股后应该只剩两只"
+
   # 粘贴多个代码：列出认出的代码，等回车全部添加；认不出的单独列出来。
   run_case batch --show-panel --search "601318 09988 TSLA 茅台"
   grep -q "items=8 " shots/batch.log || fail "批量添加在确认前不应该改动自选"

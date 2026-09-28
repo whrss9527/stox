@@ -105,3 +105,33 @@ final class UpdateTests: XCTestCase {
         )
     }
 }
+
+final class ReleaseNotesTests: XCTestCase {
+    func testKeepsOnlyTheHighlights() {
+        let notes = """
+        ## 更新内容
+
+        - 五日分时
+        - 键盘操作
+
+        ## 安装
+
+        1. 下载 Stox.zip
+        2. 拖进应用程序
+
+        ## What's Changed
+        * Add a five-day intraday chart by @whrss9527 in https://github.com/whrss9527/stox/pull/13
+
+        **Full Changelog**: https://github.com/whrss9527/stox/compare/v0.10.0...v0.11.0
+        """
+        XCTAssertEqual(ReleaseNotesText.highlights(notes), "- 五日分时\n- 键盘操作")
+    }
+
+    func testOlderNotesDropInstallSteps() {
+        let notes = "## 安装\r\n\r\n1. 下载\r\n\r\n## What's Changed\r\n* Add holdings by @whrss9527\r\n\r\n**Full Changelog**: https://x"
+        XCTAssertEqual(ReleaseNotesText.highlights(notes), "")
+        XCTAssertEqual(ReleaseNotesText.highlights("修复了一些问题"), "修复了一些问题", "没有标题的说明原样显示")
+        let release = ReleaseInfo(version: "0.13.0", tag: "v0.13.0", pageURL: URL(string: "https://github.com")!, notes: "## 更新内容\n- 筛选")
+        XCTAssertEqual(release.highlights, "- 筛选")
+    }
+}

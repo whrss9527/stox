@@ -199,8 +199,8 @@ struct UpdateSection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if !release.notes.isEmpty {
-                ReleaseNotes(text: release.notes)
+            if !release.highlights.isEmpty {
+                ReleaseNotes(text: release.highlights)
                     .lineLimit(12)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)

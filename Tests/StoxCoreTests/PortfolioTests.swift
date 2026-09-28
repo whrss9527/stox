@@ -246,3 +246,20 @@ final class CloseSummaryTests: XCTestCase {
         XCTAssertEqual(note.day, "2026-09-28", "按美东的日期")
     }
 }
+
+final class FilterTests: XCTestCase {
+    func testFiltersByMarketAndHoldings() {
+        var items = Watchlist.defaults
+        XCTAssertEqual(WatchlistFilter.available(for: items), [.all, .cn, .hk, .us], "没有持仓时不显示“持仓”")
+        items[5].holding = Holding(shares: 100, cost: 1200)
+        XCTAssertEqual(WatchlistFilter.available(for: items), [.all, .cn, .hk, .us, .holdings])
+        XCTAssertEqual(WatchlistFilter.hk.apply(items).map(\.symbol.rawValue), ["hkHSI", "hk00700"])
+        XCTAssertEqual(WatchlistFilter.holdings.apply(items).map(\.symbol.rawValue), ["sh600519"])
+        XCTAssertEqual(WatchlistFilter.all.apply(items).count, 8)
+
+        let onlyCN = items.filter { $0.symbol.market.region == .cn && $0.holding == nil }
+        XCTAssertEqual(WatchlistFilter.available(for: onlyCN), [], "只有一个市场、没有持仓时不显示筛选")
+        XCTAssertEqual(WatchlistFilter.effective(.us, items: onlyCN), .all, "选中的市场没有了就回到全部")
+        XCTAssertEqual(WatchlistFilter.effective(.hk, items: items), .hk)
+    }
+}
