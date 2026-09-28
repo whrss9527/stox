@@ -593,13 +593,21 @@ struct HoldingsSummaryView: View {
     @EnvironmentObject private var settings: SettingsStore
 
     var body: some View {
-        let summaries = Portfolio.summaries(items: store.items, quotes: store.quotes)
+        // 跟着列表上方的筛选走：只看某个分组、某个市场时只算这些。
+        let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
+        let summaries = Self.summaries(store: store, settings: settings)
         if !summaries.isEmpty {
-            // 只有一种货币时不需要货币那一列。
-            let showsCurrency = summaries.count > 1
+            // 只有一种货币、也没有筛选时不需要第一列；筛选着的时候第一列的表头写着筛的是什么。
+            let filtered = filter != .all
+            let showsCurrency = summaries.count > 1 || filtered
             Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
                 GridRow {
-                    if showsCurrency {
+                    if filtered {
+                        Text(filter.title)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    } else if showsCurrency {
                         Color.clear
                             .gridCellUnsizedAxes([.horizontal, .vertical])
                     }
@@ -621,8 +629,15 @@ struct HoldingsSummaryView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .glassCard()
-            .help("按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币")
+            .help((filtered ? "只算列表上方选中的“\(filter.title)”。" : "")
+                + "按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币")
         }
+    }
+
+    /// 列表上方筛选出来的那些持仓，按币种合计。
+    static func summaries(store: QuoteStore, settings: SettingsStore) -> [PortfolioSummary] {
+        let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
+        return Portfolio.summaries(items: filter.apply(store.items), quotes: store.quotes)
     }
 
     private func row(_ title: String, _ summary: PortfolioSummary, showsCurrency: Bool, help: String = "") -> some View {

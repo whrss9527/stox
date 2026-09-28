@@ -187,7 +187,12 @@ smoke() {
   # 编辑页：持仓、记一笔买卖、止盈止损。
   run_case editor --show-panel --edit sh600519
   grep -q "panel_frame=" shots/editor.log || fail "编辑页没有打开"
-  grep -Eq "items=5 quotes=[0-9]+ holdings=4" shots/holdings.log || fail "持仓没有读出来"
+  grep -Eq "items=5 quotes=[0-9]+ holdings=4 summary=cn,hk,us " shots/holdings.log || fail "持仓没有读出来"
+  # 列表上方只看港股时，持仓合计也只算港股。
+  defaults write "$DOMAIN" list.filter -string hk
+  run_case holdings-hk --show-panel
+  defaults delete "$DOMAIN" list.filter
+  grep -q "summary=hk " shots/holdings-hk.log || fail "只看港股时持仓合计应该只算港币"
   # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来。
   grep -Eq "alerts=[1-9]" shots/holdings.log || fail "持仓盈利达到阈值时没有提醒"
   # 打开了收盘小结：收盘不到 16 小时的市场各发一条。CI 运行的时间不固定，发没发取决于这时哪个市场刚收盘，只提示不判失败。
