@@ -8,10 +8,13 @@
 </p>
 <p>
   <img src="docs/images/search.jpg" width="300" alt="搜索添加">
-  <img src="docs/images/settings.jpg" width="300" alt="设置">
+  <img src="docs/images/neutral.jpg" width="300" alt="不显示红绿">
+</p>
+<p>
+  <img src="docs/images/settings.jpg" width="604" alt="设置窗口">
 </p>
 
-以上截图由 CI 在 macOS 15 上启动打包好的 App 自动截取，数据为 2026-09-28 的实时行情。
+截图依次是自选列表、展开详情、搜索添加、“不显示红绿”配色和设置窗口，由 CI 在 macOS 15 上启动打包好的 App 自动截取，数据为 2026-09-28 的实时行情。
 
 ## 功能
 
@@ -100,7 +103,11 @@ UNIVERSAL=1 make app   # 打包 Apple 芯片 + Intel 通用版
 
 ### 更新
 
+<img src="docs/images/update.jpg" width="300" alt="面板底部的更新条" align="right">
+
 Stox 启动后和之后每 6 小时检查一次 [GitHub Releases](https://github.com/whrss9527/stox/releases)，发现新版本时发一条通知，面板底部出现“更新”按钮。点一下会下载 `Stox.zip`，用发布附带的 SHA-256 校验，确认是同一个 App 并且签名完整后替换程序并重新启动，自选和设置都会保留。从“下载”文件夹直接运行时，新版本会装进“应用程序”，旧的那份移到废纸篓。不想自动检查可以在“关于与更新”页关掉。
+
+<br clear="right">
 
 ## 开发
 
