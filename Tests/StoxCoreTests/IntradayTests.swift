@@ -129,7 +129,15 @@ final class FiveDayTests: XCTestCase {
         XCTAssertEqual(series.previousClose, 440.2, "基准线是第一天的昨收")
         XCTAssertEqual(series.dayPreviousCloses.last ?? nil, 436.6)
         XCTAssertEqual(series.pointCount, 11)
-        XCTAssertEqual(series.days.last?.points.last, IntradayPoint(minute: 16 * 60 + 8, price: 439.8))
+        XCTAssertEqual(series.days.last?.points.last?.minute, 16 * 60 + 8)
+        XCTAssertEqual(series.days.last?.points.last?.price, 439.8)
+
+        // 每天各算各的均价；前几天的成交额是凑数的，算出来不在价格范围里，不要。
+        let today = try XCTUnwrap(series.days.last)
+        XCTAssertEqual(try XCTUnwrap(today.points[0].average), 167_797_970 / 380_150, accuracy: 1e-9)
+        XCTAssertNil(today.points[1].average)
+        XCTAssertEqual(try XCTUnwrap(today.latestAverage), 6_774_063_362.9 / 15_335_550, accuracy: 1e-9)
+        XCTAssertNil(series.days.first?.latestAverage)
     }
 
     func testUSKeyWithSuffixAndGarbage() throws {

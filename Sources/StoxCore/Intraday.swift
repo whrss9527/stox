@@ -222,7 +222,10 @@ public enum TencentMultiDayParser {
         for case let day as [String: Any] in list {
             guard let rows = day["data"] as? [String] else { continue }
             let date = (day["date"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            days.append(IntradaySeries(symbol: symbol, date: date, points: rows.compactMap(TencentMinuteParser.point(from:))))
+            // 每天的均价各算各的，和分时图一样指数没有。
+            let parsed = rows.compactMap(TencentMinuteParser.row(from:))
+            let points = symbol.isIndex ? parsed.map(\.point) : TencentMinuteParser.addingAverages(parsed)
+            days.append(IntradaySeries(symbol: symbol, date: date, points: points))
             closes.append((day["prec"] as? String).flatMap(Double.init).flatMap { $0 > 0 ? $0 : nil })
         }
         // 接口是最近的一天在前，画图要从早到晚。

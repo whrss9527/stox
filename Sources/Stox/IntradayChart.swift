@@ -134,17 +134,19 @@ struct IntradayChart: View {
     }
 }
 
-/// 五日图：最近五个交易日的分时连在一起，每天占一样宽，竖线分开各天，虚线是第一天的昨收。
+/// 五日图：最近五个交易日的分时连在一起，每天占一样宽，竖线分开各天，虚线是第一天的昨收，
+/// 橙色的线是每天各自的成交均价（个股才有）。
 struct FiveDayChart: View {
     let series: MultiDaySeries?
     let region: MarketRegion
     let color: Color
     /// 鼠标指着的那一天和那一点。
     var hovered: (day: Int, point: IntradayPoint)?
+    var showAverage = true
 
     var body: some View {
         GeometryReader { proxy in
-            if let series, let scale = Scale(series: series, region: region, size: proxy.size) {
+            if let series, let scale = Scale(series: series, region: region, size: proxy.size, includingAverages: showAverage) {
                 ZStack {
                     scale.separators
                         .stroke(Color.secondary.opacity(0.3), lineWidth: 0.5)
@@ -153,6 +155,10 @@ struct FiveDayChart: View {
                     if let baseline = scale.baseline {
                         baseline
                             .stroke(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
+                    }
+                    if showAverage {
+                        scale.averages
+                            .stroke(IntradayChart.averageColor.opacity(0.9), style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round))
                     }
                     scale.line
                         .stroke(color, style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
@@ -180,7 +186,7 @@ struct FiveDayChart: View {
         .accessibilityLabel("五日走势")
     }
 
-    /// 坐标换算。纵轴包含第一天的昨收，和分时图一样至少留出 0.4% 的范围。
+    /// 坐标换算。纵轴包含第一天的昨收（画均价线时也包含均价），和分时图一样至少留出 0.4% 的范围。
     struct Scale {
         let series: MultiDaySeries
         let region: MarketRegion
@@ -188,8 +194,10 @@ struct FiveDayChart: View {
         let top: Double
         let bottom: Double
 
-        init?(series: MultiDaySeries, region: MarketRegion, size: CGSize) {
-            let prices = series.days.flatMap { $0.points.map(\.price) } + (series.previousClose.map { [$0] } ?? [])
+        init?(series: MultiDaySeries, region: MarketRegion, size: CGSize, includingAverages: Bool = false) {
+            var prices = series.days.flatMap { $0.points.map(\.price) }
+            if let previousClose = series.previousClose { prices.append(previousClose) }
+            if includingAverages { prices += series.days.flatMap { $0.points.compactMap(\.average) } }
             guard series.pointCount > 1, size.width > 0, size.height > 0,
                   let low = prices.min(), let high = prices.max()
             else { return nil }
@@ -230,6 +238,28 @@ struct FiveDayChart: View {
                 path.addLine(to: CGPoint(x: last.x, y: size.height))
                 path.addLine(to: CGPoint(x: first.x, y: size.height))
                 path.closeSubpath()
+            }
+            return path
+        }
+
+        /// 每天各自的均价线，天与天之间断开。
+        var averages: Path {
+            var path = Path()
+            for (day, daySeries) in series.days.enumerated() {
+                var drawing = false
+                for point in daySeries.points {
+                    guard let average = point.average else {
+                        drawing = false
+                        continue
+                    }
+                    let target = CGPoint(x: location(day: day, point: point).x, y: y(average))
+                    if drawing {
+                        path.addLine(to: target)
+                    } else {
+                        path.move(to: target)
+                        drawing = true
+                    }
+                }
             }
             return path
         }

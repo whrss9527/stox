@@ -92,7 +92,8 @@ struct QuoteChartSection: View {
                 series: fiveDaySeries,
                 region: region,
                 color: Theme.priceColor(for: fiveDayDirection, convention: settings.colorConvention),
-                hovered: hoveredFiveDay
+                hovered: hoveredFiveDay,
+                showAverage: settings.showMovingAverages
             )
         case .day, .week, .month:
             let data = klineData
@@ -212,6 +213,9 @@ struct QuoteChartSection: View {
             text += String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60) + price(point.price)
             if let reference = series.dayPreviousCloses[day], reference > 0 {
                 text += "  " + QuoteFormatter.percent((point.price - reference) / reference * 100)
+            }
+            if settings.showMovingAverages, let average = point.average {
+                text += "  均价 " + price(average)
             }
             return text
         }
