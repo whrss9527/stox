@@ -1,0 +1,119 @@
+# Stox
+
+一个轻量的 macOS 菜单栏股票行情工具。点一下菜单栏图标打开行情面板，再点一下（或点面板外、按 Esc）就关掉。原生 Swift 编写，压缩包不到 1MB，内存占用约 25MB。
+
+<p>
+  <img src="docs/images/panel.jpg" width="300" alt="自选列表">
+  <img src="docs/images/detail.jpg" width="300" alt="展开详情">
+</p>
+<p>
+  <img src="docs/images/search.jpg" width="300" alt="搜索添加">
+  <img src="docs/images/settings.jpg" width="300" alt="设置">
+</p>
+
+以上截图由 CI 在 macOS 15 上启动打包好的 App 自动截取，数据为 2026-09-28 的实时行情。
+
+## 功能
+
+- **一键开关**：左键单击菜单栏图标打开 / 关闭面板；点面板外或按 Esc 也会关闭；全局快捷键 ⌃⌥S 在任何 App 里都能呼出。
+- **菜单栏行情**：把任意几只股票“显示在菜单栏”，红绿配色、等宽数字不跳动；多只时可以轮播，适合刘海屏。
+- **覆盖三地市场**：沪深北 A 股、港股、美股，以及上证指数、恒生指数、纳斯达克等指数和 ETF。
+- **搜索添加**：输入代码、中文名或拼音首字母（`600519`、`腾讯`、`gzmt`、`aapl`），回车添加第一条结果。
+- **自选管理**：拖动排序；单击展开今开、最高、最低、成交额、市值；右键可固定到菜单栏、设置提醒、在雪球查看、删除。
+- **价格提醒**：价格高于 / 低于、涨幅 / 跌幅达到阈值时发系统通知，每个条件每个交易日最多提醒一次。
+- **省电**：休市和午休时自动降到每分钟刷新一次，节假日根据行情时间自动识别；电脑睡眠时停止请求。
+- **其他**：红涨绿跌 / 绿涨红跌可切换，开机自启动，右键菜单一键隐藏菜单栏行情。
+
+行情来自腾讯财经公开接口，免费、无需注册和 API Key。港股行情延时约 15 分钟。数据仅供参考，不构成投资建议。
+
+## 安装
+
+需要 macOS 13 Ventura 或更新版本，Apple 芯片和 Intel 都支持。
+
+### 方式一：下载构建好的 App
+
+1. 打开仓库的 [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) 页面，进入最近一次成功的构建，下载 `Stox-app`；打 tag 发布后也可以在 Releases 里下载 `Stox.zip`。
+2. 解压后把 `Stox.app` 拖进“应用程序”文件夹。
+3. App 使用临时签名（没有 Apple 开发者证书），第一次打开会被系统拦截。任选一种方式放行：
+   - 在终端执行 `xattr -dr com.apple.quarantine /Applications/Stox.app`，然后正常打开；
+   - 或者先双击一次，再到“系统设置 → 隐私与安全性”里点“仍要打开”。
+
+### 方式二：从源码构建
+
+需要 Xcode 16 或更新版本。
+
+```bash
+git clone https://github.com/whrss9527/stox.git
+cd stox
+make install      # 编译、打包成 Stox.app、复制到“应用程序”并启动
+```
+
+其他命令：
+
+```bash
+make run          # 只打包到 dist/Stox.app 并运行
+make test         # 运行单元测试
+UNIVERSAL=1 make app   # 打包 Apple 芯片 + Intel 通用版
+```
+
+本机编译的 App 不会被 Gatekeeper 拦截。
+
+## 使用
+
+| 操作 | 效果 |
+|---|---|
+| 左键单击菜单栏图标 | 打开 / 关闭面板 |
+| ⌃⌥S | 在任何 App 里打开 / 关闭面板 |
+| Esc | 清空搜索 → 返回列表 → 关闭面板 |
+| 右键单击菜单栏图标 | 刷新、隐藏菜单栏行情、设置、退出 |
+| 单击一行 | 展开 / 收起详情 |
+| 拖动一行 | 调整顺序 |
+| 右键单击一行 | 显示在菜单栏、价格提醒与简称、在雪球查看、复制代码、删除 |
+| ⌘R / ⌘, / ⌘Q | 面板打开时：刷新 / 设置 / 退出 |
+
+搜索框也接受直接输入代码：
+
+| 输入 | 识别为 |
+|---|---|
+| `600519`、`sh600519`、`600519.SS` | 沪市 贵州茅台 |
+| `000001`、`000001.SZ` | 深市 平安银行（上证指数请输入 `sh000001`） |
+| `920819`、`bj920819` | 北交所 |
+| `700`、`00700`、`0700.HK` | 港股 腾讯控股 |
+| `hkHSI` | 恒生指数 |
+| `AAPL`、`brk.b` | 美股 |
+| `us.IXIC`、`us.DJI`、`us.INX` | 纳斯达克、道琼斯、标普 500 |
+
+## 开发
+
+```
+Sources/
+  StoxCore/   与界面无关的逻辑：代码解析、腾讯行情与搜索解析、交易时段、提醒、格式化（Linux 上也能编译测试）
+  Stox/       菜单栏 App：NSStatusItem + NSPopover + SwiftUI
+  StoxCLI/    命令行调试工具 stox-cli
+Tests/StoxCoreTests/   单元测试，使用真实接口返回作为样本
+scripts/
+  build-app.sh         编译并组装、签名 Stox.app
+  make-icon.swift      生成 App 图标
+  check-datasources.sh 打印行情接口的原始返回，排查格式变化
+```
+
+用命令行检查数据源：
+
+```bash
+swift run stox-cli quote sh600519 700 AAPL us.IXIC
+swift run stox-cli search 茅台
+swift run stox-cli raw hk00700
+```
+
+调试界面时，可以让 App 启动后直接打开面板，并在终端打印菜单栏文字和面板位置：
+
+```bash
+dist/Stox.app/Contents/MacOS/Stox --show-panel                    # 自选列表
+dist/Stox.app/Contents/MacOS/Stox --show-panel --expand sh600519  # 展开某只证券的详情
+dist/Stox.app/Contents/MacOS/Stox --show-panel --search 腾讯       # 预填搜索词
+dist/Stox.app/Contents/MacOS/Stox --show-settings                 # 设置页
+```
+
+CI 会在 macOS 上启动打包好的 App，确认启动不崩溃，并把面板截图作为构建产物上传。
+
+设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。
