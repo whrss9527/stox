@@ -39,12 +39,16 @@ public struct PriceAlert: Codable, Hashable, Sendable {
         case .fallBelow: return fallBelow
         case .profitAbove: return profitAbove
         case .lossBelow: return lossBelow
+        // 涨停跌停不是每只单独设的，由设置里的总开关管（见 AlertEngine.evaluate）。
+        case .limitUp, .limitDown: return nil
         }
     }
 }
 
 public enum AlertCondition: String, Codable, CaseIterable, Sendable {
     case priceAbove, priceBelow, riseAbove, fallBelow, profitAbove, lossBelow
+    /// A 股封涨停、跌停。
+    case limitUp, limitDown
 
     func isMet(by quote: Quote, holding: Holding?, threshold: Double) -> Bool {
         switch self {
@@ -55,6 +59,8 @@ public enum AlertCondition: String, Codable, CaseIterable, Sendable {
         case .profitAbove, .lossBelow:
             guard let percent = holding.flatMap({ Portfolio.position($0, quote: quote)?.totalProfitPercent }) else { return false }
             return self == .profitAbove ? percent >= abs(threshold) : percent <= -abs(threshold)
+        case .limitUp: return quote.isLimitUp
+        case .limitDown: return quote.isLimitDown
         }
     }
 }
@@ -82,6 +88,10 @@ public struct AlertTrigger: Sendable, Equatable {
             return "\(name) 持仓盈利达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
         case .lossBelow:
             return "\(name) 持仓亏损达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+        case .limitUp:
+            return "\(name) 涨停"
+        case .limitDown:
+            return "\(name) 跌停"
         }
     }
 
@@ -111,15 +121,21 @@ public struct AlertEngine: Codable, Sendable, Equatable {
         self.firedDays = firedDays
     }
 
-    public mutating func evaluate(items: [WatchItem], quotes: [Symbol: Quote], now: Date) -> [AlertTrigger] {
+    /// - Parameter limitAlerts: 设置里打开了“涨停、跌停时提醒”：自选里的 A 股个股封板时也提醒。
+    public mutating func evaluate(items: [WatchItem], quotes: [Symbol: Quote], now: Date, limitAlerts: Bool = false) -> [AlertTrigger] {
         var triggers: [AlertTrigger] = []
-        for item in items where !item.alert.isEmpty {
+        for item in items where !item.alert.isEmpty || limitAlerts {
             guard let quote = quotes[item.symbol], quote.price > 0, quote.hasTraded else { continue }
             let day = Self.dayKey(quote.timestamp ?? now, region: item.symbol.market.region)
             for condition in AlertCondition.allCases {
-                guard let threshold = item.alert.threshold(for: condition),
-                      condition.isMet(by: quote, holding: item.holding, threshold: threshold)
-                else { continue }
+                let threshold: Double?
+                switch condition {
+                case .limitUp, .limitDown:
+                    threshold = limitAlerts && !item.symbol.isIndex ? 0 : nil
+                default:
+                    threshold = item.alert.threshold(for: condition)
+                }
+                guard let threshold, condition.isMet(by: quote, holding: item.holding, threshold: threshold) else { continue }
                 let key = Self.key(item.symbol, condition)
                 guard firedDays[key] != day else { continue }
                 firedDays[key] = day

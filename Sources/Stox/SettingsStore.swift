@@ -166,6 +166,10 @@ final class SettingsStore: ObservableObject {
     @Published var closeSummary: Bool {
         didSet { defaults.set(closeSummary, forKey: Keys.closeSummary) }
     }
+    /// 自选里的 A 股个股封涨停、跌停时提醒。只在本机，不同步。
+    @Published var limitAlerts: Bool {
+        didSet { defaults.set(limitAlerts, forKey: Keys.limitAlerts) }
+    }
     /// 菜单栏只显示图标（右键单击菜单栏图标切换）。
     @Published var hideTicker: Bool {
         didSet { defaults.set(hideTicker, forKey: Keys.hideTicker) }
@@ -269,6 +273,7 @@ final class SettingsStore: ObservableObject {
         rotateTicker = defaults.object(forKey: Keys.rotateTicker) as? Bool ?? false
         alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
         closeSummary = defaults.object(forKey: Keys.closeSummary) as? Bool ?? false
+        limitAlerts = defaults.object(forKey: Keys.limitAlerts) as? Bool ?? false
         hideTicker = defaults.object(forKey: Keys.hideTicker) as? Bool ?? false
         hideTickerWhenClosed = defaults.object(forKey: Keys.hideTickerWhenClosed) as? Bool ?? false
         hotKeyEnabled = defaults.object(forKey: Keys.hotKeyEnabled) as? Bool ?? true
@@ -346,6 +351,7 @@ final class SettingsStore: ObservableObject {
         static let toggleHotkey = "hotkey.toggle"
         static let alertsEnabled = "alertsEnabled"
         static let closeSummary = "alerts.closeSummary"
+        static let limitAlerts = "alerts.limit"
         static let autoCheckUpdates = "update.autoCheck"
         static let syncEnabled = "sync.enabled"
         static let appearance = "appearance"

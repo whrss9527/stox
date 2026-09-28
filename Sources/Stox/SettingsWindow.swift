@@ -244,6 +244,11 @@ struct GeneralPage: View {
                             if enabled { Notifier.shared.requestAuthorization() }
                         }
                     FormNote("有持仓的市场收盘后各发一次：今日盈亏、持仓盈亏和市值。美股在盘后开始时发。")
+                    Toggle("A 股涨停、跌停时提醒", isOn: $settings.limitAlerts)
+                        .onChange(of: settings.limitAlerts) { enabled in
+                            if enabled { Notifier.shared.requestAuthorization() }
+                        }
+                    FormNote("自选里的 A 股个股（不含指数）封涨停或跌停时发一条通知，开板再封板当天不再重复。")
                     Button("打开系统的通知设置") {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!)
                     }

@@ -14,6 +14,29 @@ final class AlertEngineTests: XCTestCase {
         WatchItem(symbol: symbol, name: "贵州茅台", alert: alert)
     }
 
+    func testLimitAlertsNeedTheSwitch() {
+        var engine = AlertEngine()
+        let items = [WatchItem(symbol: symbol, name: "贵州茅台"), WatchItem(symbol: Symbol("sh000001")!, name: "上证指数")]
+        let time = MarketRegion.cn.calendar.date(from: DateComponents(year: 2026, month: 9, day: 28, hour: 10))!
+        let sealed = Quote(symbol: symbol, name: "贵州茅台", price: 110, previousClose: 100, open: 101, volume: 100,
+                           limitUp: 110, limitDown: 90, timestamp: time)
+        let quotes = [symbol: sealed]
+
+        XCTAssertTrue(engine.evaluate(items: items, quotes: quotes, now: time).isEmpty, "没打开开关时不提醒")
+        let fired = engine.evaluate(items: items, quotes: quotes, now: time, limitAlerts: true)
+        XCTAssertEqual(fired.map(\.condition), [.limitUp])
+        XCTAssertEqual(fired.first?.title, "贵州茅台 涨停")
+        XCTAssertEqual(fired.first?.body, "现价 110.00，涨跌 +10.00（+10.00%）")
+        XCTAssertTrue(engine.evaluate(items: items, quotes: quotes, now: time, limitAlerts: true).isEmpty, "开板再封板当天不再提醒")
+
+        var down = sealed
+        down.price = 90
+        down.change = -10
+        down.changePercent = -10
+        XCTAssertEqual(engine.evaluate(items: items, quotes: [symbol: down], now: time, limitAlerts: true).map(\.condition), [.limitDown])
+        XCTAssertTrue(PriceAlert().isEmpty, "涨停跌停不算单只的提醒条件")
+    }
+
     func testFiresOncePerDay() {
         var engine = AlertEngine()
         let items = [item(PriceAlert(priceAbove: 105))]
