@@ -2,7 +2,7 @@ import Foundation
 import StoxCore
 
 enum ColorConvention: String, CaseIterable, Identifiable {
-    case redUp, greenUp
+    case redUp, greenUp, neutral
 
     var id: String { rawValue }
 
@@ -10,48 +10,69 @@ enum ColorConvention: String, CaseIterable, Identifiable {
         switch self {
         case .redUp: return "红涨绿跌"
         case .greenUp: return "绿涨红跌"
+        case .neutral: return "不显示红绿"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .redUp: return "A 股、港股的习惯"
+        case .greenUp: return "美股的习惯"
+        case .neutral: return "全部使用系统默认颜色，不显眼"
         }
     }
 }
 
-/// 用户偏好，全部保存在 UserDefaults。
+/// 用户偏好，全部保存在 UserDefaults。标注“同步”的会通过 iCloud 同步到其他 Mac。
 @MainActor
 final class SettingsStore: ObservableObject {
     static let intervalOptions: [Double] = [3, 5, 10, 30, 60]
 
     private let defaults: UserDefaults
 
+    /// 需要同步的设置变了（由 SyncManager 设置）。
+    var onSyncedSettingChange: (() -> Void)?
+
+    // 同步
     @Published var refreshInterval: Double {
-        didSet { defaults.set(refreshInterval, forKey: Keys.refreshInterval) }
+        didSet { defaults.set(refreshInterval, forKey: Keys.refreshInterval); onSyncedSettingChange?() }
     }
     @Published var slowWhenIdle: Bool {
-        didSet { defaults.set(slowWhenIdle, forKey: Keys.slowWhenIdle) }
+        didSet { defaults.set(slowWhenIdle, forKey: Keys.slowWhenIdle); onSyncedSettingChange?() }
     }
     @Published var colorConvention: ColorConvention {
-        didSet { defaults.set(colorConvention.rawValue, forKey: Keys.colorConvention) }
+        didSet { defaults.set(colorConvention.rawValue, forKey: Keys.colorConvention); onSyncedSettingChange?() }
     }
     @Published var showName: Bool {
-        didSet { defaults.set(showName, forKey: Keys.showName) }
+        didSet { defaults.set(showName, forKey: Keys.showName); onSyncedSettingChange?() }
     }
     @Published var showPrice: Bool {
-        didSet { defaults.set(showPrice, forKey: Keys.showPrice) }
+        didSet { defaults.set(showPrice, forKey: Keys.showPrice); onSyncedSettingChange?() }
     }
     @Published var showPercent: Bool {
-        didSet { defaults.set(showPercent, forKey: Keys.showPercent) }
+        didSet { defaults.set(showPercent, forKey: Keys.showPercent); onSyncedSettingChange?() }
     }
     /// 固定了多只证券时，菜单栏每 5 秒轮流显示一只，节省刘海屏的空间。
     @Published var rotateTicker: Bool {
-        didSet { defaults.set(rotateTicker, forKey: Keys.rotateTicker) }
+        didSet { defaults.set(rotateTicker, forKey: Keys.rotateTicker); onSyncedSettingChange?() }
     }
-    /// 临时隐藏菜单栏行情，只显示图标。
+    @Published var alertsEnabled: Bool {
+        didSet { defaults.set(alertsEnabled, forKey: Keys.alertsEnabled); onSyncedSettingChange?() }
+    }
+
+    // 只和这台 Mac 有关，不同步
+    /// 菜单栏只显示图标（右键单击菜单栏图标切换）。
     @Published var hideTicker: Bool {
         didSet { defaults.set(hideTicker, forKey: Keys.hideTicker) }
     }
     @Published var hotKeyEnabled: Bool {
         didSet { defaults.set(hotKeyEnabled, forKey: Keys.hotKeyEnabled) }
     }
-    @Published var alertsEnabled: Bool {
-        didSet { defaults.set(alertsEnabled, forKey: Keys.alertsEnabled) }
+    @Published var autoCheckUpdates: Bool {
+        didSet { defaults.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates) }
+    }
+    @Published var syncEnabled: Bool {
+        didSet { defaults.set(syncEnabled, forKey: Keys.syncEnabled) }
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -59,18 +80,50 @@ final class SettingsStore: ObservableObject {
         let interval = defaults.object(forKey: Keys.refreshInterval) as? Double ?? 5
         refreshInterval = Self.intervalOptions.contains(interval) ? interval : 5
         slowWhenIdle = defaults.object(forKey: Keys.slowWhenIdle) as? Bool ?? true
-        colorConvention = (defaults.string(forKey: Keys.colorConvention)).flatMap(ColorConvention.init(rawValue:)) ?? .redUp
+        colorConvention = defaults.string(forKey: Keys.colorConvention).flatMap(ColorConvention.init(rawValue:)) ?? .redUp
         showName = defaults.object(forKey: Keys.showName) as? Bool ?? true
         showPrice = defaults.object(forKey: Keys.showPrice) as? Bool ?? true
         showPercent = defaults.object(forKey: Keys.showPercent) as? Bool ?? true
         rotateTicker = defaults.object(forKey: Keys.rotateTicker) as? Bool ?? false
+        alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
         hideTicker = defaults.object(forKey: Keys.hideTicker) as? Bool ?? false
         hotKeyEnabled = defaults.object(forKey: Keys.hotKeyEnabled) as? Bool ?? true
-        alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
+        autoCheckUpdates = defaults.object(forKey: Keys.autoCheckUpdates) as? Bool ?? true
+        syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
     }
 
     var tickerOptions: TickerOptions {
         TickerOptions(showName: showName, showPrice: showPrice, showPercent: showPercent)
+    }
+
+    /// 需要同步的设置。
+    var syncedSettings: SyncedSettings {
+        SyncedSettings(
+            refreshInterval: refreshInterval,
+            slowWhenIdle: slowWhenIdle,
+            colorScheme: colorConvention.rawValue,
+            showName: showName,
+            showPrice: showPrice,
+            showPercent: showPercent,
+            rotateTicker: rotateTicker,
+            alertsEnabled: alertsEnabled
+        )
+    }
+
+    /// 应用从 iCloud 来的设置；缺少或不认识的值保留本机的。
+    func apply(_ synced: SyncedSettings) {
+        if let value = synced.refreshInterval, Self.intervalOptions.contains(value), value != refreshInterval {
+            refreshInterval = value
+        }
+        if let value = synced.slowWhenIdle, value != slowWhenIdle { slowWhenIdle = value }
+        if let value = synced.colorScheme.flatMap(ColorConvention.init(rawValue:)), value != colorConvention {
+            colorConvention = value
+        }
+        if let value = synced.showName, value != showName { showName = value }
+        if let value = synced.showPrice, value != showPrice { showPrice = value }
+        if let value = synced.showPercent, value != showPercent { showPercent = value }
+        if let value = synced.rotateTicker, value != rotateTicker { rotateTicker = value }
+        if let value = synced.alertsEnabled, value != alertsEnabled { alertsEnabled = value }
     }
 
     private enum Keys {
@@ -84,5 +137,7 @@ final class SettingsStore: ObservableObject {
         static let hideTicker = "ticker.hidden"
         static let hotKeyEnabled = "hotKeyEnabled"
         static let alertsEnabled = "alertsEnabled"
+        static let autoCheckUpdates = "update.autoCheck"
+        static let syncEnabled = "sync.enabled"
     }
 }

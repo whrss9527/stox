@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "发布版本号，例如 v0.1.0。留空则只构建不发布"
+        description: "发布版本号，例如 v0.2.0。留空则只构建不发布"
         required: false
         default: ""
 
@@ -27,17 +27,18 @@ jobs:
       - name: Unit tests
         run: swift test
       - name: Live data smoke test
-        # 真实请求腾讯行情接口；数据源偶尔抖动时不阻塞构建。
+        # 真实请求腾讯行情接口和 GitHub 的发布接口；偶尔抖动时不阻塞构建。
         continue-on-error: true
         run: |
           swift run stox-cli quote sh000001 sh600519 sz000001 sz399006 sh510300 bj920819 hk00700 hkHSI usAAPL usBRK.B us.IXIC
           swift run stox-cli search gzmt
           swift run stox-cli search 腾讯
+          swift run stox-cli latest-release 0.0.1
 
   app:
     name: macOS app
     runs-on: macos-15
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -45,9 +46,15 @@ jobs:
         with:
           fetch-depth: 0
       - name: Toolchain
+        # 用 runner 上最新的正式版 Xcode：用 Xcode 26 编译时，面板在 macOS 26 上会换成系统的 Liquid Glass。
         run: |
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -iv -e beta -e release_candidate -e '_rc' | sort -V | tail -1 || true)
+          if [ -n "$latest" ]; then
+            sudo xcode-select -s "$latest"
+          fi
           xcodebuild -version
           swift --version
+          echo "::notice title=toolchain::$(xcodebuild -version | head -1), $(swift --version 2>&1 | head -1)"
       - name: Unit tests
         run: swift test
       - name: Build Stox.app (universal)
@@ -57,7 +64,7 @@ jobs:
           # 手动发布时用输入的版本号；推送 v* 标签时由脚本从标签读取。
           if [ -n "$RELEASE_TAG" ]; then
             if ! [[ "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "::error::版本号格式应为 v主版本.次版本.修订号，例如 v0.1.0"
+              echo "::error::版本号格式应为 v主版本.次版本.修订号，例如 v0.2.0"
               exit 1
             fi
             export VERSION="${RELEASE_TAG#v}"
@@ -67,44 +74,28 @@ jobs:
         run: |
           plutil -p dist/Stox.app/Contents/Info.plist
           ls -la dist/Stox.app/Contents/MacOS dist/Stox.app/Contents/Resources
+          codesign --verify --deep --strict --verbose=2 dist/Stox.app
       - name: Launch smoke test
-        # 真正启动打包好的 App：启动后不能崩溃；同时打开面板截图，供检查界面。
-        run: |
-          mkdir -p shots
-          run_case() {
-            local name="$1"
-            shift
-            ./dist/Stox.app/Contents/MacOS/Stox "$@" > "shots/$name.log" 2>&1 &
-            local pid=$!
-            sleep 14
-            if ! kill -0 "$pid" 2>/dev/null; then
-              echo "::error::Stox exited during launch ($name)"
-              cat "shots/$name.log"
-              ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5
-              exit 1
-            fi
-            {
-              echo "STOX_DIAG rss_kb=$(ps -o rss= -p "$pid" | tr -d ' ')"
-              echo "STOX_DIAG $(vmmap -summary "$pid" 2>/dev/null | grep -m1 'Physical footprint:' | tr -s ' ')"
-            } > "shots/$name-memory.log"
-            grep -h STOX_DIAG "shots/$name.log" "shots/$name-memory.log" || true
-            screencapture -x "shots/$name-full.png" || echo "screencapture failed"
-            kill "$pid"
-            wait "$pid" 2>/dev/null || true
-          }
-          run_case panel --show-panel
-          run_case detail --show-panel --expand sh600519
-          run_case search --show-panel --search 腾讯
-          run_case settings --show-settings
+        # 真正启动打包好的 App：面板、详情、搜索、设置窗口，以及右键切换的“只显示图标”。
+        run: scripts/ci-e2e.sh smoke
+      - name: iCloud sync test
+        # 用一个假的 iCloud 云盘文件夹走一遍同步：启动时拉取、运行中收到改动、文件被删后写回。
+        run: scripts/ci-e2e.sh sync
+      - name: One-click update test
+        # 本地假发布 9.9.9：发现新版本、下载校验替换并重新启动，以及从临时位置运行时装进“应用程序”。
+        run: scripts/ci-e2e.sh update
       - name: Crop screenshots
+        if: always()
         continue-on-error: true
         run: |
-          for name in panel detail search settings; do
-            frame=$(grep -o 'capture_frame=[0-9 -]*' "shots/$name.log" | head -1 | cut -d= -f2)
-            if [ -n "$frame" ] && [ -f "shots/$name-full.png" ]; then
-              swift scripts/ci-screenshot.swift "shots/$name-full.png" "shots/$name.jpg" $frame 900 0.85
-              swift scripts/ci-screenshot.swift "shots/$name-full.png" "shots/$name-preview.jpg" $frame 640 0.45
-            fi
+          swiftc -O scripts/ci-screenshot.swift -o "$RUNNER_TEMP/crop"
+          for log in shots/*.log; do
+            name=$(basename "$log" .log)
+            [ -f "shots/$name-full.png" ] || continue
+            frame=$(grep -o 'capture_frame=[0-9 -]*' "$log" | head -1 | cut -d= -f2)
+            [ -n "$frame" ] || continue
+            "$RUNNER_TEMP/crop" "shots/$name-full.png" "shots/$name.jpg" $frame 900 0.85
+            "$RUNNER_TEMP/crop" "shots/$name-full.png" "shots/$name-preview.jpg" $frame 640 0.45
           done
           ls -la shots
       - uses: actions/upload-artifact@v4
@@ -112,55 +103,70 @@ jobs:
         with:
           name: screenshots
           path: shots/
-      # 提交信息里带 [screenshots] 时，把诊断信息和截图以注释形式发布，
-      # 方便在无法下载构建产物的环境里通过 API 取回查看。
+      # 提交信息里带 [screenshots] 时，把诊断信息和截图以注释形式发布，方便在无法下载构建产物的环境里
+      # 通过 API 取回查看。[screenshots: panel settings-display] 这样可以指定要哪几张。
+      - name: Pick screenshots
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
+        continue-on-error: true
+        env:
+          MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          names=$(printf '%s\n' "$MESSAGE" | grep -o '\[screenshots[^]]*\]' | head -1 | sed -e 's/^\[screenshots:*//' -e 's/\]$//' | tr ',' ' ')
+          if [ -z "$(echo $names)" ]; then
+            names="panel settings-display"
+          fi
+          echo $names | tee shots/annotate.txt
       - name: Diagnostics as annotations
-        if: contains(github.event.head_commit.message, '[screenshots]')
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
         run: |
-          grep -h "status_title\|rss_kb\|footprint" shots/*.log | head -9 | while read -r line; do
+          grep -h "status_title\|footprint" shots/panel.log shots/panel-memory.log shots/hidden.log shots/sync-panel.log 2>/dev/null | head -9 | while read -r line; do
             echo "::notice title=diag::$line"
           done
       - name: Screenshot annotations (1)
-        if: contains(github.event.head_commit.message, '[screenshots]')
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
         run: scripts/ci-annotate-image.sh 1
       - name: Screenshot annotations (2)
-        if: contains(github.event.head_commit.message, '[screenshots]')
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
         run: scripts/ci-annotate-image.sh 2
       - name: Screenshot annotations (3)
-        if: contains(github.event.head_commit.message, '[screenshots]')
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
         run: scripts/ci-annotate-image.sh 3
       - name: Screenshot annotations (4)
-        if: contains(github.event.head_commit.message, '[screenshots]')
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
         run: scripts/ci-annotate-image.sh 4
       - name: Live data smoke test
         continue-on-error: true
         run: swift run -c release stox-cli quote sh600519 hk00700 usAAPL us.IXIC
       - name: Package
+        # 一键更新靠 SHA256SUMS.txt 校验下载的压缩包，发布时和 Stox.zip 一起上传。
         run: |
           cd dist
           ditto -c -k --keepParent Stox.app Stox.zip
-          shasum -a 256 Stox.zip
+          shasum -a 256 Stox.zip > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
           name: Stox-app
-          path: dist/Stox.zip
+          path: |
+            dist/Stox.zip
+            dist/SHA256SUMS.txt
       - name: Publish release
         # 两种发布方式：推送 v* 标签；或在 Actions 页面手动运行 build 并填写版本号，
-        # 这时由 CI 在当前提交上创建标签。已存在同名 release 时只上传或替换安装包。
+        # 这时由 CI 在当前提交上创建标签。已存在同名 release 时只上传或替换附件。
         if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || inputs.release_tag }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/Stox.zip --clobber
+            gh release upload "$TAG" dist/Stox.zip dist/SHA256SUMS.txt --clobber
           else
-            gh release create "$TAG" dist/Stox.zip \
+            gh release create "$TAG" dist/Stox.zip dist/SHA256SUMS.txt \
               --target "$GITHUB_SHA" \
               --title "Stox $TAG" \
               --notes-file .github/release-notes.md \

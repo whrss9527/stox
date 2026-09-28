@@ -6,6 +6,7 @@ import StoxCore
 //   stox-cli quote sh600519 700 AAPL us.IXIC   解析并打印行情
 //   stox-cli raw sh600519 hk00700              打印接口原始返回
 //   stox-cli search 茅台                       搜索证券
+//   stox-cli latest-release 0.1.0              查询 GitHub 上的最新发布，并和给定版本比较
 //
 // 有代码取不到行情、或搜索无结果时以非零状态退出，方便在 CI 里做冒烟测试。
 
@@ -15,6 +16,7 @@ func printUsage() {
       stox-cli quote <代码>...    例如 stox-cli quote sh600519 700 AAPL us.IXIC
       stox-cli raw <代码>...      打印接口原始返回
       stox-cli search <关键词>    例如 stox-cli search gzmt
+      stox-cli latest-release [当前版本]   查询最新发布
     """)
 }
 
@@ -79,6 +81,17 @@ do {
             print("\(pad(r.symbol.rawValue, 12)) \(pad(r.name, 24)) \(r.typeLabel)")
         }
         exit(results.isEmpty ? 1 : 0)
+
+    case "latest-release":
+        let current = arguments.dropFirst().first ?? "0.0.0"
+        let release = try await UpdateCheck.latest(currentVersion: current)
+        let published = release.publishedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "--"
+        print("最新版本 \(release.tag)，发布于 \(published)")
+        print("附件 \(release.archiveName ?? "无")，\(release.archiveSize ?? 0) 字节")
+        let verification = release.checksumsURL != nil ? UpdateCheck.checksumsName : (release.archiveSHA256 != nil ? "附件摘要" : "无")
+        print("校验方式 \(verification)")
+        print(UpdateCheck.isNewer(release.version, than: current) ? "比 \(current) 新，可以更新" : "不比 \(current) 新")
+        exit(release.canInstall ? 0 : 1)
 
     default:
         printUsage()

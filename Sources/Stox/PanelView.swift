@@ -2,23 +2,46 @@ import AppKit
 import SwiftUI
 import StoxCore
 
-/// 面板根视图：自选列表、设置、单只证券编辑三个页面。
+struct PanelActions {
+    var openSettings: (SettingsPage?) -> Void
+    var quit: () -> Void
+    /// SwiftUI 量出来的面板实际尺寸，窗口跟着调整。
+    var sizeChanged: (CGSize) -> Void
+}
+
+struct PanelSizeKey: PreferenceKey {
+    static let defaultValue = CGSize.zero
+
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
+/// 面板根视图：自选列表页和单只证券的编辑页，外面是一层玻璃。
 @MainActor
 struct PanelView: View {
     @EnvironmentObject private var router: PanelRouter
+    let actions: PanelActions
 
     var body: some View {
         Group {
             switch router.route {
             case .list:
-                WatchlistPanel()
-            case .settings:
-                SettingsPanel()
+                WatchlistPanel(actions: actions)
             case .edit(let symbol):
                 StockEditorPanel(symbol: symbol)
             }
         }
+        .padding(12)
         .frame(width: Theme.panelWidth)
+        .background(GlassPanelBackground())
+        .padding(8)
+        .background(GeometryReader { proxy in
+            Color.clear.preference(key: PanelSizeKey.self, value: proxy.size)
+        })
+        .onPreferenceChange(PanelSizeKey.self) { size in
+            actions.sizeChanged(size)
+        }
     }
 }
 
@@ -28,19 +51,19 @@ struct PanelView: View {
 struct WatchlistPanel: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var router: PanelRouter
+    let actions: PanelActions
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 10) {
             PanelHeader()
             SearchBar()
-            Divider()
             if router.trimmedQuery.isEmpty {
                 WatchlistView()
             } else {
                 SearchResultsView()
             }
-            Divider()
-            PanelFooter()
+            UpdateBanner { actions.openSettings(.about) }
+            PanelFooter(actions: actions)
         }
         .task(id: router.searchText) {
             await router.runSearch(using: store)
@@ -51,24 +74,30 @@ struct WatchlistPanel: View {
 @MainActor
 struct PanelHeader: View {
     @EnvironmentObject private var store: QuoteStore
-    @EnvironmentObject private var router: PanelRouter
+    @EnvironmentObject private var settings: SettingsStore
 
     var body: some View {
         HStack(spacing: 10) {
-            Text("Stox")
-                .font(.system(size: 14, weight: .semibold))
-            HStack(spacing: 8) {
-                ForEach(store.activeRegions, id: \.self) { region in
-                    let phase = store.phase(for: region)
-                    HStack(spacing: 3) {
-                        Circle()
-                            .fill(Theme.phaseColor(phase))
-                            .frame(width: 6, height: 6)
-                        Text("\(region.displayName)\(phase.displayName)")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.secondary)
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .frame(width: 30, height: 30)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Stox")
+                    .font(.system(size: 14, weight: .semibold))
+                HStack(spacing: 8) {
+                    ForEach(store.activeRegions, id: \.self) { region in
+                        let phase = store.phase(for: region)
+                        HStack(spacing: 3) {
+                            Circle()
+                                .fill(Theme.phaseColor(phase, convention: settings.colorConvention))
+                                .frame(width: 6, height: 6)
+                            Text("\(region.displayName)\(phase.displayName)")
+                                .font(.system(size: 10.5))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .help(region == .hk ? "港股行情延时约 15 分钟" : "")
                     }
-                    .help(region == .hk ? "港股行情延时约 15 分钟" : "")
                 }
             }
             Spacer(minLength: 4)
@@ -84,20 +113,12 @@ struct PanelHeader: View {
                     .rotationEffect(.degrees(store.isRefreshing ? 180 : 0))
                     .animation(.easeInOut(duration: 0.3), value: store.isRefreshing)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(IconButtonStyle())
             .keyboardShortcut("r", modifiers: .command)
             .help("立即刷新（⌘R）")
-            Button {
-                router.route = .settings
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .buttonStyle(.borderless)
-            .keyboardShortcut(",", modifiers: .command)
-            .help("设置（⌘,）")
         }
-        .padding(.horizontal, 14)
-        .frame(height: 40)
+        .padding(10)
+        .glassCard(prominent: true)
     }
 }
 
@@ -125,14 +146,12 @@ struct SearchBar: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 10)
-        .frame(height: 30)
-        .background(RoundedRectangle(cornerRadius: 7).fill(Color.primary.opacity(0.06)))
         .padding(.horizontal, 12)
-        .padding(.bottom, 8)
+        .frame(height: 34)
+        .glassCard(cornerRadius: 12)
     }
 
     /// 回车：添加第一条搜索结果。
@@ -148,37 +167,41 @@ struct WatchlistView: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var router: PanelRouter
 
-    private static let maxHeight: CGFloat = 440
+    private static let maxHeight: CGFloat = 430
 
     var body: some View {
-        if store.items.isEmpty {
-            VStack(spacing: 8) {
-                Image(systemName: "star")
-                    .font(.system(size: 26))
-                    .foregroundStyle(.tertiary)
-                Text("还没有自选，在上面的搜索框里添加")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 150)
-        } else {
-            List {
-                ForEach(store.items) { item in
-                    QuoteRow(item: item, quote: store.quotes[item.symbol], expanded: router.expanded == item.symbol)
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
+        Group {
+            if store.items.isEmpty {
+                VStack(spacing: 8) {
+                    Image(systemName: "star")
+                        .font(.system(size: 26))
+                        .foregroundStyle(.tertiary)
+                    Text("还没有自选，在上面的搜索框里添加")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
                 }
-                .onMove { source, destination in
-                    store.move(fromOffsets: source, toOffset: destination)
+                .frame(maxWidth: .infinity)
+                .frame(height: 140)
+            } else {
+                List {
+                    ForEach(store.items) { item in
+                        QuoteRow(item: item, quote: store.quotes[item.symbol], expanded: router.expanded == item.symbol)
+                            .listRowInsets(EdgeInsets(top: 0, leading: 6, bottom: 0, trailing: 6))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                    }
+                    .onMove { source, destination in
+                        store.move(fromOffsets: source, toOffset: destination)
+                    }
                 }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .environment(\.defaultMinListRowHeight, 1)
+                .frame(height: listHeight)
+                .padding(.vertical, 6)
             }
-            .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .environment(\.defaultMinListRowHeight, 1)
-            .frame(height: listHeight)
         }
+        .glassCard()
     }
 
     private var listHeight: CGFloat {
@@ -196,7 +219,7 @@ struct SearchResultsView: View {
     @EnvironmentObject private var router: PanelRouter
 
     var body: some View {
-        VStack(spacing: 0) {
+        Group {
             if router.searchResults.isEmpty {
                 Text(router.isSearching ? "搜索中…" : (router.searchError.map { "搜索失败：\($0)" } ?? "没有找到相关证券"))
                     .font(.system(size: 12))
@@ -213,52 +236,54 @@ struct SearchResultsView: View {
                             }
                         }
                     }
+                    .padding(6)
                 }
-                .frame(height: min(CGFloat(router.searchResults.count) * SearchResultRow.height, 360))
+                .frame(height: min(CGFloat(router.searchResults.count) * SearchResultRow.height + 12, 360))
             }
         }
+        .glassCard()
     }
 }
 
 @MainActor
 struct SearchResultRow: View {
-    static let height: CGFloat = 38
+    static let height: CGFloat = 40
 
     let result: SearchResult
     let added: Bool
     let add: () -> Void
-    @State private var hovering = false
 
     var body: some View {
-        HStack(spacing: 8) {
-            MarketBadge(market: result.symbol.market)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(result.name)
-                    .font(.system(size: 12.5, weight: .medium))
-                    .lineLimit(1)
-                Text(result.isDirect ? "按代码添加" : "\(result.symbol.displayCode) · \(result.typeLabel)")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-            if added {
-                Label("已添加", systemImage: "checkmark")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            } else {
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 15))
-                    .foregroundStyle(Color.accentColor)
-            }
-        }
-        .padding(.horizontal, 14)
-        .frame(height: Self.height)
-        .background(hovering && !added ? Color.primary.opacity(0.06) : Color.clear)
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .onTapGesture {
+        Button {
             if !added { add() }
+        } label: {
+            HStack(spacing: 8) {
+                MarketBadge(market: result.symbol.market)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(result.name)
+                        .font(.system(size: 12.5, weight: .medium))
+                        .lineLimit(1)
+                    Text(result.isDirect ? "按代码添加" : "\(result.symbol.displayCode) · \(result.typeLabel)")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if added {
+                    Label("已添加", systemImage: "checkmark")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                } else {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: Self.height)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(HoverRowStyle())
+        .disabled(added)
     }
 }
 
@@ -266,6 +291,7 @@ struct SearchResultRow: View {
 struct PanelFooter: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
+    let actions: PanelActions
 
     var body: some View {
         HStack(spacing: 6) {
@@ -273,17 +299,25 @@ struct PanelFooter: View {
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-            Spacer()
-            Button("退出") {
-                NSApp.terminate(nil)
+            Spacer(minLength: 4)
+            Button {
+                actions.openSettings(nil)
+            } label: {
+                Image(systemName: "gearshape")
             }
-            .buttonStyle(.borderless)
-            .font(.system(size: 11))
+            .buttonStyle(IconButtonStyle())
+            .keyboardShortcut(",", modifiers: .command)
+            .help("设置（⌘,）")
+            Button {
+                actions.quit()
+            } label: {
+                Image(systemName: "power")
+            }
+            .buttonStyle(IconButtonStyle())
             .keyboardShortcut("q", modifiers: .command)
             .help("退出 Stox（⌘Q）")
         }
-        .padding(.horizontal, 14)
-        .frame(height: 30)
+        .padding(.horizontal, 4)
     }
 
     private var statusText: String {
@@ -291,19 +325,21 @@ struct PanelFooter: View {
         let cadence = store.effectiveInterval > settings.refreshInterval
             ? "休市中每分钟刷新"
             : "每 \(Int(settings.refreshInterval)) 秒刷新"
-        return "\(QuoteFormatter.time(updated)) 更新 · \(cadence) · 拖动可排序"
+        return "\(QuoteFormatter.time(updated)) 更新 · \(cadence) · 拖动排序"
     }
 }
 
 @MainActor
 struct MarketBadge: View {
+    @EnvironmentObject private var settings: SettingsStore
     let market: Market
 
     var body: some View {
+        let tint = Theme.marketTint(market, convention: settings.colorConvention)
         Text(market.label)
             .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(Theme.marketTint(market))
+            .foregroundStyle(tint)
             .frame(width: 15, height: 13)
-            .background(RoundedRectangle(cornerRadius: 3).fill(Theme.marketTint(market).opacity(0.14)))
+            .background(RoundedRectangle(cornerRadius: 3).fill(tint.opacity(0.14)))
     }
 }

@@ -76,17 +76,27 @@ public enum Watchlist {
 
     /// 解码保存的自选列表，忽略无法识别的条目并去重。
     public static func decode(_ data: Data) -> [WatchItem]? {
-        struct Lossy: Decodable {
-            let item: WatchItem?
-            init(from decoder: Decoder) throws { item = try? WatchItem(from: decoder) }
-        }
-        guard let decoded = try? JSONDecoder().decode([Lossy].self, from: data) else { return nil }
+        guard let decoded = try? JSONDecoder().decode([LossyWatchItem].self, from: data) else { return nil }
+        return deduplicated(decoded.compactMap(\.item))
+    }
+
+    /// 同一只证券只保留第一次出现的那一项。
+    public static func deduplicated(_ items: [WatchItem]) -> [WatchItem] {
         var seen = Set<Symbol>()
-        return decoded.compactMap(\.item).filter { seen.insert($0.symbol).inserted }
+        return items.filter { seen.insert($0.symbol).inserted }
     }
 
     public static func encode(_ items: [WatchItem]) -> Data? {
         try? JSONEncoder().encode(items)
+    }
+}
+
+/// 解码失败的条目变成 nil 而不是让整个列表解码失败，旧版本或别的设备写的数据也能读。
+struct LossyWatchItem: Decodable {
+    let item: WatchItem?
+
+    init(from decoder: Decoder) throws {
+        item = try? WatchItem(from: decoder)
     }
 }
 
