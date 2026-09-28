@@ -43,10 +43,15 @@ struct QuoteChartSection: View {
                 }
         }
         .task(id: TrackID(symbol: item.symbol, period: settings.chartPeriod)) {
-            if let period = settings.chartPeriod.klinePeriod {
-                await store.trackKline(item.symbol, period: period)
-            } else {
+            switch settings.chartPeriod {
+            case .intraday:
                 await store.trackIntraday(item.symbol)
+            case .fiveDay:
+                await store.trackFiveDay(item.symbol)
+            case .day, .week, .month:
+                if let period = settings.chartPeriod.klinePeriod {
+                    await store.trackKline(item.symbol, period: period)
+                }
             }
         }
     }
@@ -65,15 +70,12 @@ struct QuoteChartSection: View {
         return series.merging(quote)
     }
 
+    private var fiveDaySeries: MultiDaySeries? { store.fiveDay[item.symbol] }
+
     @ViewBuilder
     private var chart: some View {
-        if settings.chartPeriod.klinePeriod != nil {
-            KlineChart(
-                series: klineSeries,
-                convention: settings.colorConvention,
-                hoveredIndex: hoveredCandle(in: klineSeries)
-            )
-        } else {
+        switch settings.chartPeriod {
+        case .intraday:
             IntradayChart(
                 series: intradaySeries,
                 previousClose: quote.previousClose,
@@ -81,7 +83,35 @@ struct QuoteChartSection: View {
                 color: Theme.priceColor(for: quote.direction, convention: settings.colorConvention),
                 hovered: hoveredPoint
             )
+        case .fiveDay:
+            FiveDayChart(
+                series: fiveDaySeries,
+                region: region,
+                color: Theme.priceColor(for: fiveDayDirection, convention: settings.colorConvention),
+                hovered: hoveredFiveDay
+            )
+        case .day, .week, .month:
+            KlineChart(
+                series: klineSeries,
+                convention: settings.colorConvention,
+                hoveredIndex: hoveredCandle(in: klineSeries)
+            )
         }
+    }
+
+    /// 五日里最新的价格，和第一天的昨收比。
+    private var fiveDayLast: Double? {
+        fiveDaySeries?.days.last(where: { !$0.points.isEmpty })?.points.last?.price
+    }
+
+    private var fiveDayDirection: PriceDirection {
+        guard let last = fiveDayLast, let base = fiveDaySeries?.previousClose else { return quote.direction }
+        return PriceDirection(last - base)
+    }
+
+    private var hoveredFiveDay: (day: Int, point: IntradayPoint)? {
+        guard let hoverX, chartWidth > 0, let series = fiveDaySeries, series.pointCount > 1 else { return nil }
+        return series.point(nearest: Double(hoverX / chartWidth), region: region)
     }
 
     private var hoveredPoint: IntradayPoint? {
@@ -140,8 +170,12 @@ struct QuoteChartSection: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// 没有指着图时，右边显示 K 线这一段的涨跌，例如“近 60 日 -8.12%”。
+    /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”。
     private var summary: String? {
+        if settings.chartPeriod == .fiveDay {
+            guard let series = fiveDaySeries, let last = fiveDayLast, let base = series.previousClose, base > 0 else { return nil }
+            return "近 \(series.days.count) 日 \(QuoteFormatter.percent((last - base) / base * 100))"
+        }
         guard let series = klineSeries, let first = series.candles.first, let last = series.candles.last,
               series.candles.count > 1, first.open > 0
         else { return nil }
@@ -158,6 +192,20 @@ struct QuoteChartSection: View {
     private var readout: String? {
         let decimals = quote.priceDecimals
         func price(_ value: Double) -> String { QuoteFormatter.price(value, decimals: decimals) }
+        if settings.chartPeriod == .fiveDay {
+            guard let series = fiveDaySeries, let hovered = hoveredFiveDay else { return nil }
+            let day = hovered.day
+            let point = hovered.point
+            var text = ""
+            if let date = series.days[day].date, date.count == 8 {
+                text += "\(date.dropFirst(4).prefix(2))-\(date.suffix(2))  "
+            }
+            text += String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60) + price(point.price)
+            if let reference = series.dayPreviousCloses[day], reference > 0 {
+                text += "  " + QuoteFormatter.percent((point.price - reference) / reference * 100)
+            }
+            return text
+        }
         if settings.chartPeriod.klinePeriod == nil {
             guard let point = hoveredPoint else { return nil }
             var text = String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60) + price(point.price)

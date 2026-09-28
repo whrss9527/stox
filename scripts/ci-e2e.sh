@@ -91,13 +91,19 @@ smoke() {
   grep -Eq "kline=([2-9][0-9])" shots/kline.log || echo "::warning::日 K 没有取到数据"
   grep -Eq "kline=([2-9][0-9])" shots/kline-us.log || echo "::warning::美股月 K 没有取到足够的数据"
 
-  # 键盘：搜索结果里按 ↓ 选下一条；列表里 ↓ ↓ 回车展开第二只，再按 → 切到日 K。
+  # 五日分时：美股要带交易所后缀才取得到。
+  run_case fiveday --show-panel --expand usAAPL --chart fiveDay
+  defaults delete "$DOMAIN" chart.period
+  grep -q "chart=fiveDay" shots/fiveday.log || fail "没有切到五日"
+  grep -Eq "fiveday=[1-9]" shots/fiveday.log || echo "::warning::五日分时没有取到数据"
+
+  # 键盘：搜索结果里按 ↓ 选下一条；列表里 ↓ ↓ 回车展开第二只，再按 → 切到五日。
   run_case keys-search --show-panel --search 腾讯 --keys down
   run_case keys-list --show-panel --keys down,down,enter,right
   defaults delete "$DOMAIN" chart.period 2>/dev/null || true
   grep -Eq 'highlight=[a-z]' shots/keys-search.log || fail "方向键没有选中搜索结果"
   grep -q 'highlight=sz399001 expanded=sz399001' shots/keys-list.log || fail "方向键和回车没有展开第二只"
-  grep -q 'chart=day' shots/keys-list.log || fail "右方向键没有切到日 K"
+  grep -q 'chart=fiveDay' shots/keys-list.log || fail "右方向键没有切到五日"
 
   # 腾讯的行情接口不可用（指向一个连不上的地址）：自动改用新浪的行情，列表照常显示。
   STOX_QUOTE_ENDPOINT="http://127.0.0.1:9/q=" run_case failover --show-panel

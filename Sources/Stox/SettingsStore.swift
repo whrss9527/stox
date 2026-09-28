@@ -55,13 +55,14 @@ enum ChangeDisplay: String, CaseIterable, Identifiable {
 
 /// 展开详情里走势图的周期。
 enum ChartPeriod: String, CaseIterable, Identifiable {
-    case intraday, day, week, month
+    case intraday, fiveDay, day, week, month
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .intraday: return "分时"
+        case .fiveDay: return "五日"
         case .day: return "日K"
         case .week: return "周K"
         case .month: return "月K"
@@ -71,7 +72,7 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
     /// K 线的周期；分时图为 nil。
     var klinePeriod: KlinePeriod? {
         switch self {
-        case .intraday: return nil
+        case .intraday, .fiveDay: return nil
         case .day: return .day
         case .week: return .week
         case .month: return .month

@@ -15,6 +15,8 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var intraday: [Symbol: IntradaySeries] = [:]
     /// 看过的 K 线，按证券和周期存。
     @Published private(set) var klines: [KlineKey: KlineSeries] = [:]
+    /// 看过的五日分时。
+    @Published private(set) var fiveDay: [Symbol: MultiDaySeries] = [:]
 
     /// 港币、美元兑人民币的汇率。持仓有两种以上货币时才去取，用来折合成人民币。
     @Published private(set) var rates: ExchangeRates?
@@ -202,6 +204,22 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 切到五日时调用：和分时一样，交易时段内每分钟刷新，休市时半小时一次。
+    func trackFiveDay(_ symbol: Symbol) async {
+        while !Task.isCancelled {
+            do {
+                if let series = try await provider.fetchFiveDay(for: symbol, exchangeCode: quotes[symbol]?.exchangeCode),
+                   !Task.isCancelled {
+                    fiveDay[symbol] = series
+                }
+            } catch {
+                // 失败时保留上一次的，下一轮再试。
+            }
+            let live = phase(for: symbol.market.region).isLive
+            try? await Task.sleep(nanoseconds: (live ? 60 : 1800) * 1_000_000_000)
+        }
+    }
+
     // MARK: - 市场状态
 
     /// 自选里出现过的市场，按 A 股、港股、美股排序。
@@ -257,6 +275,7 @@ final class QuoteStore: ObservableObject {
         quotes[symbol] = nil
         intraday[symbol] = nil
         klines = klines.filter { $0.key.symbol != symbol }
+        fiveDay[symbol] = nil
         alertEngine.reset(symbol)
         save()
         saveAlertState()
