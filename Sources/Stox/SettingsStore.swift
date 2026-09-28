@@ -221,6 +221,10 @@ final class SettingsStore: ObservableObject {
     @Published var flashOnChange: Bool {
         didSet { defaults.set(flashOnChange, forKey: Keys.flashOnChange) }
     }
+    /// 紧凑列表：每只一行，名称、代码、现价和色块排在一起，一屏能看到更多。
+    @Published var compactRows: Bool {
+        didSet { defaults.set(compactRows, forKey: Keys.compactRows) }
+    }
     /// K 线上画 5、10、20 根的收盘价均线，分时图上画成交均价。
     @Published var showMovingAverages: Bool {
         didSet { defaults.set(showMovingAverages, forKey: Keys.showMovingAverages) }
@@ -294,6 +298,7 @@ final class SettingsStore: ObservableObject {
         changeDisplay = defaults.string(forKey: Keys.changeDisplay).flatMap(ChangeDisplay.init(rawValue:)) ?? .percent
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showMovingAverages = defaults.object(forKey: Keys.showMovingAverages) as? Bool ?? true
+        compactRows = defaults.object(forKey: Keys.compactRows) as? Bool ?? false
         showExtendedHours = defaults.object(forKey: Keys.showExtendedHours) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
@@ -368,6 +373,7 @@ final class SettingsStore: ObservableObject {
         static let changeDisplay = "list.pill"
         static let flashOnChange = "list.flash"
         static let showMovingAverages = "chart.movingAverages"
+        static let compactRows = "list.compact"
         static let showExtendedHours = "list.extendedHours"
         static let showDayProfit = "ticker.dayProfit"
         static let panelPinned = "panel.pinned"

@@ -154,6 +154,12 @@ smoke() {
   defaults delete "$DOMAIN" list.filter
   grep -q "filter=hk visible=2" shots/filtered.log || fail "筛选港股后应该只剩两只"
 
+  # 紧凑列表：每只一行。
+  defaults write "$DOMAIN" list.compact -bool true
+  run_case compact --show-panel
+  defaults delete "$DOMAIN" list.compact
+  grep -q "compact=true" shots/compact.log || fail "没有切到紧凑列表"
+
   # 分组：腾讯和苹果在“科技”里，列表上方选了这个分组。
   write_watchlist '[{"symbol":"sh600519","name":"贵州茅台"},{"symbol":"hk00700","name":"腾讯控股","group":"科技"},{"symbol":"usAAPL","name":"苹果","group":"科技"}]'
   defaults write "$DOMAIN" list.filter -string "group:科技"

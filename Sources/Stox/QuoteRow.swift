@@ -5,7 +5,13 @@ import StoxCore
 /// 自选列表的一行：名称 / 代码 / 现价 / 涨跌幅色块。单击展开详情，右键有更多操作。
 @MainActor
 struct QuoteRow: View {
-    static let rowHeight: CGFloat = 46
+    static let standardRowHeight: CGFloat = 46
+    /// 紧凑列表的一行：名称、代码、现价、色块排成一行。
+    static let compactRowHeight: CGFloat = 30
+
+    static func rowHeight(compact: Bool) -> CGFloat {
+        compact ? compactRowHeight : standardRowHeight
+    }
 
     /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。
     static func detailHeight(for item: WatchItem) -> CGFloat {
@@ -28,7 +34,21 @@ struct QuoteRow: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            summary
+            Group {
+                if settings.compactRows {
+                    compactSummary
+                } else {
+                    summary
+                }
+            }
+            .padding(.horizontal, 10)
+            .frame(height: Self.rowHeight(compact: settings.compactRows))
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityText)
+            .onAppear { lastPrice = quote?.price }
+            .onChange(of: quote?.price) { price in
+                priceChanged(to: price)
+            }
             if expanded, let quote {
                 QuoteDetailView(item: item, quote: quote)
                     .frame(height: Self.detailHeight(for: item))
@@ -125,16 +145,7 @@ struct QuoteRow: View {
             }
             Spacer(minLength: 6)
             VStack(alignment: .trailing, spacing: 1) {
-                Text(quote.map { QuoteFormatter.price($0.price, decimals: $0.priceDecimals) } ?? "--")
-                    .font(.system(size: 14, weight: .medium).monospacedDigit())
-                    .foregroundStyle(color)
-                    .lineLimit(1)
-                    .padding(.horizontal, 3)
-                    .background(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .fill(Theme.priceColor(for: flash ?? .flat, convention: settings.colorConvention).opacity(flash == nil ? 0 : 0.2))
-                    )
-                    .padding(.horizontal, -3)
+                priceLabel(size: 14)
                 if let position {
                     // 有持仓时在现价下面显示持仓盈亏：公文包图标加比例，不占名称和代码的地方。
                     HStack(spacing: 2) {
@@ -148,32 +159,73 @@ struct QuoteRow: View {
                     .help("持仓盈亏")
                 }
             }
-            Button {
-                settings.changeDisplay = settings.changeDisplay.next
-            } label: {
-                Text(pillText)
-                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(Theme.pillForeground(convention: settings.colorConvention))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .frame(width: 70, height: 24)
-                    .background(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .fill(Theme.pillBackground(for: direction, convention: settings.colorConvention))
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            pill(width: 70, height: 24, fontSize: 12)
+        }
+    }
+
+    /// 紧凑列表的一行：市场、名称、代码、状态标签、现价和色块。持仓盈亏、盘前盘后价在展开后看。
+    private var compactSummary: some View {
+        HStack(spacing: 6) {
+            MarketBadge(market: item.symbol.market)
+            Text(quote?.name ?? item.displayName)
+                .font(.system(size: 12.5, weight: .medium))
+                .lineLimit(1)
+            Text(item.symbol.displayCode)
+                .font(.system(size: 10).monospacedDigit())
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            if let tag = statusTag {
+                Text(tag)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 3)
+                    .background(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.4)))
             }
-            .buttonStyle(.plain)
-            .help("\(settings.changeDisplay.title)。点一下切换涨跌幅、涨跌额、总市值")
+            if !item.alert.isEmpty {
+                Image(systemName: "bell.fill")
+                    .font(.system(size: 8))
+                    .foregroundStyle(.orange)
+                    .help("已设置价格提醒")
+            }
+            Spacer(minLength: 6)
+            priceLabel(size: 13)
+            pill(width: 64, height: 20, fontSize: 11.5)
         }
-        .padding(.horizontal, 10)
-        .frame(height: Self.rowHeight)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityText)
-        .onAppear { lastPrice = quote?.price }
-        .onChange(of: quote?.price) { price in
-            priceChanged(to: price)
+    }
+
+    /// 现价，价格变动时背后闪一下。
+    private func priceLabel(size: CGFloat) -> some View {
+        Text(quote.map { QuoteFormatter.price($0.price, decimals: $0.priceDecimals) } ?? "--")
+            .font(.system(size: size, weight: .medium).monospacedDigit())
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .padding(.horizontal, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Theme.priceColor(for: flash ?? .flat, convention: settings.colorConvention).opacity(flash == nil ? 0 : 0.2))
+            )
+            .padding(.horizontal, -3)
+    }
+
+    /// 右边的色块，点一下在涨跌幅、涨跌额、总市值之间切换。
+    private func pill(width: CGFloat, height: CGFloat, fontSize: CGFloat) -> some View {
+        Button {
+            settings.changeDisplay = settings.changeDisplay.next
+        } label: {
+            Text(pillText)
+                .font(.system(size: fontSize, weight: .semibold).monospacedDigit())
+                .foregroundStyle(Theme.pillForeground(convention: settings.colorConvention))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(width: width, height: height)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Theme.pillBackground(for: direction, convention: settings.colorConvention))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
+        .buttonStyle(.plain)
+        .help("\(settings.changeDisplay.title)。点一下切换涨跌幅、涨跌额、总市值")
     }
 
     /// 读屏软件念的内容：名称、代码、现价、涨跌，有持仓时加上持仓盈亏。

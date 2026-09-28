@@ -283,7 +283,7 @@ final class StatusItemController: NSObject {
         var height = ceil(size.height)
         if let available = availableHeight(), height > available {
             // 超出多少，列表就矮多少，一步算到位。列表是面板里唯一能伸缩的部分。
-            let minimum = QuoteRow.rowHeight * 2
+            let minimum = QuoteRow.rowHeight(compact: settings.compactRows) * 2
             let current = min(
                 WatchlistView.naturalHeight(store: store, settings: settings, expanded: router.expanded), router.listMaxHeight
             )
@@ -492,7 +492,7 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
-        print("STOX_DIAG filter=\(filter.id) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count) route=\(router.route.name) groups=\(Watchlist.groups(in: store.items).joined(separator: ","))")
+        print("STOX_DIAG filter=\(filter.id) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count) route=\(router.route.name) groups=\(Watchlist.groups(in: store.items).joined(separator: ",")) compact=\(settings.compactRows)")
         // 展开的那只在 K 线图上有几根有 MA20。
         let ma20 = router.expanded
             .flatMap { symbol in settings.chartPeriod.klinePeriod.flatMap { store.klines[KlineKey(symbol: symbol, period: $0)] } }
