@@ -17,6 +17,7 @@ struct StockEditorPanel: View {
     @State private var fallBelow = ""
     @State private var shares = ""
     @State private var cost = ""
+    @State private var note = ""
     @State private var loaded = false
 
     var body: some View {
@@ -34,6 +35,16 @@ struct StockEditorPanel: View {
                         TextField("", text: $alias, prompt: Text(NameAbbreviator.abbreviate(item.displayName)))
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 150)
+                    }
+                    .padding(.vertical, 8)
+                    Divider()
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("备注")
+                        Spacer()
+                        TextField("", text: $note, prompt: Text("比如关注的理由"), axis: .vertical)
+                            .textFieldStyle(.roundedBorder)
+                            .lineLimit(1...3)
+                            .frame(width: 220)
                     }
                     .padding(.vertical, 8)
                 }
@@ -215,6 +226,7 @@ struct StockEditorPanel: View {
         riseAbove = format(item.alert.riseAbove)
         fallBelow = format(item.alert.fallBelow)
         shares = item.holding.map { QuoteFormatter.plain($0.shares) } ?? ""
+        note = item.note ?? ""
         cost = format(item.holding?.cost)
     }
 
@@ -228,6 +240,8 @@ struct StockEditorPanel: View {
         updated.pinned = pinned
         let trimmedAlias = alias.trimmingCharacters(in: .whitespaces)
         updated.alias = trimmedAlias.isEmpty ? nil : trimmedAlias
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        updated.note = trimmedNote.isEmpty ? nil : trimmedNote
         updated.alert = PriceAlert(
             priceAbove: value(priceAbove),
             priceBelow: value(priceBelow),

@@ -108,12 +108,26 @@ smoke() {
 
   # 持仓：列表上方按币种合计，展开后显示持仓盈亏。
   write_watchlist '[{"symbol":"sh000001","name":"上证指数","alias":"上证","pinned":true},
-    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200}},
+    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},"note":"等回调到 1200 附近再加仓"},
     {"symbol":"sz000001","name":"平安银行","holding":{"shares":2000,"cost":12.5}},
     {"symbol":"hk00700","name":"腾讯控股","holding":{"shares":200,"cost":380}},
     {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'
+  defaults write "$DOMAIN" ticker.dayProfit -bool true
   run_case holdings --show-panel --expand sh600519
+  defaults delete "$DOMAIN" ticker.dayProfit
   grep -Eq "items=5 quotes=[0-9]+ holdings=4" shots/holdings.log || fail "持仓没有读出来"
+  grep -q 'status_title="上证 .* 今日 ' shots/holdings.log || fail "菜单栏没有显示今日盈亏"
+
+  # 钉住的面板放回上次拖到的位置（左上角 x=100，离屏幕底边 600）。
+  defaults write "$DOMAIN" panel.pinned -bool true
+  defaults write "$DOMAIN" panel.pinnedX -float 100
+  defaults write "$DOMAIN" panel.pinnedY -float 600
+  run_case pinned --show-panel
+  defaults delete "$DOMAIN" panel.pinned
+  defaults delete "$DOMAIN" panel.pinnedX
+  defaults delete "$DOMAIN" panel.pinnedY
+  grep -q "pinned=true" shots/pinned.log || fail "没有读到钉住的设置"
+  grep -q "panel_frame=100 " shots/pinned.log || fail "钉住的面板没有放回上次的位置"
 
   # 外观选深色：面板和设置窗口用深色，菜单栏不受影响。
   defaults write "$DOMAIN" appearance -string dark

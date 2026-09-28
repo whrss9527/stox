@@ -20,6 +20,7 @@ final class StatusItemController: NSObject {
     /// SwiftUI 最近一次量出的面板内容尺寸。
     private var contentSize = CGSize.zero
     private var resizeObserver: NSObjectProtocol?
+    private var moveObserver: NSObjectProtocol?
     /// 面板因为点到别处而关闭的时间：点菜单栏图标关闭面板时，不要紧接着又把它打开。
     private var lastAutoClose = Date.distantPast
     private var rotationTimer: Timer?
@@ -51,6 +52,13 @@ final class StatusItemController: NSObject {
                 self?.updateButton()
                 self?.panel?.appearance = self?.settings.appearance.nsAppearance
             }
+            .store(in: &cancellables)
+
+        settings.$panelPinned
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] pinned in self?.pinnedChanged(pinned) }
             .store(in: &cancellables)
 
         updateRotationTimer()
@@ -132,18 +140,42 @@ final class StatusItemController: NSObject {
         hostingView = hosting
         let panel = PanelWindow(contentView: hosting)
         panel.appearance = settings.appearance.nsAppearance
+        panel.pinned = settings.panelPinned
         resizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.keepBelowMenuBar() }
         }
-        panel.onClose = { [weak self] in self?.panelLostFocus() }
+        moveObserver = NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in
+            Task { @MainActor in self?.panelMoved() }
+        }
+        panel.onResignKey = { [weak self] in self?.panelLostFocus() }
+        panel.onClose = { [weak self] in self?.closePanel() }
         panel.onEscape = { [weak self] in self?.router.handleEscape() ?? false }
         self.panel = panel
     }
 
     private func panelLostFocus() {
-        guard let panel, panel.isVisible else { return }
+        guard let panel, panel.isVisible, !settings.panelPinned else { return }
         lastAutoClose = Date()
         closePanel()
+    }
+
+    /// 钉住或取消钉住。取消时面板回到菜单栏图标下面。
+    private func pinnedChanged(_ pinned: Bool) {
+        guard let panel else { return }
+        panel.pinned = pinned
+        if pinned {
+            settings.pinnedTopLeft = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
+        } else if panel.isVisible {
+            position(panel)
+            panel.makeKey()
+        }
+        Log.info(pinned ? "面板已钉住" : "面板取消钉住")
+    }
+
+    /// 钉住时拖动了面板：记下位置。
+    private func panelMoved() {
+        guard let panel, panel.isVisible, settings.panelPinned else { return }
+        settings.pinnedTopLeft = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
     }
 
     /// 按最近一次量到的内容尺寸调整；还没量过时用 fittingSize 估一下。
@@ -194,14 +226,20 @@ final class StatusItemController: NSObject {
         panel.setFrameOrigin(NSPoint(x: panel.frame.origin.x, y: limit - panel.frame.height))
     }
 
-    /// 面板顶边最高能到哪：菜单栏图标下面 2 个点。
+    /// 面板顶边最高能到哪：没钉住时是菜单栏图标下面 2 个点；钉住时是所在屏幕可见区域的顶边。
     private func topLimit() -> CGFloat? {
+        if settings.panelPinned, let screen = panel?.screen ?? NSScreen.main {
+            return screen.visibleFrame.maxY
+        }
         guard let button = statusItem.button, let buttonWindow = button.window else { return nil }
         return buttonWindow.convertToScreen(button.convert(button.bounds, to: nil)).minY - 2
     }
 
-    /// 面板最多能有多高：从菜单栏图标下面到屏幕可见区域的底部。
+    /// 面板最多能有多高：从顶边（菜单栏图标下面，钉住时是面板现在的顶边）到屏幕可见区域的底部。
     private func availableHeight() -> CGFloat? {
+        if settings.panelPinned, let panel, let screen = panel.screen ?? NSScreen.main {
+            return min(panel.frame.maxY, screen.visibleFrame.maxY) - (screen.visibleFrame.minY + 6)
+        }
         guard let button = statusItem.button, let buttonWindow = button.window,
               let screen = buttonWindow.screen ?? NSScreen.main
         else { return nil }
@@ -211,6 +249,18 @@ final class StatusItemController: NSObject {
 
     /// 放在菜单栏图标正下方，不超出屏幕。
     private func position(_ panel: PanelWindow) {
+        if settings.panelPinned, let topLeft = settings.pinnedTopLeft {
+            // 钉住时放回上次拖到的位置；那块屏幕不在了就放到主屏幕里。
+            let size = panel.frame.size
+            let screen = NSScreen.screens.first { $0.visibleFrame.insetBy(dx: -1, dy: -1).contains(topLeft) } ?? NSScreen.main
+            var origin = NSPoint(x: topLeft.x, y: topLeft.y - size.height)
+            if let visible = screen?.visibleFrame {
+                origin.x = min(max(origin.x, visible.minX), visible.maxX - size.width)
+                origin.y = min(max(origin.y, visible.minY), visible.maxY - size.height)
+            }
+            panel.setFrameOrigin(origin)
+            return
+        }
         guard let button = statusItem.button, let buttonWindow = button.window else { return }
         let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
         let size = panel.frame.size
@@ -230,18 +280,25 @@ final class StatusItemController: NSObject {
         let entries = settings.hideTicker
             ? []
             : MenuBarTicker.entries(items: store.items, quotes: store.quotes, options: settings.tickerOptions)
+        // 今日盈亏总是跟在最后，轮流显示时也不参与轮换。
+        let profit = settings.hideTicker || !settings.showDayProfit
+            ? []
+            : MenuBarTicker.dayProfitParts(Portfolio.summaries(items: store.items, quotes: store.quotes))
 
-        guard !entries.isEmpty else {
+        guard !entries.isEmpty || !profit.isEmpty else {
             button.attributedTitle = NSAttributedString(string: "")
             button.image = Self.icon
             return
         }
 
-        let shown: [[TickerPart]]
+        var shown: [[TickerPart]]
         if settings.rotateTicker, entries.count > 1 {
             shown = [entries[rotationIndex % entries.count]]
         } else {
             shown = entries
+        }
+        if !profit.isEmpty {
+            shown.append(profit)
         }
         button.image = nil
         button.attributedTitle = attributedTitle(for: shown)
@@ -299,7 +356,7 @@ final class StatusItemController: NSObject {
             "\(Int(rect.minX)) \(Int(screenHeight - rect.maxY)) \(Int(rect.width)) \(Int(rect.height))"
         }
         let title = statusItem.button?.attributedTitle.string ?? ""
-        print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil) color=\(settings.colorConvention.rawValue)")
+        print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil) color=\(settings.colorConvention.rawValue) pinned=\(settings.panelPinned)")
         let statusFrame = statusItem.button?.window?.frame
         if let statusFrame {
             print("STOX_DIAG status_frame=\(topLeft(statusFrame))")

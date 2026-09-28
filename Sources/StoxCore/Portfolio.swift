@@ -97,4 +97,13 @@ extension MarketRegion {
         case .us: return "美元"
         }
     }
+
+    /// 菜单栏上用的货币符号。
+    public var currencySymbol: String {
+        switch self {
+        case .cn: return "¥"
+        case .hk: return "HK$"
+        case .us: return "$"
+        }
+    }
 }

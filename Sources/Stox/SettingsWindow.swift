@@ -304,8 +304,10 @@ struct DisplayPage: View {
                         .disabled(settings.hideTicker)
                     Toggle("固定了多只时轮流显示", isOn: $settings.rotateTicker)
                         .disabled(settings.hideTicker)
+                    Toggle("在菜单栏显示今日盈亏", isOn: $settings.showDayProfit)
+                        .disabled(settings.hideTicker)
                     Toggle("价格变动时在面板里闪一下", isOn: $settings.flashOnChange)
-                    FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。轮流显示时每 5 秒换一只，适合刘海屏。")
+                    FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。轮流显示时每 5 秒换一只，适合刘海屏。今日盈亏只算填了持仓的证券，人民币、港币、美元分开显示，不参与轮流。")
                 }
                 Section("涨跌颜色") {
                     Picker("涨跌颜色", selection: $settings.colorConvention) {

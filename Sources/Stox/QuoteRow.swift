@@ -9,7 +9,7 @@ struct QuoteRow: View {
 
     /// 展开后详情的高度：分时图、三行行情数据，有持仓时再加一行。
     static func detailHeight(for item: WatchItem) -> CGFloat {
-        (item.holding == nil ? 129 : 162) + IntradayChart.height + 6
+        (item.holding == nil ? 129 : 162) + IntradayChart.height + 6 + (item.note == nil ? 0 : 20)
     }
 
     let item: WatchItem
@@ -68,6 +68,12 @@ struct QuoteRow: View {
                             .font(.system(size: 8.5))
                             .foregroundStyle(.orange)
                             .help("已设置价格提醒")
+                    }
+                    if let note = item.note {
+                        Image(systemName: "text.bubble")
+                            .font(.system(size: 8.5))
+                            .foregroundStyle(.secondary)
+                            .help(note)
                     }
                 }
                 HStack(spacing: 4) {
@@ -265,6 +271,14 @@ struct QuoteDetailView: View {
                         cell("今日盈亏", "--")
                     }
                 }
+            }
+            if let note = item.note {
+                Label(note, systemImage: "text.bubble")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .help(note)
             }
             HStack(spacing: 10) {
                 Text(timeText)
