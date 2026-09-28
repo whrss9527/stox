@@ -774,6 +774,7 @@ struct PanelFooter: View {
         if let copiedMessage {
             return copiedMessage
         }
+        if store.items.isEmpty { return "还没有自选" }
         guard let updated = store.lastUpdated else { return "正在获取行情…" }
         let cadence = store.effectiveInterval > settings.refreshInterval
             ? "休市中每分钟刷新"
