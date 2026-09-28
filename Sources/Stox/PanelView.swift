@@ -241,11 +241,16 @@ struct WatchlistView: View {
     }
 
     private var listHeight: CGFloat {
+        min(Self.naturalHeight(store: store, expanded: router.expanded), router.listMaxHeight)
+    }
+
+    /// 列表不受屏幕高度限制时的高度：每行固定高度，展开的那一行加上详情，最多 defaultMaxHeight。
+    static func naturalHeight(store: QuoteStore, expanded: Symbol?) -> CGFloat {
         var height = CGFloat(store.items.count) * QuoteRow.rowHeight
-        if let expanded = router.expanded, let item = store.item(for: expanded), store.quotes[expanded] != nil {
+        if let expanded, let item = store.item(for: expanded), store.quotes[expanded] != nil {
             height += QuoteRow.detailHeight(for: item)
         }
-        return min(max(height, QuoteRow.rowHeight * 2), router.listMaxHeight)
+        return min(max(height, QuoteRow.rowHeight * 2), defaultMaxHeight)
     }
 }
 
