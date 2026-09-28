@@ -518,11 +518,21 @@ struct TipsCards: View {
 
     /// 发布说明里“更新内容”的前几条。
     private static func loadNotes(_ version: String) async -> String? {
-        guard let release = try? await UpdateCheck.release(version: version, currentVersion: AppInfo.version) else { return nil }
+        let release: ReleaseInfo
+        do {
+            release = try await UpdateCheck.release(version: version, currentVersion: AppInfo.version)
+        } catch {
+            Log.info("取 \(version) 的更新内容失败：\(error.localizedDescription)")
+            print("STOX_DIAG whatsnew=failed \(error)")
+            fflush(stdout)
+            return nil
+        }
         let lines = release.highlights
             .split(separator: "\n")
             .map(String.init)
             .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        print("STOX_DIAG whatsnew=\(lines.count) lines")
+        fflush(stdout)
         return lines.isEmpty ? nil : lines.prefix(4).joined(separator: "\n")
     }
 
