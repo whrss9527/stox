@@ -99,6 +99,58 @@ public struct KlineSeries: Equatable, Sendable {
     }
 }
 
+/// K 线图上画的东西：最后几根 K 线、每根的涨跌幅和收盘价均线。
+/// 向接口多要的那些历史只用来算均线和第一根的涨跌，不画出来，这样均线从图的最左边就有。
+public struct KlineChartData: Equatable, Sendable {
+    /// 图上显示多少根。
+    public static let visibleCount = 60
+    /// 均线的根数：MA5、MA10、MA20。
+    public static let averagePeriods = [5, 10, 20]
+    /// 向接口要多少根：比显示的多出最长的均线要用的那些。
+    public static var fetchCount: Int { visibleCount + (averagePeriods.max() ?? 0) }
+
+    public var period: KlinePeriod
+    public var candles: [Candle]
+    /// 每根相对前一根收盘的涨跌幅（%）；前面没有 K 线的那一根为 nil。
+    public var changes: [Double?]
+    /// 均线，和 averagePeriods 一一对应；每条和 candles 一一对应，前面的根数不够算时为 nil。
+    public var averages: [[Double?]]
+
+    public init(series: KlineSeries, visibleCount: Int = KlineChartData.visibleCount, averagePeriods: [Int] = KlineChartData.averagePeriods) {
+        let all = series.candles
+        let start = max(0, all.count - visibleCount)
+        period = series.period
+        candles = Array(all[start...])
+        changes = (start..<all.count).map { series.changePercent(at: $0) }
+        // 收盘价的前缀和，sums[i] 是前 i 根的和。
+        var sums = [0.0]
+        sums.reserveCapacity(all.count + 1)
+        for candle in all { sums.append(sums[sums.count - 1] + candle.close) }
+        averages = averagePeriods.map { n in
+            (start..<all.count).map { index -> Double? in
+                guard n > 0, index + 1 >= n else { return nil }
+                return (sums[index + 1] - sums[index + 1 - n]) / Double(n)
+            }
+        }
+    }
+
+    /// 纵轴要容下的范围：K 线的最高最低，画均线时再加上图上的均线值。
+    public func priceRange(includingAverages: Bool) -> (low: Double, high: Double)? {
+        var values = candles.flatMap { [$0.low, $0.high] }
+        if includingAverages {
+            values += averages.flatMap { $0.compactMap { $0 } }
+        }
+        guard let low = values.min(), let high = values.max() else { return nil }
+        return (low, high)
+    }
+
+    /// 这一段的涨跌幅（%）：最后一根的收盘相对第一根的开盘。
+    public var totalChangePercent: Double? {
+        guard candles.count > 1, let first = candles.first, let last = candles.last, first.open > 0 else { return nil }
+        return (last.close - first.open) / first.open * 100
+    }
+}
+
 /// K 线日期的换算，都按交易所当地时间。
 enum KlineCalendar {
     static func calendar(for region: MarketRegion) -> Calendar {

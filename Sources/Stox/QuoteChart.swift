@@ -65,12 +65,12 @@ struct QuoteChartSection: View {
 
     private var intradaySeries: IntradaySeries? { store.intraday[item.symbol] }
 
-    /// K 线接口的数据，最后一根用实时行情更新过。
-    private var klineSeries: KlineSeries? {
+    /// K 线图上画的：接口的数据，最后一根用实时行情更新过，只留最后 60 根，带着均线。
+    private var klineData: KlineChartData? {
         guard let period = settings.chartPeriod.klinePeriod,
               let series = store.klines[KlineKey(symbol: item.symbol, period: period)]
         else { return nil }
-        return series.merging(quote)
+        return KlineChartData(series: series.merging(quote))
     }
 
     private var fiveDaySeries: MultiDaySeries? { store.fiveDay[item.symbol] }
@@ -94,10 +94,13 @@ struct QuoteChartSection: View {
                 hovered: hoveredFiveDay
             )
         case .day, .week, .month:
+            let data = klineData
             KlineChart(
-                series: klineSeries,
+                data: data,
                 convention: settings.colorConvention,
-                hoveredIndex: hoveredCandle(in: klineSeries)
+                hoveredIndex: hoveredCandle(in: data),
+                showAverages: settings.showMovingAverages,
+                decimals: quote.priceDecimals
             )
         }
     }
@@ -123,9 +126,9 @@ struct QuoteChartSection: View {
         return series.point(nearest: offset, region: region)
     }
 
-    private func hoveredCandle(in series: KlineSeries?) -> Int? {
-        guard let hoverX, chartWidth > 0, let series else { return nil }
-        return CandleLayout(count: series.candles.count, width: Double(chartWidth)).index(at: Double(hoverX))
+    private func hoveredCandle(in data: KlineChartData?) -> Int? {
+        guard let hoverX, chartWidth > 0, let data else { return nil }
+        return CandleLayout(count: data.candles.count, width: Double(chartWidth)).index(at: Double(hoverX))
     }
 
     // MARK: - 上面一排
@@ -179,16 +182,14 @@ struct QuoteChartSection: View {
             guard let series = fiveDaySeries, let last = fiveDayLast, let base = series.previousClose, base > 0 else { return nil }
             return "近 \(series.days.count) 日 \(QuoteFormatter.percent((last - base) / base * 100))"
         }
-        guard let series = klineSeries, let first = series.candles.first, let last = series.candles.last,
-              series.candles.count > 1, first.open > 0
-        else { return nil }
+        guard let data = klineData, let change = data.totalChangePercent else { return nil }
         let unit: String
-        switch series.period {
+        switch data.period {
         case .day: unit = "日"
         case .week: unit = "周"
         case .month: unit = "个月"
         }
-        return "近 \(series.candles.count) \(unit) \(QuoteFormatter.percent((last.close - first.open) / first.open * 100))"
+        return "近 \(data.candles.count) \(unit) \(QuoteFormatter.percent(change))"
     }
 
     /// 指着图时显示的读数。
@@ -217,11 +218,11 @@ struct QuoteChartSection: View {
             }
             return text
         }
-        guard let series = klineSeries, let index = hoveredCandle(in: series) else { return nil }
-        let candle = series.candles[index]
-        let date = series.period == .month ? String(candle.date.prefix(7)) : candle.date
+        guard let data = klineData, let index = hoveredCandle(in: data) else { return nil }
+        let candle = data.candles[index]
+        let date = data.period == .month ? String(candle.date.prefix(7)) : candle.date
         var text = "\(date)  开 \(price(candle.open))  高 \(price(candle.high))  低 \(price(candle.low))  收 \(price(candle.close))"
-        if let change = series.changePercent(at: index) {
+        if let change = data.changes[index] {
             text += "  " + QuoteFormatter.percent(change)
         }
         return text
@@ -229,19 +230,32 @@ struct QuoteChartSection: View {
 }
 
 /// K 线图：每根一个实体加上下影线，红涨绿跌跟着设置走。不显示红绿时阳线空心、阴线实心。
+/// 画均线时上方留一行写 MA5、MA10、MA20 的值：鼠标指着时是那一根的，否则是最后一根的。
 struct KlineChart: View {
-    let series: KlineSeries?
+    static let legendHeight: CGFloat = 11
+    /// 三条均线的颜色，和 KlineChartData.averagePeriods 一一对应。
+    static let averageColors: [Color] = [.orange, .blue, .purple]
+
+    let data: KlineChartData?
     let convention: ColorConvention
     var hoveredIndex: Int?
+    var showAverages = true
+    var decimals = 2
 
     var body: some View {
-        GeometryReader { proxy in
-            if let series, !series.candles.isEmpty {
-                Canvas { context, size in
-                    draw(series.candles, in: &context, size: size)
+        GeometryReader { _ in
+            if let data, !data.candles.isEmpty {
+                VStack(spacing: 0) {
+                    if showAverages {
+                        legend(data)
+                            .frame(height: Self.legendHeight)
+                    }
+                    Canvas { context, size in
+                        draw(data, in: &context, size: size)
+                    }
                 }
             } else {
-                Text(series == nil ? "正在加载 K 线…" : "暂时没有 K 线数据")
+                Text(data == nil ? "正在加载 K 线…" : "暂时没有 K 线数据")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -251,14 +265,32 @@ struct KlineChart: View {
         .accessibilityLabel("K 线走势")
     }
 
-    private func draw(_ candles: [Candle], in context: inout GraphicsContext, size: CGSize) {
-        guard size.width > 0, size.height > 0,
-              let high = candles.map(\.high).max(), let low = candles.map(\.low).min()
-        else { return }
+    private func legend(_ data: KlineChartData) -> some View {
+        let index = hoveredIndex.flatMap { data.candles.indices.contains($0) ? $0 : nil } ?? data.candles.count - 1
+        return HStack(spacing: 8) {
+            ForEach(0..<min(data.averages.count, KlineChartData.averagePeriods.count), id: \.self) { line in
+                let value = data.averages[line][index]
+                Text("MA\(KlineChartData.averagePeriods[line]) \(value.map { QuoteFormatter.price($0, decimals: decimals) } ?? "--")")
+                    .foregroundStyle(Self.color(ofAverage: line))
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 9).monospacedDigit())
+        .lineLimit(1)
+        .accessibilityHidden(true)
+    }
+
+    static func color(ofAverage line: Int) -> Color {
+        averageColors[line % averageColors.count]
+    }
+
+    private func draw(_ data: KlineChartData, in context: inout GraphicsContext, size: CGSize) {
+        let candles = data.candles
+        guard size.width > 0, size.height > 0, let range = data.priceRange(includingAverages: showAverages) else { return }
         // 上下各留一点边，最高最低点不贴着边；一动不动时给 1% 的范围。
-        let span = max(high - low, high * 0.01, 0.0001)
-        let top = high + span * 0.06
-        let bottom = low - span * 0.06
+        let span = max(range.high - range.low, range.high * 0.01, 0.0001)
+        let top = range.high + span * 0.06
+        let bottom = range.low - span * 0.06
         func y(_ price: Double) -> CGFloat {
             CGFloat((top - price) / (top - bottom)) * size.height
         }
@@ -294,6 +326,30 @@ struct KlineChart: View {
             } else {
                 context.fill(Path(rect), with: .color(tint))
             }
+        }
+
+        guard showAverages else { return }
+        // 均线画在 K 线上面；前面根数不够算的地方空着。
+        for (line, values) in data.averages.enumerated() {
+            var path = Path()
+            var drawing = false
+            for (index, value) in values.enumerated() {
+                guard let value else {
+                    drawing = false
+                    continue
+                }
+                let point = CGPoint(x: CGFloat(layout.centerX(of: index)), y: y(value))
+                if drawing {
+                    path.addLine(to: point)
+                } else {
+                    path.move(to: point)
+                    drawing = true
+                }
+            }
+            context.stroke(
+                path, with: .color(Self.color(ofAverage: line).opacity(0.9)),
+                style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round)
+            )
         }
     }
 

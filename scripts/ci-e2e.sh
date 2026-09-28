@@ -90,6 +90,8 @@ smoke() {
   grep -q "chart=day" shots/kline.log || fail "没有切到日 K"
   grep -Eq "kline=([2-9][0-9])" shots/kline.log || echo "::warning::日 K 没有取到数据"
   grep -Eq "kline=([2-9][0-9])" shots/kline-us.log || echo "::warning::美股月 K 没有取到足够的数据"
+  # 多取了 20 根历史，取到了的话图上 60 根都有 MA20。
+  grep -Eq "ma20=60 " shots/kline.log || echo "::warning::日 K 上的均线没有从最左边开始"
 
   # 五日分时：美股要带交易所后缀才取得到。
   run_case fiveday --show-panel --expand usAAPL --chart fiveDay
@@ -213,6 +215,15 @@ smoke() {
   elif [[ "$late" == *" extended=0 "* ]]; then
     echo "::warning::美股不在常规交易时段，但没有取到盘前盘后价：$late"
   fi
+
+  # 设置里关掉盘前盘后价以后不去取；K 线不画均线。
+  defaults write "$DOMAIN" list.extendedHours -bool false
+  defaults write "$DOMAIN" chart.movingAverages -bool false
+  run_case plain --show-panel --expand usAAPL --chart day
+  defaults delete "$DOMAIN" list.extendedHours
+  defaults delete "$DOMAIN" chart.movingAverages
+  defaults delete "$DOMAIN" chart.period
+  grep -q "STOX_DIAG late us_phase=[a-zA-Z]* extended=0 " shots/plain.log || fail "关掉盘前盘后价以后不应该再取"
 }
 
 sync_test() {

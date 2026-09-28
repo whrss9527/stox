@@ -58,7 +58,8 @@ struct QuoteRow: View {
 
     /// 美股个股不在常规交易时显示的盘前盘后价。
     private var extended: ExtendedQuote? {
-        quote.flatMap { ExtendedQuote(store.extendedHours[item.symbol], quote: $0) }
+        guard settings.showExtendedHours else { return nil }
+        return quote.flatMap { ExtendedQuote(store.extendedHours[item.symbol], quote: $0) }
     }
 
     /// 色块里的文字：涨跌幅、涨跌额或者总市值（指数没有市值）。
@@ -363,7 +364,7 @@ struct QuoteDetailView: View {
     private var timeText: String {
         let region = item.symbol.market.region
         // 美股不在常规交易时，这一行换成盘前盘后价和它的成交时间；行情时间这时总是收盘那一刻，不用再写。
-        if let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
+        if settings.showExtendedHours, let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
             var text = "\(extended.label) \(extended.priceText) \(QuoteFormatter.percent(extended.percent))"
             if let time = extended.timeText { text += " · 美东 \(time)" }
             return text
