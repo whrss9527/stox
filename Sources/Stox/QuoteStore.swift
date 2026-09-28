@@ -385,8 +385,11 @@ final class QuoteStore: ObservableObject {
         saveAlertState()
     }
 
-    func move(fromOffsets source: IndexSet, toOffset destination: Int) {
-        items.move(fromOffsets: source, toOffset: destination)
+    /// 拖动排序。visible 是列表里看得见的那几只，筛选着的时候只在它们之间换位置，看不见的原地不动。
+    func move(visible: [Symbol], fromOffsets source: IndexSet, toOffset destination: Int) {
+        let updated = Watchlist.moving(items, visible: visible, fromOffsets: source, toOffset: destination)
+        guard updated != items else { return }
+        items = updated
         save()
     }
 
