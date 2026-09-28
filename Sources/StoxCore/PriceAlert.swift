@@ -77,6 +77,15 @@ public struct AlertTrigger: Sendable, Equatable {
     /// 触发时的持仓，止盈止损提醒的正文里用。
     public var holding: Holding?
 
+    public init(symbol: Symbol, name: String, condition: AlertCondition, threshold: Double, quote: Quote, holding: Holding? = nil) {
+        self.symbol = symbol
+        self.name = name
+        self.condition = condition
+        self.threshold = threshold
+        self.quote = quote
+        self.holding = holding
+    }
+
     public var title: String {
         switch condition {
         case .priceAbove:
