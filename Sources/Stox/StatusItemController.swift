@@ -187,8 +187,42 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func openPanel() {
-        router.route = .list
+        showPanel(route: .list)
+    }
+
+    /// 打开面板并切到指定页面。printDiagnostics 用于 CI：打印菜单栏文字和面板位置，方便检查和截图。
+    func showPanel(route: PanelRoute, printDiagnostics: Bool = false) {
+        router.route = route
         showPopover()
+        guard printDiagnostics else { return }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            self?.printDiagnostics()
+        }
+    }
+
+    private func printDiagnostics() {
+        let screenHeight = NSScreen.screens.first?.frame.height ?? 0
+        func topLeft(_ rect: NSRect) -> String {
+            "\(Int(rect.minX)) \(Int(screenHeight - rect.maxY)) \(Int(rect.width)) \(Int(rect.height))"
+        }
+        let title = statusItem.button?.attributedTitle.string ?? ""
+        print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil)")
+        if let frame = statusItem.button?.window?.frame {
+            print("STOX_DIAG status_frame=\(topLeft(frame))")
+        }
+        print("STOX_DIAG popover_shown=\(popover.isShown) content_size=\(Int(popover.contentSize.width))x\(Int(popover.contentSize.height))")
+        let popoverFrame = popover.contentViewController?.view.window?.frame
+        if let popoverFrame {
+            print("STOX_DIAG popover_frame=\(topLeft(popoverFrame))")
+        }
+        // 截图裁剪区域：菜单栏按钮与面板的并集。
+        let frames = [statusItem.button?.window?.frame, popoverFrame].compactMap { $0 }
+        if let first = frames.first {
+            print("STOX_DIAG capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
+        }
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) error=\(store.lastError ?? "none")")
+        fflush(stdout)
     }
 
     @objc private func refreshNow() {
@@ -200,8 +234,7 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func openSettings() {
-        router.route = .settings
-        showPopover()
+        showPanel(route: .settings)
     }
 
     @objc private func quit() {

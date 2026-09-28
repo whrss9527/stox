@@ -288,7 +288,10 @@ struct PanelFooter: View {
 
     private var statusText: String {
         guard let updated = store.lastUpdated else { return "正在获取行情…" }
-        return "\(QuoteFormatter.time(updated)) 更新 · 每 \(Int(settings.refreshInterval)) 秒刷新 · 拖动可排序"
+        let cadence = store.effectiveInterval > settings.refreshInterval
+            ? "休市中每分钟刷新"
+            : "每 \(Int(settings.refreshInterval)) 秒刷新"
+        return "\(QuoteFormatter.time(updated)) 更新 · \(cadence) · 拖动可排序"
     }
 }
 

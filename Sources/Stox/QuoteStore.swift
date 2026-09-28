@@ -60,7 +60,7 @@ final class QuoteStore: ObservableObject {
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.refresh()
-                let delay = self.nextDelay()
+                let delay = self.effectiveInterval
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
@@ -117,7 +117,8 @@ final class QuoteStore: ObservableObject {
         }
     }
 
-    private func nextDelay() -> TimeInterval {
+    /// 当前实际的刷新间隔：所有关注的市场都休市时会放宽到每分钟一次。
+    var effectiveInterval: TimeInterval {
         let phases = activeRegions.map { phase(for: $0) }
         return RefreshPolicy.interval(base: settings.refreshInterval, phases: phases, slowWhenIdle: settings.slowWhenIdle)
     }

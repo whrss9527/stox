@@ -50,6 +50,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let workspace = NSWorkspace.shared.notificationCenter
         workspace.addObserver(self, selector: #selector(systemWillSleep), name: NSWorkspace.willSleepNotification, object: nil)
         workspace.addObserver(self, selector: #selector(systemDidWake), name: NSWorkspace.didWakeNotification, object: nil)
+
+        // 调试与 CI 截图用：`Stox --show-panel` / `Stox --show-settings` 启动后直接打开面板。
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("--show-panel") || arguments.contains("--show-settings") {
+            let route: PanelRoute = arguments.contains("--show-settings") ? .settings : .list
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 4_000_000_000)
+                self?.statusController?.showPanel(route: route, printDiagnostics: true)
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
