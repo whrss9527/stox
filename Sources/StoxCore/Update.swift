@@ -36,6 +36,11 @@ public struct ReleaseInfo: Equatable, Sendable {
         self.checksumsURL = checksumsURL
     }
 
+    /// 发布说明里“更新内容”那一节；旧版本的发布说明没有这一节时，去掉安装步骤和自动生成的改动列表后剩下的部分。
+    public var highlights: String {
+        ReleaseNotesText.highlights(notes)
+    }
+
     /// 附件摘要里的十六进制 SHA-256。
     public var archiveSHA256: String? {
         guard let digest = archiveDigest?.lowercased(), digest.hasPrefix("sha256:") else { return nil }
@@ -249,5 +254,35 @@ public enum InstallLocation {
         let target = folder.appendingPathComponent(appName, isDirectory: true).standardizedFileURL
         let trash = original.flatMap { $0.standardizedFileURL.path == target.path ? nil : $0 }
         return InstallPlan(target: target, trashAfter: trash, relocating: true)
+    }
+}
+
+/// 发布说明的整理：App 里只显示这个版本更新了什么，安装步骤和 GitHub 自动生成的列表不显示。
+public enum ReleaseNotesText {
+    static let highlightsHeading = "## 更新内容"
+    /// 这些标题下面的内容不显示。
+    static let skippedHeadings = ["## 安装", "## What's Changed", "## New Contributors"]
+
+    public static func highlights(_ notes: String) -> String {
+        let lines = notes.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
+        var kept: [String] = []
+        var skipping = false
+        var sawHighlights = false
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("## ") {
+                if trimmed == highlightsHeading {
+                    sawHighlights = true
+                    skipping = false
+                    continue
+                }
+                // 有“更新内容”时只要那一节；没有时跳过已知的几节，其他的照常显示。
+                skipping = sawHighlights || skippedHeadings.contains { trimmed.hasPrefix($0) }
+                continue
+            }
+            if trimmed.hasPrefix("**Full Changelog**") { continue }
+            if !skipping { kept.append(line) }
+        }
+        return kept.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

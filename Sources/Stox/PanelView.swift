@@ -193,7 +193,7 @@ struct WatchlistView: View {
     static let defaultMaxHeight: CGFloat = 430
 
     var body: some View {
-        Group {
+        VStack(spacing: 0) {
             if store.items.isEmpty {
                 VStack(spacing: 8) {
                     Image(systemName: "star")
@@ -206,9 +206,17 @@ struct WatchlistView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 140)
             } else {
+                let filters = WatchlistFilter.available(for: store.items)
+                let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
+                let visible = Self.visibleItems(store: store, settings: settings)
+                if !filters.isEmpty {
+                    WatchlistFilterBar(filters: filters, active: filter, count: visible.count)
+                        .padding(.horizontal, 10)
+                        .padding(.top, 8)
+                }
                 ScrollViewReader { proxy in
                     List {
-                        ForEach(settings.sortMode.apply(store.items, quotes: store.quotes)) { item in
+                        ForEach(visible) { item in
                             QuoteRow(
                                 item: item,
                                 quote: store.quotes[item.symbol],
@@ -220,8 +228,8 @@ struct WatchlistView: View {
                                 .listRowBackground(Color.clear)
                                 .id(item.symbol)
                         }
-                        // 按涨跌幅排序时不能拖动。
-                        .onMove(perform: settings.sortMode == .custom ? { source, destination in
+                        // 按涨跌幅排序或者筛选着的时候不能拖动。
+                        .onMove(perform: settings.sortMode == .custom && filter == .all ? { source, destination in
                             store.move(fromOffsets: source, toOffset: destination)
                         } : nil)
                     }
@@ -257,16 +265,57 @@ struct WatchlistView: View {
     }
 
     private var listHeight: CGFloat {
-        min(Self.naturalHeight(store: store, expanded: router.expanded), router.listMaxHeight)
+        min(Self.naturalHeight(store: store, settings: settings, expanded: router.expanded), router.listMaxHeight)
+    }
+
+    /// 列表里显示的自选：先筛选，再排序。键盘上下选择也按这个顺序。
+    static func visibleItems(store: QuoteStore, settings: SettingsStore) -> [WatchItem] {
+        let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
+        return settings.sortMode.apply(filter.apply(store.items), quotes: store.quotes)
     }
 
     /// 列表不受屏幕高度限制时的高度：每行固定高度，展开的那一行加上详情，最多 defaultMaxHeight。
-    static func naturalHeight(store: QuoteStore, expanded: Symbol?) -> CGFloat {
-        var height = CGFloat(store.items.count) * QuoteRow.rowHeight
-        if let expanded, let item = store.item(for: expanded), store.quotes[expanded] != nil {
+    static func naturalHeight(store: QuoteStore, settings: SettingsStore, expanded: Symbol?) -> CGFloat {
+        let visible = visibleItems(store: store, settings: settings)
+        var height = CGFloat(visible.count) * QuoteRow.rowHeight
+        if let expanded, let item = visible.first(where: { $0.symbol == expanded }), store.quotes[expanded] != nil {
             height += QuoteRow.detailHeight(for: item)
         }
         return min(max(height, QuoteRow.rowHeight * 2), defaultMaxHeight)
+    }
+}
+
+/// 列表上方的筛选：全部、各市场、持仓，右边是显示了几只。
+@MainActor
+struct WatchlistFilterBar: View {
+    @EnvironmentObject private var settings: SettingsStore
+    let filters: [WatchlistFilter]
+    let active: WatchlistFilter
+    let count: Int
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ForEach(filters, id: \.self) { filter in
+                let selected = filter == active
+                Button {
+                    settings.listFilter = filter
+                } label: {
+                    Text(filter.title)
+                        .font(.system(size: 10.5, weight: selected ? .semibold : .regular))
+                        .foregroundStyle(selected ? Color.primary : Color.secondary)
+                        .padding(.horizontal, 8)
+                        .frame(height: 20)
+                        .background(Capsule().fill(Color.primary.opacity(selected ? 0.1 : 0)))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+            Spacer(minLength: 4)
+            Text("\(count) 只")
+                .font(.system(size: 10).monospacedDigit())
+                .foregroundStyle(.tertiary)
+        }
     }
 }
 

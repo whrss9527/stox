@@ -192,7 +192,7 @@ final class StatusItemController: NSObject {
                 return false
             }
         }
-        let symbols = settings.sortMode.apply(store.items, quotes: store.quotes).map(\.symbol)
+        let symbols = WatchlistView.visibleItems(store: store, settings: settings).map(\.symbol)
         switch key {
         case .up, .down:
             guard !symbols.isEmpty else { return false }
@@ -264,7 +264,9 @@ final class StatusItemController: NSObject {
         if let available = availableHeight(), height > available {
             // 超出多少，列表就矮多少，一步算到位。列表是面板里唯一能伸缩的部分。
             let minimum = QuoteRow.rowHeight * 2
-            let current = min(WatchlistView.naturalHeight(store: store, expanded: router.expanded), router.listMaxHeight)
+            let current = min(
+                WatchlistView.naturalHeight(store: store, settings: settings, expanded: router.expanded), router.listMaxHeight
+            )
             let limit = max(minimum, floor(current - (height - available)))
             if limit < router.listMaxHeight {
                 // 在 SwiftUI 量尺寸的回调里，放到下一轮再改，避免在视图更新期间发布变化；
@@ -444,6 +446,8 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
+        let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
+        print("STOX_DIAG filter=\(filter.rawValue) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count)")
         print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }

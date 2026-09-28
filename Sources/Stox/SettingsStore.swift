@@ -33,6 +33,18 @@ extension WatchlistSort {
     }
 }
 
+extension WatchlistFilter {
+    var title: String {
+        switch self {
+        case .all: return "全部"
+        case .cn: return "A股"
+        case .hk: return "港股"
+        case .us: return "美股"
+        case .holdings: return "持仓"
+        }
+    }
+}
+
 /// 列表每一行右边色块里显示什么，点一下色块依次切换。
 enum ChangeDisplay: String, CaseIterable, Identifiable {
     case percent, change, marketCap
@@ -182,6 +194,10 @@ final class SettingsStore: ObservableObject {
     @Published var sortMode: WatchlistSort {
         didSet { defaults.set(sortMode.rawValue, forKey: Keys.sortMode) }
     }
+    /// 列表上方选的筛选：全部、某个市场或持仓。
+    @Published var listFilter: WatchlistFilter {
+        didSet { defaults.set(listFilter.rawValue, forKey: Keys.listFilter) }
+    }
     /// 列表右边色块里显示涨跌幅、涨跌额还是总市值。
     @Published var changeDisplay: ChangeDisplay {
         didSet { defaults.set(changeDisplay.rawValue, forKey: Keys.changeDisplay) }
@@ -247,6 +263,7 @@ final class SettingsStore: ObservableObject {
         syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
         appearance = defaults.string(forKey: Keys.appearance).flatMap(AppearanceMode.init(rawValue:)) ?? .system
         sortMode = defaults.string(forKey: Keys.sortMode).flatMap(WatchlistSort.init(rawValue:)) ?? .custom
+        listFilter = defaults.string(forKey: Keys.listFilter).flatMap(WatchlistFilter.init(rawValue:)) ?? .all
         changeDisplay = defaults.string(forKey: Keys.changeDisplay).flatMap(ChangeDisplay.init(rawValue:)) ?? .percent
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
@@ -315,6 +332,7 @@ final class SettingsStore: ObservableObject {
         static let syncEnabled = "sync.enabled"
         static let appearance = "appearance"
         static let sortMode = "list.sort"
+        static let listFilter = "list.filter"
         static let changeDisplay = "list.pill"
         static let flashOnChange = "list.flash"
         static let showDayProfit = "ticker.dayProfit"

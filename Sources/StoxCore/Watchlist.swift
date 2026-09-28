@@ -223,3 +223,40 @@ public enum WatchlistSort: String, CaseIterable, Sendable {
         }.map(\.element)
     }
 }
+
+/// 自选列表的筛选：全部、某个市场、有持仓的。
+public enum WatchlistFilter: String, CaseIterable, Codable, Sendable {
+    case all, cn, hk, us, holdings
+
+    public func apply(_ items: [WatchItem]) -> [WatchItem] {
+        switch self {
+        case .all: return items
+        case .cn: return items.filter { $0.symbol.market.region == .cn }
+        case .hk: return items.filter { $0.symbol.market.region == .hk }
+        case .us: return items.filter { $0.symbol.market.region == .us }
+        case .holdings: return items.filter { $0.holding != nil }
+        }
+    }
+
+    /// 值得显示的筛选：自选涉及两个以上市场时列出这些市场；有的有持仓、有的没有时加上“持仓”。
+    /// 只剩“全部”一项时返回空数组，不显示筛选。
+    public static func available(for items: [WatchItem]) -> [WatchlistFilter] {
+        var result: [WatchlistFilter] = [.all]
+        let regions = Set(items.map { $0.symbol.market.region })
+        if regions.count > 1 {
+            if regions.contains(.cn) { result.append(.cn) }
+            if regions.contains(.hk) { result.append(.hk) }
+            if regions.contains(.us) { result.append(.us) }
+        }
+        let held = items.filter { $0.holding != nil }.count
+        if held > 0, held < items.count {
+            result.append(.holdings)
+        }
+        return result.count > 1 ? result : []
+    }
+
+    /// 实际生效的筛选：选中的那一项已经不适用（比如美股都删了）时回到全部。
+    public static func effective(_ selected: WatchlistFilter, items: [WatchItem]) -> WatchlistFilter {
+        available(for: items).contains(selected) ? selected : .all
+    }
+}
