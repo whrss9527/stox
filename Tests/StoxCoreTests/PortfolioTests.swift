@@ -263,3 +263,26 @@ final class FilterTests: XCTestCase {
         XCTAssertEqual(WatchlistFilter.effective(.hk, items: items), .hk)
     }
 }
+
+final class TableTests: XCTestCase {
+    func testHoldingsTable() {
+        let moutai = Symbol("sh600519")!
+        let tencent = Symbol("hk00700")!
+        let items = [
+            WatchItem(symbol: Symbol("sh000001")!, name: "上证指数"),
+            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200)),
+            WatchItem(symbol: tencent, name: "腾讯控股", holding: Holding(shares: 200, cost: 380)),
+            WatchItem(symbol: Symbol("usAAPL")!, name: "苹果", holding: Holding(shares: 10, cost: 300)),
+        ]
+        let quotes: [Symbol: Quote] = [
+            moutai: Quote(symbol: moutai, name: "贵州茅台", price: 1243.88, previousClose: 1237),
+            tencent: Quote(symbol: tencent, name: "腾讯控股", price: 439.8, previousClose: 436.6, priceDecimals: 3),
+        ]
+        let rows = Portfolio.tableText(items: items, quotes: quotes).components(separatedBy: "\n")
+        XCTAssertEqual(rows.count, 3, "指数没有持仓，苹果没有行情，都不列")
+        XCTAssertEqual(rows[0], "名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏")
+        XCTAssertEqual(rows[1], "贵州茅台\t600519\tCNY\t100\t1200\t1243.88\t124388.00\t4388.00\t3.66%\t688.00")
+        XCTAssertEqual(rows[2], "腾讯控股\t00700\tHKD\t200\t380\t439.800\t87960.00\t11960.00\t15.74%\t640.00")
+        XCTAssertEqual(Portfolio.tableText(items: Array(items.prefix(1)), quotes: quotes), "", "没有持仓时是空的")
+    }
+}

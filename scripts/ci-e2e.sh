@@ -111,6 +111,17 @@ smoke() {
   grep -Eq "items=8 quotes=[1-9]" shots/failover.log || fail "改用新浪后没有行情"
   grep -q "items=8 quotes=8 " shots/failover.log || echo "::warning::新浪没有返回全部 8 只的行情"
 
+  # 休市时只显示图标：菜单栏上的市场（默认是上证）休市时只剩图标，交易中照常显示行情。CI 什么时候跑都能判断。
+  defaults write "$DOMAIN" ticker.hideWhenClosed -bool true
+  run_case when-closed --show-panel
+  defaults delete "$DOMAIN" ticker.hideWhenClosed
+  grep -q "ticker_hidden=" shots/when-closed.log || fail "没有打印菜单栏的状态"
+  if grep -q "ticker_live=false" shots/when-closed.log; then
+    grep -q 'status_title="" image=true' shots/when-closed.log || fail "休市时菜单栏应该只剩图标"
+  else
+    grep -q 'status_title="上证' shots/when-closed.log || fail "交易中菜单栏应该照常显示行情"
+  fi
+
   # 右键单击切换的“只显示图标”：菜单栏只剩图标，左键照样能打开面板。
   defaults write "$DOMAIN" ticker.hidden -bool true
   run_case hidden --show-panel

@@ -301,6 +301,9 @@ struct DisplayPage: View {
                 Section("菜单栏") {
                     Toggle("只显示图标，隐藏行情", isOn: $settings.hideTicker)
                     FormNote("右键单击菜单栏里的 Stox 可以随时在“显示行情”和“只显示图标”之间切换，左键单击照常打开行情面板。")
+                    Toggle("休市时只显示图标", isOn: $settings.hideTickerWhenClosed)
+                        .disabled(settings.hideTicker)
+                    FormNote("菜单栏上的证券所在的市场都休市时只显示图标，开盘（包括美股盘前）后自动恢复，晚上不占地方。")
                     Toggle("显示名称", isOn: $settings.showName)
                         .disabled(settings.hideTicker)
                     Toggle("显示价格", isOn: $settings.showPrice)
@@ -312,7 +315,7 @@ struct DisplayPage: View {
                     Toggle("在菜单栏显示今日盈亏", isOn: $settings.showDayProfit)
                         .disabled(settings.hideTicker)
                     Toggle("价格变动时在面板里闪一下", isOn: $settings.flashOnChange)
-                    FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。轮流显示时每 5 秒换一只，适合刘海屏。今日盈亏只算填了持仓的证券，人民币、港币、美元分开显示，不参与轮流。")
+                    FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。轮流显示时每 5 秒换一只，适合刘海屏。今日盈亏只算填了持仓的证券，几种货币都有时按汇率折成人民币显示一个数，不参与轮流。")
                 }
                 Section("涨跌颜色") {
                     Picker("涨跌颜色", selection: $settings.colorConvention) {
