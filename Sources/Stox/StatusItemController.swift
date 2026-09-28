@@ -119,7 +119,15 @@ final class StatusItemController: NSObject {
                     await self?.simulate(keys)
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
                 }
-                if printDiagnostics { self?.printDiagnostics() }
+                if printDiagnostics {
+                    self?.printDiagnostics()
+                    // 盘前盘后价在行情之后才取，过几秒再报一次。
+                    try? await Task.sleep(nanoseconds: 6_000_000_000)
+                    if let self {
+                        print("STOX_DIAG late \(self.extendedHoursDiagnostics)")
+                        fflush(stdout)
+                    }
+                }
             }
         }
     }
@@ -469,12 +477,19 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
-        let extended = store.quotes.values.filter { $0.extendedPrice != nil }.count
-        print("STOX_DIAG us_phase=\(store.phase(for: .us)) extended=\(extended)")
+        print("STOX_DIAG \(extendedHoursDiagnostics)")
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
         print("STOX_DIAG filter=\(filter.rawValue) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count)")
         print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
+    }
+
+    /// 美股现在的时段和取到的盘前盘后价，CI 用来检查。
+    var extendedHoursDiagnostics: String {
+        let sample = store.extendedHours
+            .min { $0.key.rawValue < $1.key.rawValue }
+            .map { "\($0.key.rawValue):\($0.value.session):\($0.value.price)" } ?? "none"
+        return "us_phase=\(store.phase(for: .us)) extended=\(store.extendedHours.count) extended_sample=\(sample)"
     }
 }
 

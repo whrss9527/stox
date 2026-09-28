@@ -56,9 +56,9 @@ struct QuoteRow: View {
 
     private var direction: PriceDirection { quote?.direction ?? .flat }
 
-    /// 美股个股在盘前、盘后以及收盘以后显示的盘前盘后价。
+    /// 美股个股不在常规交易时显示的盘前盘后价。
     private var extended: ExtendedQuote? {
-        quote.flatMap { ExtendedQuote($0, phase: store.phase(for: .us)) }
+        quote.flatMap { ExtendedQuote(store.extendedHours[item.symbol], quote: $0) }
     }
 
     /// 色块里的文字：涨跌幅、涨跌额或者总市值（指数没有市值）。
@@ -118,7 +118,7 @@ struct QuoteRow: View {
                             .font(.system(size: 9.5).monospacedDigit())
                             .foregroundStyle(Theme.priceColor(for: PriceDirection(extended.change), convention: settings.colorConvention))
                             .lineLimit(1)
-                            .help("\(extended.label) \(extended.priceText)，相对收盘 \(QuoteFormatter.percent(extended.percent))")
+                            .help(extended.helpText)
                     }
                 }
             }
@@ -363,31 +363,40 @@ struct QuoteDetailView: View {
         guard let timestamp = quote.timestamp else { return "" }
         var text = "\(region.displayName)时间 \(QuoteFormatter.time(timestamp, timeZone: region.timeZone))"
         if region == .hk { text += " · 延时约 15 分钟" }
-        if let extended = ExtendedQuote(quote, phase: store.phase(for: region)) {
+        if let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
             text += " · \(extended.label) \(extended.priceText)（\(QuoteFormatter.percent(extended.percent))）"
         }
         return text
     }
 }
 
-/// 美股盘前盘后价，按现在的时段决定叫“盘前”还是“盘后”；交易中、非美股、没有数据时为 nil。
+/// 列表和详情里显示的美股盘前盘后价：标签、价格和相对收盘的涨跌。没有数据、和行情对不上时为 nil。
 struct ExtendedQuote {
     let label: String
     let price: Double
     let change: Double
     let percent: Double
     let decimals: Int
+    let time: Date?
 
-    init?(_ quote: Quote, phase: MarketPhase) {
-        guard quote.symbol.market.region == .us, let price = quote.extendedPrice, let change = quote.extendedChange,
-              let label = phase.extendedLabel
-        else { return nil }
-        self.label = label
-        self.price = price
+    init?(_ extended: ExtendedHoursQuote?, quote: Quote) {
+        guard let extended, let change = extended.change(from: quote) else { return nil }
+        label = extended.session.displayName
+        price = extended.price
         self.change = change.change
-        self.percent = change.percent
+        percent = change.percent
         decimals = quote.priceDecimals
+        time = extended.time
     }
 
     var priceText: String { QuoteFormatter.price(price, decimals: decimals) }
+
+    /// 鼠标停在标签上时的说明：价格、相对收盘的涨跌和成交时间。
+    var helpText: String {
+        var text = "\(label) \(priceText)，相对收盘 \(QuoteFormatter.percent(percent))"
+        if let time {
+            text += "，美东时间 \(QuoteFormatter.time(time, timeZone: MarketRegion.us.timeZone).prefix(5))"
+        }
+        return text
+    }
 }

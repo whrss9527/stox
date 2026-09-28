@@ -19,7 +19,7 @@ import Foundation
 /// | 38 / 39 | 换手率%（港股在第 59 位） / 市盈率 |
 /// | 45 | 总市值（亿；指数为成分股总市值，不展示） |
 /// | 47 / 48 | A 股：涨停价 / 跌停价；港美股：52 周最高 / 最低 |
-/// | 67 / 68 | A 股：52 周最高 / 最低；美股个股的 67 是盘前或盘后的最新成交价 |
+/// | 67 / 68 | A 股：52 周最高 / 最低（美股的 67 是当天的成交均价，即成交额除以成交量，没有用） |
 ///
 /// 无效代码不会出现在返回里。
 public enum TencentQuoteParser {
@@ -117,8 +117,7 @@ public enum TencentQuoteParser {
             low52Week: positive(isCN ? 68 : 49),
             timestamp: parseTimestamp(fields[30], timeZone: region.timeZone),
             priceDecimals: isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4]),
-            exchangeCode: fields[2].isEmpty ? nil : fields[2],
-            extendedPrice: region == .us && !isIndex ? positive(67) : nil
+            exchangeCode: fields[2].isEmpty ? nil : fields[2]
         )
     }
 

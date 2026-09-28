@@ -46,8 +46,6 @@ public struct Quote: Sendable, Equatable {
     public var priceDecimals: Int
     /// 数据源里的交易所代码，例如 `600519`、`AAPL.OQ`、`.IXIC`。美股查 K 线时要用到后缀。
     public var exchangeCode: String?
-    /// 美股个股盘前或盘后的最新成交价；没有时为 nil。
-    public var extendedPrice: Double?
 
     public init(
         symbol: Symbol,
@@ -70,8 +68,7 @@ public struct Quote: Sendable, Equatable {
         low52Week: Double? = nil,
         timestamp: Date? = nil,
         priceDecimals: Int = 2,
-        exchangeCode: String? = nil,
-        extendedPrice: Double? = nil
+        exchangeCode: String? = nil
     ) {
         self.symbol = symbol
         self.name = name
@@ -95,7 +92,6 @@ public struct Quote: Sendable, Equatable {
         self.timestamp = timestamp
         self.priceDecimals = priceDecimals
         self.exchangeCode = exchangeCode
-        self.extendedPrice = extendedPrice
     }
 
     public var direction: PriceDirection { PriceDirection(change) }
@@ -112,13 +108,6 @@ public struct Quote: Sendable, Equatable {
     public var isLimitUp: Bool {
         guard let limitUp, limitUp > 0 else { return false }
         return abs(price - limitUp) < 1e-6
-    }
-
-    /// 盘前盘后价相对常规交易收盘（盘前时是上一个交易日的收盘）的涨跌和涨跌幅。
-    public var extendedChange: (change: Double, percent: Double)? {
-        guard let extendedPrice, extendedPrice > 0, price > 0 else { return nil }
-        let change = extendedPrice - price
-        return (change, change / price * 100)
     }
 
     public var isLimitDown: Bool {

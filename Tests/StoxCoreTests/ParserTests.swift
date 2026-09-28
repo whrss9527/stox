@@ -185,24 +185,82 @@ final class TencentSearchParserTests: XCTestCase {
 }
 
 final class ExtendedHoursTests: XCTestCase {
-    func testUSStocksCarryTheExtendedPrice() throws {
-        let quotes = TencentQuoteParser.parse(Fixtures.unitedStates)
-        // 抓取时是周一凌晨（美东），第 67 位是上周五的盘后价。
-        let apple = try XCTUnwrap(quotes[Symbol("usAAPL")!])
-        XCTAssertEqual(apple.extendedPrice, 339.28)
-        let change = try XCTUnwrap(apple.extendedChange)
-        XCTAssertEqual(change.change, 339.28 - 341.07, accuracy: 1e-9)
-        XCTAssertEqual(change.percent, (339.28 - 341.07) / 341.07 * 100, accuracy: 1e-9)
-        XCTAssertEqual(quotes[Symbol("usBRK.B")!]?.extendedPrice, 504.77)
-        XCTAssertNil(quotes[Symbol("us.IXIC")!]?.extendedPrice, "指数没有盘前盘后")
-        XCTAssertNil(TencentQuoteParser.parse(Fixtures.aShares)[Symbol("sh600519")!]?.extendedPrice, "A 股的第 67 位是 52 周最高")
+    // pandata 是 2026-09-28 美东 16:03 从 usfqkline 抓取的原样，那一根 K 线按同一时刻的行情补上。
+    static let afterHours = #"""
+    {"code":0,"msg":"","data":{"usAAPL.OQ":{"qfqday":[["2026-09-28","340.370","338.400","342.990","338.040","31448642.000"]],"pandata":{"last":"338.43","volume":"31458547","pct":"-0.77","netchange":"-2.64","time":"2026-09-28 16:03:14","tag":"after","season":"EST"},"version":"12"}}}
+    """#
+
+    private func usTime(_ text: String) -> Date? {
+        TencentQuoteParser.parseTimestamp(text, timeZone: MarketRegion.us.timeZone)
     }
 
-    func testLabels() {
-        XCTAssertEqual(MarketPhase.preMarket.extendedLabel, "盘前")
-        XCTAssertEqual(MarketPhase.afterHours.extendedLabel, "盘后")
-        XCTAssertEqual(MarketPhase.closed.extendedLabel, "盘后")
-        XCTAssertNil(MarketPhase.trading.extendedLabel)
-        XCTAssertNil(Quote(symbol: Symbol("usAAPL")!, name: "", price: 0, previousClose: 1, extendedPrice: 2).extendedChange)
+    /// 2026-09-28（周一）收盘时苹果的行情。
+    private var appleClose: Quote {
+        Quote(symbol: Symbol("usAAPL")!, name: "苹果", price: 338.40, previousClose: 341.07, timestamp: usTime("2026-09-28 16:00:01"))
+    }
+
+    func testParsesAfterHours() throws {
+        let extended = try XCTUnwrap(TencentExtendedHoursParser.parse(Data(Self.afterHours.utf8)))
+        XCTAssertEqual(extended.session, .afterHours)
+        XCTAssertEqual(extended.session.displayName, "盘后")
+        XCTAssertEqual(extended.price, 338.43)
+        XCTAssertEqual(extended.time, usTime("2026-09-28 16:03:14"))
+
+        // 涨跌相对当天的收盘价，不用接口里相对前一天收盘的 pct。
+        let change = try XCTUnwrap(extended.change(from: appleClose))
+        XCTAssertEqual(change.change, 0.03, accuracy: 1e-9)
+        XCTAssertEqual(change.percent, 0.03 / 338.40 * 100, accuracy: 1e-9)
+    }
+
+    func testRegularHoursHaveNone() {
+        let numeric = #"{"data":{"usAAPL.OQ":{"pandata":{"last":-1,"volume":"","pct":"","netchange":"","time":"","tag":"","season":""}}}}"#
+        XCTAssertNil(TencentExtendedHoursParser.parse(Data(numeric.utf8)), "常规交易时段里 last 是 -1")
+        let text = #"{"data":{"usAAPL.OQ":{"pandata":{"last":"-1","time":"","tag":""}}}}"#
+        XCTAssertNil(TencentExtendedHoursParser.parse(Data(text.utf8)))
+        XCTAssertNil(TencentExtendedHoursParser.parse(Data(#"{"data":{"usAAPL.OQ":{"qfqday":[]}}}"#.utf8)))
+        XCTAssertNil(TencentExtendedHoursParser.parse(Data("<html>".utf8)))
+    }
+
+    func testSessionFromTagOrTime() throws {
+        func parse(_ pandata: [String: Any]) -> ExtendedHoursQuote? { TencentExtendedHoursParser.parse(pandata: pandata) }
+        XCTAssertEqual(parse(["last": "339.1", "tag": "pre", "time": "2026-09-29 07:30:00"])?.session, .preMarket)
+        XCTAssertEqual(parse(["last": 339.1, "tag": "after"])?.session, .afterHours, "数字也认")
+        XCTAssertEqual(parse(["last": "339.1", "tag": "", "time": "2026-09-29 07:30:00"])?.session, .preMarket, "没有标签时上午算盘前")
+        XCTAssertEqual(parse(["last": "339.1", "time": "2026-09-28 17:45:00"])?.session, .afterHours, "下午算盘后")
+        XCTAssertNil(parse(["last": "339.1", "tag": "?"]), "标签和时间都没有时不知道是盘前还是盘后")
+        XCTAssertEqual(ExtendedHoursQuote.Session.preMarket.displayName, "盘前")
+    }
+
+    func testOnlyFollowingTradesCount() {
+        let quote = appleClose
+        func trade(_ session: ExtendedHoursQuote.Session, _ time: String) -> ExtendedHoursQuote {
+            ExtendedHoursQuote(session: session, price: 339, time: usTime(time))
+        }
+        XCTAssertTrue(trade(.afterHours, "2026-09-28 19:59:58").follows(quote))
+        XCTAssertTrue(trade(.preMarket, "2026-09-29 04:01:00").follows(quote), "第二天盘前，行情还是前一天收盘的")
+        XCTAssertFalse(trade(.afterHours, "2026-09-25 19:59:58").follows(quote), "上周五的盘后价不能和周一的收盘比")
+        XCTAssertFalse(trade(.preMarket, "2026-09-28 09:29:00").follows(quote), "当天盘前的已经过时了")
+        XCTAssertNil(trade(.afterHours, "2026-09-25 19:59:58").change(from: quote))
+        XCTAssertTrue(ExtendedHoursQuote(session: .afterHours, price: 339).follows(quote), "没有时间时不检查")
+        var noPrice = quote
+        noPrice.price = 0
+        XCTAssertNil(trade(.afterHours, "2026-09-28 17:00:00").change(from: noPrice))
+    }
+
+    func testURLAndSkippedSymbols() async throws {
+        XCTAssertEqual(
+            TencentProvider.extendedHoursURL(for: Symbol("usAAPL")!, exchangeCode: "AAPL.OQ")?.absoluteString,
+            "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL.OQ,day,,,1,qfq"
+        )
+        XCTAssertEqual(
+            TencentProvider.extendedHoursURL(for: Symbol("usBRK.B")!, exchangeCode: "BRK.B.N")?.absoluteString,
+            "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usBRK.B.N,day,,,1,qfq"
+        )
+        // A 股、美股指数没有盘前盘后，不发请求。
+        let provider = TencentProvider(timeout: 0.01)
+        let aShare = try await provider.fetchExtendedHours(for: Symbol("sh600519")!, exchangeCode: nil)
+        XCTAssertNil(aShare)
+        let index = try await provider.fetchExtendedHours(for: Symbol("us.IXIC")!, exchangeCode: nil)
+        XCTAssertNil(index)
     }
 }
