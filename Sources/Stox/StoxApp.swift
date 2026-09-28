@@ -133,6 +133,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///        [--chart intraday|fiveDay|day|week|month] [--keys down,down,enter]   走势图的周期、依次模拟的按键
     ///        [--edit sh600519]                                  直接打开这只的持仓、提醒与简称页
     ///        [--group 科技]                                      直接打开这个分组的编辑页
+    ///        [--export-backup 路径] [--import-backup 路径]       启动时导出备份，或者用备份替换自选（不问）
     ///   Stox --show-settings [general|display|sync|about]      打开设置窗口并打印窗口位置
     ///   Stox --check-update                                    先检查一次更新再打开上面两者
     ///   Stox --install-update                                  检查并直接安装新版本
@@ -154,6 +155,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let chart = value(after: "--chart").flatMap(ChartPeriod.init(rawValue:))
         let edit = value(after: "--edit").flatMap { Symbol($0) }
         let group = value(after: "--group")
+        if let path = value(after: "--export-backup") {
+            do {
+                try sync.backupData().write(to: URL(fileURLWithPath: path), options: .atomic)
+                print("STOX_DIAG backup_exported=\(store.items.count)")
+            } catch {
+                print("STOX_DIAG backup_error=\(error.localizedDescription)")
+            }
+        }
+        if let path = value(after: "--import-backup") {
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: path)), let document = try? SyncDocument.decode(data) {
+                sync.importBackup(document.content, replace: true)
+                print("STOX_DIAG backup_imported=\(document.content.watchlist.count)")
+            } else {
+                print("STOX_DIAG backup_error=unreadable")
+            }
+        }
         let keys = (value(after: "--keys") ?? "").split(separator: ",").compactMap { PanelKey(rawValue: String($0)) }
         if let chart {
             settings.chartPeriod = chart

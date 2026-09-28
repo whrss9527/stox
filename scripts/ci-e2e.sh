@@ -154,6 +154,17 @@ smoke() {
   defaults delete "$DOMAIN" list.filter
   grep -q "filter=hk visible=2" shots/filtered.log || fail "筛选港股后应该只剩两只"
 
+  # 备份到文件：导出默认的 8 只，换成另一份自选，再用备份替换回来。
+  rm -f "$WORK/backup.json"
+  run_case backup-export --show-panel --export-backup "$WORK/backup.json"
+  grep -q "backup_exported=8" shots/backup-export.log || fail "没有导出备份"
+  grep -q '"sh600519"' "$WORK/backup.json" || fail "备份里没有贵州茅台"
+  write_watchlist '[{"symbol":"sz000001","name":"平安银行"}]'
+  run_case backup-import --show-panel --import-backup "$WORK/backup.json"
+  defaults delete "$DOMAIN" watchlist.v1
+  grep -q "backup_imported=8" shots/backup-import.log || fail "没有读出备份"
+  grep -q "items=8 " shots/backup-import.log || fail "用备份替换以后应该是 8 只"
+
   # 紧凑列表：每只一行。
   defaults write "$DOMAIN" list.compact -bool true
   run_case compact --show-panel
