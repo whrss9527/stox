@@ -17,6 +17,8 @@ final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private var panel: PanelWindow?
     private var hostingView: NSHostingView<AnyView>?
+    /// SwiftUI 最近一次量出的面板内容尺寸。
+    private var contentSize = CGSize.zero
     /// 面板因为点到别处而关闭的时间：点菜单栏图标关闭面板时，不要紧接着又把它打开。
     private var lastAutoClose = Date.distantPast
     private var rotationTimer: Timer?
@@ -126,6 +128,9 @@ final class StatusItemController: NSObject {
             .environmentObject(updater)
             .environmentObject(sync)
         let hosting = NSHostingView(rootView: AnyView(root))
+        // 窗口大小由我们按 SwiftUI 量出的尺寸来定。默认情况下 NSHostingView 会按内容的最小尺寸撑大窗口，
+        // 内容比屏幕高时窗口会往上长，盖住菜单栏。
+        hosting.sizingOptions = []
         hostingView = hosting
         let panel = PanelWindow(contentView: hosting)
         panel.appearance = settings.appearance.nsAppearance
@@ -140,14 +145,19 @@ final class StatusItemController: NSObject {
         closePanel()
     }
 
+    /// 按最近一次量到的内容尺寸调整；还没量过时用 fittingSize 估一下。
     private func resizePanel() {
-        guard let hostingView else { return }
-        resizePanel(to: hostingView.fittingSize)
+        if contentSize.width > 0, contentSize.height > 0 {
+            resizePanel(to: contentSize)
+        } else if let hostingView {
+            resizePanel(to: hostingView.fittingSize)
+        }
     }
 
     /// 顶边不动，按内容尺寸调整窗口。屏幕放不下时先把列表压矮，面板永远不盖住菜单栏。
     private func resizePanel(to size: CGSize) {
         guard let panel, size.width > 0, size.height > 0 else { return }
+        contentSize = size
         var height = ceil(size.height)
         if let available = availableHeight(), height > available {
             let minimum = QuoteRow.rowHeight * 2

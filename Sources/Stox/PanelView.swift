@@ -42,6 +42,8 @@ struct PanelView: View {
         .onPreferenceChange(PanelSizeKey.self) { size in
             actions.sizeChanged(size)
         }
+        // 窗口还没跟上内容尺寸的那一瞬间，内容贴着顶部，被裁掉的是底部而不是标题。
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 }
 
