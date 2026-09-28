@@ -3,6 +3,7 @@ import SwiftUI
 import StoxCore
 
 /// 面板内的二级页面标题栏：返回按钮 + 标题。
+@MainActor
 struct NavigationHeader: View {
     let title: String
     var subtitle: String?
@@ -31,6 +32,7 @@ struct NavigationHeader: View {
     }
 }
 
+@MainActor
 struct SettingsPanel: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
@@ -128,6 +130,7 @@ struct SettingsPanel: View {
 }
 
 /// 单只证券的设置：菜单栏显示、简称、价格提醒。
+@MainActor
 struct StockEditorPanel: View {
     let symbol: Symbol
 

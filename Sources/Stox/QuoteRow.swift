@@ -3,6 +3,7 @@ import SwiftUI
 import StoxCore
 
 /// 自选列表的一行：名称 / 代码 / 现价 / 涨跌幅色块。单击展开详情，右键有更多操作。
+@MainActor
 struct QuoteRow: View {
     static let rowHeight: CGFloat = 46
     static let detailHeight: CGFloat = 96
@@ -130,6 +131,7 @@ struct QuoteRow: View {
 }
 
 /// 展开后的详情：开高低收、成交、市值，以及常用操作。
+@MainActor
 struct QuoteDetailView: View {
     let item: WatchItem
     let quote: Quote

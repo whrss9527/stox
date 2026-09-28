@@ -48,7 +48,7 @@
 
 ### 方式二：从源码构建
 
-需要 Xcode 15 或更新版本（或 Xcode Command Line Tools）。
+需要 Xcode 16 或更新版本。
 
 ```bash
 git clone https://github.com/whrss9527/stox.git

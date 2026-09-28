@@ -3,15 +3,15 @@ import SwiftUI
 import StoxCore
 
 /// 面板根视图：自选列表、设置、单只证券编辑三个页面。
+@MainActor
 struct PanelView: View {
     @EnvironmentObject private var router: PanelRouter
-    let close: () -> Void
 
     var body: some View {
         Group {
             switch router.route {
             case .list:
-                WatchlistPanel(close: close)
+                WatchlistPanel()
             case .settings:
                 SettingsPanel()
             case .edit(let symbol):
@@ -24,10 +24,10 @@ struct PanelView: View {
 
 // MARK: - 自选列表页
 
+@MainActor
 struct WatchlistPanel: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var router: PanelRouter
-    let close: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
@@ -48,6 +48,7 @@ struct WatchlistPanel: View {
     }
 }
 
+@MainActor
 struct PanelHeader: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var router: PanelRouter
@@ -100,19 +101,18 @@ struct PanelHeader: View {
     }
 }
 
+@MainActor
 struct SearchBar: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var router: PanelRouter
-    @FocusState private var focused: Bool
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-            TextField("添加自选：代码 / 名称 / 拼音，如 600519、腾讯、aapl", text: $router.searchText)
+            TextField("搜索代码、名称或拼音，回车添加", text: $router.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12.5))
-                .focused($focused)
                 .onSubmit(addFirstResult)
             if router.isSearching {
                 ProgressView()
@@ -137,12 +137,13 @@ struct SearchBar: View {
 
     /// 回车：添加第一条搜索结果。
     private func addFirstResult() {
-        guard let first = router.searchResults.first(where: { !store.contains($0.symbol) }) else { return }
-        store.add(first.symbol, name: first.typeCode == "按代码添加" ? "" : first.name)
+        guard let candidate = router.submissionCandidate(excluding: { store.contains($0) }) else { return }
+        store.add(candidate.symbol, name: candidate.isDirect ? "" : candidate.name)
         router.clearSearch()
     }
 }
 
+@MainActor
 struct WatchlistView: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var router: PanelRouter
@@ -189,6 +190,7 @@ struct WatchlistView: View {
     }
 }
 
+@MainActor
 struct SearchResultsView: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var router: PanelRouter
@@ -206,7 +208,7 @@ struct SearchResultsView: View {
                     VStack(spacing: 0) {
                         ForEach(router.searchResults) { result in
                             SearchResultRow(result: result, added: store.contains(result.symbol)) {
-                                store.add(result.symbol, name: result.typeCode == "按代码添加" ? "" : result.name)
+                                store.add(result.symbol, name: result.isDirect ? "" : result.name)
                                 router.clearSearch()
                             }
                         }
@@ -218,6 +220,7 @@ struct SearchResultsView: View {
     }
 }
 
+@MainActor
 struct SearchResultRow: View {
     static let height: CGFloat = 38
 
@@ -233,7 +236,7 @@ struct SearchResultRow: View {
                 Text(result.name)
                     .font(.system(size: 12.5, weight: .medium))
                     .lineLimit(1)
-                Text("\(result.symbol.displayCode) · \(result.typeLabel)")
+                Text(result.isDirect ? "按代码添加" : "\(result.symbol.displayCode) · \(result.typeLabel)")
                     .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
             }
@@ -259,6 +262,7 @@ struct SearchResultRow: View {
     }
 }
 
+@MainActor
 struct PanelFooter: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
@@ -288,6 +292,7 @@ struct PanelFooter: View {
     }
 }
 
+@MainActor
 struct MarketBadge: View {
     let market: Market
 

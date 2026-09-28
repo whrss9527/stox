@@ -16,6 +16,8 @@ final class StatusItemController: NSObject {
     private let popover = NSPopover()
     private var outsideClickMonitor: Any?
     private var keyMonitor: Any?
+    /// 打开面板前处于前台的 App，关闭面板后把焦点还给它。
+    private var previousApp: NSRunningApplication?
     private var rotationTimer: Timer?
     private var rotationIndex = 0
     private var cancellables = Set<AnyCancellable>()
@@ -30,7 +32,8 @@ final class StatusItemController: NSObject {
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(handleClick(_:))
-            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            // 和系统菜单一样在按下鼠标时响应，打开更跟手。
+            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
             button.imagePosition = .imageLeading
             button.toolTip = "Stox 行情（⌃⌥S）"
         }
@@ -38,7 +41,7 @@ final class StatusItemController: NSObject {
         // 面板的开关完全由自己控制：transient 行为下点击菜单栏图标会先关闭再立刻重新打开。
         popover.behavior = .applicationDefined
         popover.animates = true
-        let rootView = PanelView(close: { [weak self] in self?.closePopover() })
+        let rootView = PanelView()
             .environmentObject(store)
             .environmentObject(settings)
             .environmentObject(router)
@@ -78,6 +81,8 @@ final class StatusItemController: NSObject {
     func showPopover() {
         guard let button = statusItem.button, !popover.isShown else { return }
         store.panelWillOpen()
+        let frontmost = NSWorkspace.shared.frontmostApplication
+        previousApp = frontmost?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : frontmost
         if #available(macOS 14.0, *) {
             NSApp.activate()
         } else {
@@ -88,11 +93,18 @@ final class StatusItemController: NSObject {
         startMonitors()
     }
 
-    func closePopover() {
-        if popover.isShown {
+    /// - Parameter restoreFocus: 用快捷键、Esc 或菜单栏图标关闭时，把焦点还给之前的 App；
+    ///   因为点击了别的 App 而关闭时不需要。
+    func closePopover(restoreFocus: Bool = true) {
+        let wasShown = popover.isShown
+        if wasShown {
             popover.performClose(nil)
         }
         stopMonitors()
+        if wasShown, restoreFocus, NSApp.isActive, let app = previousApp, !app.isTerminated {
+            app.activate(options: [])
+        }
+        previousApp = nil
     }
 
     private func startMonitors() {
@@ -100,7 +112,7 @@ final class StatusItemController: NSObject {
         // 点击其他 App 或桌面时关闭。
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             Task { @MainActor [weak self] in
-                self?.closePopover()
+                self?.closePopover(restoreFocus: false)
             }
         }
         // Esc：先清空搜索 / 返回列表，再关闭面板。
@@ -136,14 +148,14 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func appDidResignActive(_ notification: Notification) {
-        closePopover()
+        closePopover(restoreFocus: false)
     }
 
     // MARK: - 点击与右键菜单
 
     @objc private func handleClick(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
-        if event?.type == .rightMouseUp || event?.modifierFlags.contains(.control) == true {
+        if event?.type == .rightMouseDown || event?.modifierFlags.contains(.control) == true {
             showMenu()
         } else {
             togglePopover()
@@ -151,7 +163,7 @@ final class StatusItemController: NSObject {
     }
 
     private func showMenu() {
-        closePopover()
+        closePopover(restoreFocus: false)
         let menu = NSMenu()
         menu.addItem(menuItem("打开面板", #selector(openPanel), key: ""))
         menu.addItem(menuItem("立即刷新", #selector(refreshNow), key: "r"))
@@ -274,6 +286,8 @@ final class PanelRouter: ObservableObject {
     @Published var searchText = ""
     @Published var expanded: Symbol?
     @Published private(set) var searchResults: [SearchResult] = []
+    /// searchResults 对应的查询词；输入后防抖期间两者不一致。
+    private var resultsQuery = ""
     @Published private(set) var isSearching = false
     @Published private(set) var searchError: String?
 
@@ -304,6 +318,7 @@ final class PanelRouter: ObservableObject {
     func clearSearch() {
         searchText = ""
         searchResults = []
+        resultsQuery = ""
         searchError = nil
         isSearching = false
     }
@@ -327,18 +342,31 @@ final class PanelRouter: ObservableObject {
             let results = try await store.search(query)
             guard !Task.isCancelled, query == trimmedQuery else { return }
             searchResults = results.isEmpty ? directCandidate(for: query) : results
+            resultsQuery = query
             searchError = nil
         } catch {
             guard !Task.isCancelled, query == trimmedQuery else { return }
             // 搜索接口失败时，仍然允许按代码直接添加。
             searchResults = directCandidate(for: query)
+            resultsQuery = query
             searchError = error.localizedDescription
         }
         isSearching = false
     }
 
+    /// 回车要添加的证券：搜索结果已就绪时取第一条未添加的结果；
+    /// 还在防抖或请求中时，只有输入本身是合法代码才直接添加。
+    func submissionCandidate(excluding contains: (Symbol) -> Bool) -> SearchResult? {
+        let query = trimmedQuery
+        guard !query.isEmpty else { return nil }
+        if resultsQuery == query {
+            return searchResults.first { !contains($0.symbol) }
+        }
+        return directCandidate(for: query).first { !contains($0.symbol) }
+    }
+
     private func directCandidate(for query: String) -> [SearchResult] {
         guard let symbol = SymbolInput.parse(query) else { return [] }
-        return [SearchResult(symbol: symbol, name: symbol.displayCode, typeCode: "按代码添加")]
+        return [SearchResult(symbol: symbol, name: symbol.displayCode, typeCode: SearchResult.directTypeCode)]
     }
 }

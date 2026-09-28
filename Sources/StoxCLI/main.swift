@@ -62,7 +62,7 @@ do {
                 pad(QuoteFormatter.change(q.change, decimals: q.priceDecimals), 10),
                 pad(QuoteFormatter.percent(q.changePercent), 9),
                 pad("量 " + QuoteFormatter.volume(q.volume, market: symbol.market), 16),
-                pad("额 " + QuoteFormatter.largeNumber(q.amount), 13),
+                pad("额 " + (q.amount > 0 ? QuoteFormatter.largeNumber(q.amount) : "--"), 13),
                 pad(q.marketCap.map { "市值 " + QuoteFormatter.largeNumber($0) } ?? "", 14),
                 "\(time) \(symbol.market.region.displayName)\(phase.displayName)",
             ].joined(separator: " "))

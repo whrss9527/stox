@@ -42,3 +42,10 @@ enum Theme {
         }
     }
 }
+
+extension SearchResult {
+    /// 搜索接口没有结果时，按用户输入的代码直接构造的候选项。
+    static let directTypeCode = "DIRECT"
+
+    var isDirect: Bool { typeCode == Self.directTypeCode }
+}
