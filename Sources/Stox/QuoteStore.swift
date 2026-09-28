@@ -301,9 +301,48 @@ final class QuoteStore: ObservableObject {
 
     func add(_ symbol: Symbol, name: String = "") {
         guard !contains(symbol) else { return }
-        items.append(WatchItem(symbol: symbol, name: name))
+        items.append(WatchItem(symbol: symbol, name: name, group: groupForNewItems))
         save()
         restart()
+    }
+
+    /// 正在看某个分组时，新加的放进这个分组，免得加完在列表里看不到。
+    private var groupForNewItems: String? {
+        if case .group(let name) = WatchlistFilter.effective(settings.listFilter, items: items) { return name }
+        return nil
+    }
+
+    /// 把一只放进分组；nil 是移出分组。
+    func setGroup(_ group: String?, for symbol: Symbol) {
+        guard let index = items.firstIndex(where: { $0.symbol == symbol }) else { return }
+        var updated = items
+        updated[index].group = group
+        guard updated != items else { return }
+        items = updated
+        save()
+    }
+
+    /// 保存分组编辑页：members 放进 name 这个分组，old 分组里没勾上的移出；改了名时列表上方的筛选跟着换过去。
+    /// name 为空相当于解散 old。
+    func saveGroup(_ name: String, members: Set<Symbol>, replacing old: String?) {
+        let updated = Watchlist.settingGroup(name, members: members, replacing: old, in: items)
+        if let old, settings.listFilter == .group(old) {
+            settings.listFilter = WatchItem.normalizedGroup(name).map { WatchlistFilter.group($0) } ?? .all
+        }
+        guard updated != items else { return }
+        items = updated
+        save()
+    }
+
+    /// 解散分组：这个分组里的都变成不分组。
+    func dissolveGroup(_ name: String) {
+        var updated = items
+        for index in updated.indices where updated[index].group == name {
+            updated[index].group = nil
+        }
+        guard updated != items else { return }
+        items = updated
+        save()
     }
 
     /// 一次加几只已知的（比如常用指数），已经在自选里的跳过。
@@ -321,8 +360,9 @@ final class QuoteStore: ObservableObject {
         guard !wanted.isEmpty else { return [] }
         let result = try await fetchQuotes(wanted).quotes
         var added = false
+        let group = groupForNewItems
         for symbol in wanted where result[symbol] != nil && !contains(symbol) {
-            items.append(WatchItem(symbol: symbol, name: result[symbol]?.name ?? ""))
+            items.append(WatchItem(symbol: symbol, name: result[symbol]?.name ?? "", group: group))
             quotes[symbol] = result[symbol]
             added = true
         }

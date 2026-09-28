@@ -20,6 +20,7 @@ struct StockEditorPanel: View {
     @State private var shares = ""
     @State private var cost = ""
     @State private var note = ""
+    @State private var group = ""
     @State private var tradeShares = ""
     @State private var tradePrice = ""
     /// 刚记了一笔买卖：说明算出来的新持仓，保存后才生效。
@@ -41,6 +42,31 @@ struct StockEditorPanel: View {
                         TextField("", text: $alias, prompt: Text(NameAbbreviator.abbreviate(item.displayName)))
                             .textFieldStyle(.roundedBorder)
                             .frame(width: 150)
+                    }
+                    .padding(.vertical, 8)
+                    Divider()
+                    HStack {
+                        Text("分组")
+                        Spacer()
+                        TextField("", text: $group, prompt: Text("不分组"))
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 150)
+                        Menu {
+                            ForEach(existingGroups, id: \.self) { name in
+                                Button(name) { group = name }
+                            }
+                            if !existingGroups.isEmpty {
+                                Divider()
+                            }
+                            Button("不分组") { group = "" }
+                        } label: {
+                            Image(systemName: "chevron.down")
+                        }
+                        .menuStyle(.button)
+                        .buttonStyle(.borderless)
+                        .menuIndicator(.hidden)
+                        .fixedSize()
+                        .help("选一个已有的分组")
                     }
                     .padding(.vertical, 8)
                     Divider()
@@ -234,6 +260,9 @@ struct StockEditorPanel: View {
 
     private var item: WatchItem? { store.item(for: symbol) }
 
+    /// 自选里已经有的分组，编辑时可以直接选。
+    private var existingGroups: [String] { Watchlist.groups(in: store.items) }
+
     private var currency: String { symbol.market.region.currency }
 
     private var alertFooter: String {
@@ -332,6 +361,7 @@ struct StockEditorPanel: View {
         lossBelow = format(item.alert.lossBelow)
         shares = item.holding.map { QuoteFormatter.plain($0.shares) } ?? ""
         note = item.note ?? ""
+        group = item.group ?? ""
         cost = format(item.holding?.cost)
     }
 
@@ -347,6 +377,7 @@ struct StockEditorPanel: View {
         updated.alias = trimmedAlias.isEmpty ? nil : trimmedAlias
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.note = trimmedNote.isEmpty ? nil : trimmedNote
+        updated.group = WatchItem.normalizedGroup(group)
         // 没有持仓（或者成本为 0）时止盈止损没有意义，一起清掉。
         var hasCost = false
         if case .valid(let holding) = holdingState {

@@ -30,6 +30,8 @@ struct PanelView: View {
                 WatchlistPanel(actions: actions)
             case .edit(let symbol):
                 StockEditorPanel(symbol: symbol)
+            case .group(let name, let member):
+                GroupEditorPanel(original: name, member: member)
             }
         }
         .padding(12)
@@ -290,37 +292,64 @@ struct WatchlistView: View {
     }
 }
 
-/// 列表上方的筛选：全部、各市场、持仓，右边是显示了几只。
+/// 列表上方的筛选：全部、各市场、持仓、各个分组，右边是显示了几只。分组多了放不下时可以左右滚动。
 @MainActor
 struct WatchlistFilterBar: View {
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var router: PanelRouter
     let filters: [WatchlistFilter]
     let active: WatchlistFilter
     let count: Int
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(filters, id: \.self) { filter in
-                let selected = filter == active
-                Button {
-                    settings.listFilter = filter
-                } label: {
-                    Text(filter.title)
-                        .font(.system(size: 10.5, weight: selected ? .semibold : .regular))
-                        .foregroundStyle(selected ? Color.primary : Color.secondary)
-                        .padding(.horizontal, 8)
-                        .frame(height: 20)
-                        .background(Capsule().fill(Color.primary.opacity(selected ? 0.1 : 0)))
-                        .contentShape(Capsule())
+        HStack(spacing: 4) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 2) {
+                    ForEach(filters, id: \.self) { filter in
+                        chip(filter)
+                    }
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? .isSelected : [])
             }
-            Spacer(minLength: 4)
+            .frame(height: 20)
             Text("\(count) 只")
                 .font(.system(size: 10).monospacedDigit())
                 .foregroundStyle(.tertiary)
+                .fixedSize()
         }
+    }
+
+    /// 分组右键可以编辑或解散。
+    @ViewBuilder
+    private func chip(_ filter: WatchlistFilter) -> some View {
+        if case .group(let name) = filter {
+            chipButton(filter)
+                .contextMenu {
+                    Button("编辑分组…") { router.route = .group(name, member: nil) }
+                    Button("解散“\(name)”分组") { store.dissolveGroup(name) }
+                }
+                .help("分组“\(name)”，右键可以编辑或解散")
+        } else {
+            chipButton(filter)
+        }
+    }
+
+    private func chipButton(_ filter: WatchlistFilter) -> some View {
+        let selected = filter == active
+        return Button {
+            settings.listFilter = filter
+        } label: {
+            Text(filter.title)
+                .font(.system(size: 10.5, weight: selected ? .semibold : .regular))
+                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .lineLimit(1)
+                .padding(.horizontal, 8)
+                .frame(height: 20)
+                .background(Capsule().fill(Color.primary.opacity(selected ? 0.1 : 0)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
@@ -716,6 +745,7 @@ struct SearchResultRow: View {
 struct PanelFooter: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var router: PanelRouter
     let actions: PanelActions
     /// 刚复制了东西：底部的状态文字换成提示，几秒后恢复。
     @State private var copiedMessage: String?
@@ -751,6 +781,9 @@ struct PanelFooter: View {
                     .disabled(store.items.isEmpty)
                 Button("复制持仓表格") { copyHoldings() }
                     .disabled(!store.items.contains { $0.holding != nil })
+                Divider()
+                Button("新建分组…") { router.route = .group(nil, member: nil) }
+                    .disabled(store.items.isEmpty)
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
             }

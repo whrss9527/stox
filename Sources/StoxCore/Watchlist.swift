@@ -14,10 +14,17 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
     public var holding: Holding?
     /// 备注，比如关注的理由；没有填写时为 nil。
     public var note: String?
+    /// 分组，比如“科技”“长期持有”；不分组时为 nil。
+    public var group: String? {
+        didSet { group = Self.normalizedGroup(group) }
+    }
+
+    /// 分组名最多这么多个字。
+    public static let groupNameLimit = 10
 
     public init(
         symbol: Symbol, name: String = "", alias: String? = nil, pinned: Bool = false,
-        alert: PriceAlert = PriceAlert(), holding: Holding? = nil, note: String? = nil
+        alert: PriceAlert = PriceAlert(), holding: Holding? = nil, note: String? = nil, group: String? = nil
     ) {
         self.symbol = symbol
         self.name = name
@@ -26,6 +33,13 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
         self.alert = alert
         self.holding = holding
         self.note = note
+        self.group = Self.normalizedGroup(group)
+    }
+
+    /// 分组名去掉首尾空白，太长的截断，空的当作不分组。
+    public static func normalizedGroup(_ text: String?) -> String? {
+        guard let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty else { return nil }
+        return String(trimmed.prefix(groupNameLimit))
     }
 
     public var id: String { symbol.rawValue }
@@ -44,7 +58,7 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
 // 手写 Codable：新增字段时旧数据也能正常读出。
 extension WatchItem: Codable {
     enum CodingKeys: String, CodingKey {
-        case symbol, name, alias, pinned, alert, holding, note
+        case symbol, name, alias, pinned, alert, holding, note, group
     }
 
     public init(from decoder: Decoder) throws {
@@ -57,6 +71,7 @@ extension WatchItem: Codable {
         // 持仓读不懂时当作没有，不影响这一项的其他内容。
         holding = (try? c.decodeIfPresent(Holding.self, forKey: .holding)).flatMap { $0.isValid ? $0 : nil }
         note = (try? c.decodeIfPresent(String.self, forKey: .note)).flatMap { $0.isEmpty ? nil : $0 }
+        group = Self.normalizedGroup(try? c.decodeIfPresent(String.self, forKey: .group))
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -68,6 +83,7 @@ extension WatchItem: Codable {
         try c.encode(alert, forKey: .alert)
         try c.encodeIfPresent(holding, forKey: .holding)
         try c.encodeIfPresent(note, forKey: .note)
+        try c.encodeIfPresent(group, forKey: .group)
     }
 }
 
@@ -103,6 +119,27 @@ public enum Watchlist {
     public static func deduplicated(_ items: [WatchItem]) -> [WatchItem] {
         var seen = Set<Symbol>()
         return items.filter { seen.insert($0.symbol).inserted }
+    }
+
+    /// 自选里用到的分组，按第一次出现的顺序。
+    public static func groups(in items: [WatchItem]) -> [String] {
+        var seen = Set<String>()
+        return items.compactMap(\.group).filter { seen.insert($0).inserted }
+    }
+
+    /// 编辑分组：members 里的都放进 name 这个分组（原来在别的分组里的也移过来，每只只能在一个分组里）；
+    /// 原来在 old 这个分组、这次没勾上的移出分组。改名时 old 是原来的名字。name 为空时相当于解散 old。
+    public static func settingGroup(_ name: String, members: Set<Symbol>, replacing old: String?, in items: [WatchItem]) -> [WatchItem] {
+        let group = WatchItem.normalizedGroup(name)
+        return items.map { item in
+            var updated = item
+            if group != nil, members.contains(item.symbol) {
+                updated.group = group
+            } else if let old, item.group == old {
+                updated.group = nil
+            }
+            return updated
+        }
     }
 
     /// 复制出去的代码，用空格分开，粘贴到搜索框就能一次全部加回来（见 SymbolInput.parseList）。
@@ -244,8 +281,35 @@ public enum WatchlistSort: String, CaseIterable, Sendable {
 }
 
 /// 自选列表的筛选：全部、某个市场、有持仓的。
-public enum WatchlistFilter: String, CaseIterable, Codable, Sendable {
+/// 列表上方的筛选：全部、某个市场、有持仓的，或者某个分组。
+public enum WatchlistFilter: Hashable, Sendable {
     case all, cn, hk, us, holdings
+    case group(String)
+
+    /// 存进设置里的写法：`all`、`cn`、`hk`、`us`、`holdings`，分组是 `group:名字`。
+    public var id: String {
+        switch self {
+        case .all: return "all"
+        case .cn: return "cn"
+        case .hk: return "hk"
+        case .us: return "us"
+        case .holdings: return "holdings"
+        case .group(let name): return "group:" + name
+        }
+    }
+
+    public init?(id: String) {
+        switch id {
+        case "all": self = .all
+        case "cn": self = .cn
+        case "hk": self = .hk
+        case "us": self = .us
+        case "holdings": self = .holdings
+        default:
+            guard id.hasPrefix("group:"), let name = WatchItem.normalizedGroup(String(id.dropFirst(6))) else { return nil }
+            self = .group(name)
+        }
+    }
 
     public func apply(_ items: [WatchItem]) -> [WatchItem] {
         switch self {
@@ -254,10 +318,12 @@ public enum WatchlistFilter: String, CaseIterable, Codable, Sendable {
         case .hk: return items.filter { $0.symbol.market.region == .hk }
         case .us: return items.filter { $0.symbol.market.region == .us }
         case .holdings: return items.filter { $0.holding != nil }
+        case .group(let name): return items.filter { $0.group == name }
         }
     }
 
-    /// 值得显示的筛选：自选涉及两个以上市场时列出这些市场；有的有持仓、有的没有时加上“持仓”。
+    /// 值得显示的筛选：自选涉及两个以上市场时列出这些市场；有的有持仓、有的没有时加上“持仓”；
+    /// 再按第一次出现的顺序列出各个分组（整个自选都在同一个分组里时不列）。
     /// 只剩“全部”一项时返回空数组，不显示筛选。
     public static func available(for items: [WatchItem]) -> [WatchlistFilter] {
         var result: [WatchlistFilter] = [.all]
@@ -270,6 +336,9 @@ public enum WatchlistFilter: String, CaseIterable, Codable, Sendable {
         let held = items.filter { $0.holding != nil }.count
         if held > 0, held < items.count {
             result.append(.holdings)
+        }
+        for name in Watchlist.groups(in: items) where items.contains(where: { $0.group != name }) {
+            result.append(.group(name))
         }
         return result.count > 1 ? result : []
     }

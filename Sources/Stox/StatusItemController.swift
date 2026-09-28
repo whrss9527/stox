@@ -479,7 +479,7 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
-        print("STOX_DIAG filter=\(filter.rawValue) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count)")
+        print("STOX_DIAG filter=\(filter.id) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count) route=\(router.route.name) groups=\(Watchlist.groups(in: store.items).joined(separator: ","))")
         // 展开的那只在 K 线图上有几根有 MA20。
         let ma20 = router.expanded
             .flatMap { symbol in settings.chartPeriod.klinePeriod.flatMap { store.klines[KlineKey(symbol: symbol, period: $0)] } }
@@ -502,6 +502,17 @@ final class StatusItemController: NSObject {
 enum PanelRoute: Equatable {
     case list
     case edit(Symbol)
+    /// 编辑分组；新建时名字为 nil，member 是先勾上的那一只。
+    case group(String?, member: Symbol?)
+
+    /// 诊断信息里的写法。
+    var name: String {
+        switch self {
+        case .list: return "list"
+        case .edit(let symbol): return "edit:" + symbol.rawValue
+        case .group(let group, _): return "group:" + (group ?? "new")
+        }
+    }
 }
 
 /// 面板内的页面切换与搜索状态。放在一个对象里，方便 Esc 键统一处理。
