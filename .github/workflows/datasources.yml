@@ -1,0 +1,19 @@
+name: datasources
+
+# 定期检查行情数据源是否可用、格式是否变化。
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 2 * * 1"
+  push:
+    paths:
+      - scripts/check-datasources.sh
+      - .github/workflows/datasources.yml
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/check-datasources.sh
