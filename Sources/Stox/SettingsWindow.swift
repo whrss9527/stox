@@ -14,7 +14,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return "通用"
-        case .display: return "菜单栏与颜色"
+        case .display: return "显示"
         case .sync: return "iCloud 同步"
         case .about: return "关于与更新"
         }
@@ -293,7 +293,7 @@ struct GeneralPage: View {
     }
 }
 
-// MARK: - 菜单栏与颜色
+// MARK: - 显示
 
 @MainActor
 struct DisplayPage: View {
@@ -301,7 +301,7 @@ struct DisplayPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "菜单栏与颜色", subtitle: "菜单栏里显示什么，涨跌用什么颜色，面板用深色还是浅色")
+            PageHeader(title: "显示", subtitle: "菜单栏和行情面板里显示什么，涨跌用什么颜色，面板用深色还是浅色")
             Form {
                 Section("外观") {
                     Picker("行情面板和设置窗口", selection: $settings.appearance) {
