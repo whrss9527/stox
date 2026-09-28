@@ -46,6 +46,7 @@ final class StatusItemController: NSObject {
             .sink { [weak self] _ in
                 self?.updateRotationTimer()
                 self?.updateButton()
+                self?.panel?.appearance = self?.settings.appearance.nsAppearance
             }
             .store(in: &cancellables)
 
@@ -82,6 +83,7 @@ final class StatusItemController: NSObject {
         }
         guard let panel else { return }
         router.route = route
+        router.listMaxHeight = WatchlistView.defaultMaxHeight
         if let expand { router.expanded = expand }
         if let search { router.searchText = search }
         store.panelWillOpen()
@@ -126,6 +128,7 @@ final class StatusItemController: NSObject {
         let hosting = NSHostingView(rootView: AnyView(root))
         hostingView = hosting
         let panel = PanelWindow(contentView: hosting)
+        panel.appearance = settings.appearance.nsAppearance
         panel.onClose = { [weak self] in self?.panelLostFocus() }
         panel.onEscape = { [weak self] in self?.router.handleEscape() ?? false }
         self.panel = panel
@@ -142,13 +145,34 @@ final class StatusItemController: NSObject {
         resizePanel(to: hostingView.fittingSize)
     }
 
-    /// 顶边不动，按内容尺寸调整窗口。
+    /// 顶边不动，按内容尺寸调整窗口。屏幕放不下时先把列表压矮，面板永远不盖住菜单栏。
     private func resizePanel(to size: CGSize) {
         guard let panel, size.width > 0, size.height > 0 else { return }
-        let rounded = NSSize(width: ceil(size.width), height: ceil(size.height))
+        var height = ceil(size.height)
+        if let available = availableHeight(), height > available {
+            let minimum = QuoteRow.rowHeight * 2
+            if router.listMaxHeight > minimum {
+                let limit = max(minimum, router.listMaxHeight - (height - available))
+                // 在 SwiftUI 量尺寸的回调里，放到下一轮再改，避免在视图更新期间发布变化。
+                DispatchQueue.main.async { [weak self] in
+                    self?.router.listMaxHeight = limit
+                }
+            }
+            height = floor(available)
+        }
+        let rounded = NSSize(width: ceil(size.width), height: height)
         guard rounded != panel.frame.size else { return }
         let origin = NSPoint(x: panel.frame.origin.x, y: panel.frame.maxY - rounded.height)
         panel.setFrame(NSRect(origin: origin, size: rounded), display: true)
+    }
+
+    /// 面板最多能有多高：从菜单栏图标下面到屏幕可见区域的底部。
+    private func availableHeight() -> CGFloat? {
+        guard let button = statusItem.button, let buttonWindow = button.window,
+              let screen = buttonWindow.screen ?? NSScreen.main
+        else { return nil }
+        let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        return buttonRect.minY - 2 - (screen.visibleFrame.minY + 6)
     }
 
     /// 放在菜单栏图标正下方，不超出屏幕。
@@ -270,6 +294,8 @@ enum PanelRoute: Equatable {
 final class PanelRouter: ObservableObject {
     @Published var route: PanelRoute = .list
     @Published var searchText = ""
+    /// 自选列表的最大高度。屏幕矮、放不下整个面板时由 StatusItemController 调低，每次打开面板时恢复。
+    @Published var listMaxHeight = WatchlistView.defaultMaxHeight
     @Published var expanded: Symbol?
     @Published private(set) var searchResults: [SearchResult] = []
     /// searchResults 对应的查询词；输入后防抖期间两者不一致。

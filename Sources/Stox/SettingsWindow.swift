@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 import StoxCore
 
@@ -45,12 +46,16 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var store: QuoteStore?
     private var updater: Updater?
     private var sync: SyncManager?
+    private var appearanceSubscription: AnyCancellable?
 
     func configure(settings: SettingsStore, store: QuoteStore, updater: Updater, sync: SyncManager) {
         self.settings = settings
         self.store = store
         self.updater = updater
         self.sync = sync
+        appearanceSubscription = settings.$appearance.sink { [weak self] mode in
+            self?.window?.appearance = mode.nsAppearance
+        }
     }
 
     func show(page: SettingsPage?) {
@@ -86,6 +91,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window.center()
         window.isReleasedWhenClosed = false
         window.delegate = self
+        window.appearance = settings.appearance.nsAppearance
         return window
     }
 
@@ -264,8 +270,17 @@ struct DisplayPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "菜单栏与颜色", subtitle: "菜单栏里显示什么，涨跌用什么颜色")
+            PageHeader(title: "菜单栏与颜色", subtitle: "菜单栏里显示什么，涨跌用什么颜色，面板用深色还是浅色")
             Form {
+                Section("外观") {
+                    Picker("行情面板和设置窗口", selection: $settings.appearance) {
+                        ForEach(AppearanceMode.allCases) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    FormNote("菜单栏里的行情文字始终跟随系统的深浅色，保证看得清。")
+                }
                 Section("菜单栏") {
                     Toggle("只显示图标，隐藏行情", isOn: $settings.hideTicker)
                     FormNote("右键单击菜单栏里的 Stox 可以随时在“显示行情”和“只显示图标”之间切换，左键单击照常打开行情面板。")
@@ -369,8 +384,8 @@ struct SyncPage: View {
                     }
                 }
                 Section("会同步什么") {
-                    FormNote("自选列表的内容和顺序、每只的菜单栏固定、简称和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。")
-                    FormNote("“只显示图标”、快捷键、登录时启动、自动检查更新只和这台 Mac 有关，不同步。")
+                    FormNote("自选列表的内容和顺序、每只的菜单栏固定、简称、持仓和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。")
+                    FormNote("“只显示图标”、面板外观、快捷键、登录时启动、自动检查更新只和这台 Mac 有关，不同步。")
                 }
                 Section("怎么同步") {
                     FormNote("文件放在 iCloud 云盘的 Stox 文件夹里。另一台 Mac 开启同步时会读到它，可以选择用 iCloud 的、用本机的，或者把两边的自选合并。之后任何一台的改动几秒内就会出现在其他 Mac 上，两台同时改动时以晚的为准。")

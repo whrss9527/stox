@@ -100,9 +100,11 @@ smoke() {
   run_case holdings --show-panel --expand sh600519
   grep -Eq "items=5 quotes=[0-9]+ holdings=4" shots/holdings.log || fail "持仓没有读出来"
 
-  # 深色模式下的面板和设置窗口（-AppleInterfaceStyle Dark 只对这个进程生效）。
-  run_case panel-dark --show-panel --expand sh600519 -AppleInterfaceStyle Dark
-  run_case settings-dark --show-settings display -AppleInterfaceStyle Dark
+  # 外观选深色：面板和设置窗口用深色，菜单栏不受影响。
+  defaults write "$DOMAIN" appearance -string dark
+  run_case panel-dark --show-panel --expand sh600519
+  run_case settings-dark --show-settings display
+  defaults delete "$DOMAIN" appearance
   grep -q "panel_frame=" shots/panel-dark.log || fail "深色模式下面板没有打开"
   defaults delete "$DOMAIN" watchlist.v1
 }
