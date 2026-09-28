@@ -129,4 +129,6 @@ pandata "tencent usfqkline pandata: usAAPL.OQ" "https://web.ifzq.gtimg.cn/appsto
 pandata "tencent US minute keys: usAAPL" "https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code=usAAPL"
 fetch "sina fx (fallback candidate)" "https://hq.sinajs.cn/list=fx_susdcny,fx_shkdcny,fx_susdhkd" "GB18030" "https://finance.sina.com.cn/"
 
-fetch "sina quote (fallback candidate)" "https://hq.sinajs.cn/list=sh600519,hk00700,gb_aapl" "GB18030" "https://finance.sina.com.cn/"
+# 新浪行情（腾讯不可用时的备用）：A 股、ETF、北交所、指数、港股、美股个股和美股指数的写法。
+fetch "sina quote (fallback)" 'https://hq.sinajs.cn/list=sh600519,sz000001,sh000001,sz399006,sh510300,bj920819,hk00700,hkHSI,gb_aapl,gb_brk.b,gb_brk$b,gb_ixic,gb_$ixic,gb_dji,gb_$dji,gb_inx,gb_$inx,sh999999' "GB18030" "https://finance.sina.com.cn/"
+fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030"
