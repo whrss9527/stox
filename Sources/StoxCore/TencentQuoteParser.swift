@@ -15,9 +15,10 @@ import Foundation
 /// | 33 / 34 | 最高 / 最低 |
 /// | 35 | A 股为 `价格/成交量/成交额(元)`，美股为币种 |
 /// | 37 | 成交额（A 股单位为万元，港美股为元） |
-/// | 38 / 39 | 换手率% / 市盈率 |
+/// | 38 / 39 | 换手率%（港股在第 59 位） / 市盈率 |
 /// | 45 | 总市值（亿；指数为成分股总市值，不展示） |
-/// | 47 / 48 | 涨停价 / 跌停价（仅 A 股） |
+/// | 47 / 48 | A 股：涨停价 / 跌停价；港美股：52 周最高 / 最低 |
+/// | 67 / 68 | A 股：52 周最高 / 最低 |
 ///
 /// 无效代码不会出现在返回里。
 public enum TencentQuoteParser {
@@ -105,11 +106,14 @@ public enum TencentQuoteParser {
             changePercent: number(32),
             volume: volume,
             amount: amount,
-            turnoverRate: positive(38),
-            peRatio: isIndex ? nil : number(39).flatMap { $0 == 0 ? nil : $0 },
+            turnoverRate: positive(region == .hk ? 59 : 38),
+            // 亏损公司的市盈率是负数，照常显示；指数只在有值时显示（A 股指数有平均市盈率）。
+            peRatio: isIndex ? positive(39) : number(39).flatMap { $0 == 0 ? nil : $0 },
             marketCap: isIndex ? nil : positive(45).map { $0 * 100_000_000 },
             limitUp: isCN ? positive(47) : nil,
             limitDown: isCN ? positive(48) : nil,
+            high52Week: positive(isCN ? 67 : 48),
+            low52Week: positive(isCN ? 68 : 49),
             timestamp: parseTimestamp(fields[30], timeZone: region.timeZone),
             priceDecimals: isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4])
         )

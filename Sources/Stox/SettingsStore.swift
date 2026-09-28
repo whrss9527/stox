@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import StoxCore
 
 enum ColorConvention: String, CaseIterable, Identifiable {
@@ -19,6 +19,29 @@ enum ColorConvention: String, CaseIterable, Identifiable {
         case .redUp: return "A 股、港股的习惯"
         case .greenUp: return "美股的习惯"
         case .neutral: return "全部使用系统默认颜色，不显眼"
+        }
+    }
+}
+
+/// 面板和设置窗口的深浅色。菜单栏始终跟随系统。
+enum AppearanceMode: String, CaseIterable, Identifiable {
+    case system, light, dark
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .system: return "跟随系统"
+        case .light: return "浅色"
+        case .dark: return "深色"
+        }
+    }
+
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: return nil
+        case .light: return NSAppearance(named: .aqua)
+        case .dark: return NSAppearance(named: .darkAqua)
         }
     }
 }
@@ -74,6 +97,9 @@ final class SettingsStore: ObservableObject {
     @Published var syncEnabled: Bool {
         didSet { defaults.set(syncEnabled, forKey: Keys.syncEnabled) }
     }
+    @Published var appearance: AppearanceMode {
+        didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -90,6 +116,7 @@ final class SettingsStore: ObservableObject {
         hotKeyEnabled = defaults.object(forKey: Keys.hotKeyEnabled) as? Bool ?? true
         autoCheckUpdates = defaults.object(forKey: Keys.autoCheckUpdates) as? Bool ?? true
         syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
+        appearance = defaults.string(forKey: Keys.appearance).flatMap(AppearanceMode.init(rawValue:)) ?? .system
     }
 
     var tickerOptions: TickerOptions {
@@ -139,5 +166,6 @@ final class SettingsStore: ObservableObject {
         static let alertsEnabled = "alertsEnabled"
         static let autoCheckUpdates = "update.autoCheck"
         static let syncEnabled = "sync.enabled"
+        static let appearance = "appearance"
     }
 }

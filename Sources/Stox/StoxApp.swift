@@ -22,8 +22,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusController: StatusItemController?
     private var hotKey: HotKey?
     private var cancellables = Set<AnyCancellable>()
+    private var signalSources: [DispatchSourceSignal] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        installSignalHandlers()
         MainMenu.install(updater: updater)
         let controller = StatusItemController(store: store, settings: settings, updater: updater, sync: sync)
         statusController = controller
@@ -75,7 +77,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         store.stop()
+        sync.flushBeforeQuit()
         Log.info("Stox 已退出")
+        Log.flush()
+    }
+
+    /// kill、终端里 Ctrl+C 这类信号也走正常退出，没写上去的 iCloud 改动会先写完。
+    private func installSignalHandlers() {
+        for signalNumber in [SIGTERM, SIGINT, SIGHUP] {
+            signal(signalNumber, SIG_IGN)
+            let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
+            source.setEventHandler {
+                NSApp.terminate(nil)
+            }
+            source.resume()
+            signalSources.append(source)
+        }
     }
 
     /// 全局快捷键 ⌃⌥S：在任何 App 里一键打开或关闭面板。

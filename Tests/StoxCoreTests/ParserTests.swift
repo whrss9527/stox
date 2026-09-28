@@ -25,6 +25,8 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(q.marketCap), 1_549_576_000_000, accuracy: 1)
         XCTAssertEqual(q.limitUp, 1360.70)
         XCTAssertEqual(q.limitDown, 1113.30)
+        XCTAssertEqual(q.high52Week, 1539.98)
+        XCTAssertEqual(q.low52Week, 1151.01)
         XCTAssertEqual(q.priceDecimals, 2)
         XCTAssertEqual(q.direction, .up)
         XCTAssertEqual(q.timestamp, date(2026, 9, 28, 14, 10, 19, .cn))
@@ -37,7 +39,9 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(index.name, "上证指数")
         XCTAssertEqual(index.changePercent, -1.61)
         XCTAssertEqual(index.direction, .down)
-        XCTAssertNil(index.peRatio)
+        XCTAssertEqual(index.peRatio, 16.70, "A 股指数带平均市盈率")
+        XCTAssertEqual(index.high52Week, 4258.86)
+        XCTAssertEqual(index.low52Week, 3741.11)
         XCTAssertNil(index.limitUp)
         XCTAssertNil(index.marketCap)
         XCTAssertEqual(index.amount, 678_213_668_263)
@@ -46,6 +50,8 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(etf.priceDecimals, 3)
         XCTAssertEqual(QuoteFormatter.price(etf.price, decimals: etf.priceDecimals), "4.417")
         XCTAssertNil(etf.peRatio)
+        XCTAssertEqual(etf.high52Week, 5.095)
+        XCTAssertEqual(etf.low52Week, 4.397)
     }
 
     func testSuspendedStockHasNoTrades() throws {
@@ -53,6 +59,7 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertFalse(q.hasTraded)
         XCTAssertEqual(q.direction, .flat)
         XCTAssertEqual(q.price, 34.28)
+        XCTAssertNil(q.high52Week, "停牌、没有 52 周数据时不显示")
     }
 
     func testHongKong() throws {
@@ -64,7 +71,10 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(q.change, 3.4)
         XCTAssertEqual(q.volume, 9_925_676)
         XCTAssertEqual(q.amount, 4_392_125_513.9)
-        XCTAssertNil(q.turnoverRate)
+        XCTAssertEqual(q.turnoverRate, 0.11, "港股的换手率在第 59 位")
+        XCTAssertEqual(q.peRatio, 16.08)
+        XCTAssertEqual(q.high52Week, 677.7)
+        XCTAssertEqual(q.low52Week, 411)
         XCTAssertNil(q.limitUp)
         XCTAssertEqual(q.timestamp, date(2026, 9, 28, 13, 55, 11, .hk))
 
@@ -76,6 +86,9 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(QuoteFormatter.largeNumber(hsi.amount), "1175.24亿")
         XCTAssertTrue(hsi.hasTraded)
         XCTAssertNil(hsi.marketCap)
+        XCTAssertNil(hsi.peRatio)
+        XCTAssertNil(hsi.turnoverRate)
+        XCTAssertEqual(hsi.high52Week, 28056.1)
         XCTAssertEqual(QuoteFormatter.price(hsi.price, decimals: hsi.priceDecimals), "24643.59")
     }
 
@@ -89,6 +102,9 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(q.volume, 30_002_507)
         XCTAssertEqual(q.amount, 10_179_398_058)
         XCTAssertEqual(q.peRatio, 39.11)
+        XCTAssertEqual(q.turnoverRate, 0.21)
+        XCTAssertEqual(q.high52Week, 345.34)
+        XCTAssertEqual(q.low52Week, 242.76)
         XCTAssertEqual(q.timestamp, date(2026, 9, 25, 16, 0, 1, .us))
 
         XCTAssertEqual(quotes[Symbol("usBRK.B")!]?.name, "伯克希尔B")
@@ -98,6 +114,9 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(ixic.volume, 6_299_972_751)
         XCTAssertEqual(ixic.amount, 0)
         XCTAssertNil(ixic.marketCap)
+        XCTAssertNil(ixic.peRatio)
+        XCTAssertEqual(ixic.high52Week, 27288.79)
+        XCTAssertEqual(ixic.low52Week, 20690.25)
     }
 
     func testIgnoresGarbage() {

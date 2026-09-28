@@ -30,6 +30,11 @@ enum Log {
         append("ERROR", message)
     }
 
+    /// 等排队中的日志写完。退出前调用，最后几行不会丢。
+    static func flush() {
+        queue.sync {}
+    }
+
     private static func append(_ level: String, _ message: String) {
         let line = "\(formatter.string(from: Date())) \(level) \(message)\n"
         queue.async {

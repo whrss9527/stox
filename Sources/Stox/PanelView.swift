@@ -58,7 +58,10 @@ struct WatchlistPanel: View {
             PanelHeader()
             SearchBar()
             if router.trimmedQuery.isEmpty {
+                HoldingsSummaryView()
                 WatchlistView()
+            } else if router.batch != nil {
+                BatchAddView()
             } else {
                 SearchResultsView()
             }
@@ -134,8 +137,8 @@ struct SearchBar: View {
             TextField("搜索代码、名称或拼音，回车添加", text: $router.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12.5))
-                .onSubmit(addFirstResult)
-            if router.isSearching {
+                .onSubmit(submit)
+            if router.isSearching || router.isAddingBatch {
                 ProgressView()
                     .controlSize(.small)
                     .scaleEffect(0.7)
@@ -154,7 +157,15 @@ struct SearchBar: View {
         .glassCard(cornerRadius: 12)
     }
 
-    /// 回车：添加第一条搜索结果。
+    /// 回车：粘贴了多个代码时全部添加，否则添加第一条搜索结果。
+    private func submit() {
+        if router.batch != nil {
+            Task { await router.addBatch(using: store) }
+        } else {
+            addFirstResult()
+        }
+    }
+
     private func addFirstResult() {
         guard let candidate = router.submissionCandidate(excluding: { store.contains($0) }) else { return }
         store.add(candidate.symbol, name: candidate.isDirect ? "" : candidate.name)
@@ -167,7 +178,8 @@ struct WatchlistView: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var router: PanelRouter
 
-    private static let maxHeight: CGFloat = 430
+    /// 屏幕够高时列表最多这么高；屏幕放不下整个面板时由 PanelRouter.listMaxHeight 再压低。
+    static let defaultMaxHeight: CGFloat = 430
 
     var body: some View {
         Group {
@@ -206,10 +218,10 @@ struct WatchlistView: View {
 
     private var listHeight: CGFloat {
         var height = CGFloat(store.items.count) * QuoteRow.rowHeight
-        if let expanded = router.expanded, store.contains(expanded), store.quotes[expanded] != nil {
-            height += QuoteRow.detailHeight
+        if let expanded = router.expanded, let item = store.item(for: expanded), store.quotes[expanded] != nil {
+            height += QuoteRow.detailHeight(for: item)
         }
-        return min(max(height, QuoteRow.rowHeight * 2), Self.maxHeight)
+        return min(max(height, QuoteRow.rowHeight * 2), router.listMaxHeight)
     }
 }
 
@@ -242,6 +254,156 @@ struct SearchResultsView: View {
             }
         }
         .glassCard()
+    }
+}
+
+/// 粘贴了多个代码时的批量添加：列出认出的代码，查过行情后标出已添加和不存在的。
+@MainActor
+struct BatchAddView: View {
+    @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var router: PanelRouter
+
+    var body: some View {
+        if let batch = router.batch {
+            let pending = batch.symbols.filter { !store.contains($0) && !router.batchMissing.contains($0) }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("认出 \(batch.symbols.count) 个代码")
+                        .font(.system(size: 12.5, weight: .semibold))
+                    Spacer()
+                    Button(pending.isEmpty ? "都已处理" : "全部添加（\(pending.count)）") {
+                        Task { await router.addBatch(using: store) }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(pending.isEmpty || router.isAddingBatch)
+                }
+                ScrollView {
+                    VStack(spacing: 0) {
+                        ForEach(batch.symbols, id: \.self) { symbol in
+                            row(symbol)
+                        }
+                    }
+                }
+                .frame(height: min(CGFloat(batch.symbols.count) * 28, 280))
+                if !batch.rejected.isEmpty {
+                    Text("认不出：" + batch.rejected.joined(separator: "、"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                if let error = router.batchError {
+                    Label(error, systemImage: "exclamationmark.triangle")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.orange)
+                }
+                Text("回车全部添加，会先查一次行情，只添加存在的代码。")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(12)
+            .glassCard()
+        }
+    }
+
+    private func row(_ symbol: Symbol) -> some View {
+        HStack(spacing: 8) {
+            MarketBadge(market: symbol.market)
+            if let item = store.item(for: symbol), !item.name.isEmpty {
+                Text(item.name)
+                    .font(.system(size: 12.5))
+                    .lineLimit(1)
+                Text(symbol.displayCode)
+                    .font(.system(size: 10.5).monospacedDigit())
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(symbol.displayCode)
+                    .font(.system(size: 12.5).monospacedDigit())
+            }
+            Spacer()
+            if store.contains(symbol) {
+                Label("已添加", systemImage: "checkmark")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            } else if router.batchMissing.contains(symbol) {
+                Label("没有这个代码", systemImage: "xmark")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.orange)
+            } else {
+                Image(systemName: "plus.circle")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(height: 28)
+        .padding(.horizontal, 4)
+    }
+}
+
+/// 有持仓时显示在列表上方：按币种分别合计的今日盈亏、持仓盈亏和市值，排成一张小表。
+@MainActor
+struct HoldingsSummaryView: View {
+    @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var settings: SettingsStore
+
+    var body: some View {
+        let summaries = Portfolio.summaries(items: store.items, quotes: store.quotes)
+        if !summaries.isEmpty {
+            // 只有一种货币时不需要货币那一列。
+            let showsCurrency = summaries.count > 1
+            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                GridRow {
+                    if showsCurrency {
+                        Color.clear
+                            .gridCellUnsizedAxes([.horizontal, .vertical])
+                    }
+                    header("今日盈亏")
+                    header("持仓盈亏")
+                    header(showsCurrency ? "市值" : "持仓市值")
+                        .gridColumnAlignment(.trailing)
+                }
+                ForEach(summaries, id: \.region) { summary in
+                    GridRow(alignment: .firstTextBaseline) {
+                        if showsCurrency {
+                            Text(summary.region.currencyName)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.secondary)
+                        }
+                        profit(summary.dayProfit, percent: summary.dayProfitPercent)
+                        profit(summary.totalProfit, percent: summary.totalProfitPercent)
+                        Text(QuoteFormatter.money(summary.marketValue))
+                            .font(.system(size: 12.5, weight: .medium).monospacedDigit())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .glassCard()
+            .help("按现价计算。人民币、港币、美元分别合计，不换算")
+        }
+    }
+
+    private func header(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+    }
+
+    /// 金额在上、比例在下，窄一点也放得下。
+    private func profit(_ value: Double, percent: Double?) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(QuoteFormatter.signedMoney(value))
+                .font(.system(size: 12.5, weight: .medium).monospacedDigit())
+            if let percent {
+                Text(QuoteFormatter.percent(percent))
+                    .font(.system(size: 10).monospacedDigit())
+            }
+        }
+        .foregroundStyle(Theme.priceColor(for: PriceDirection(value), convention: settings.colorConvention))
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

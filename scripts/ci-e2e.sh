@@ -40,6 +40,11 @@ log_has() {
   grep -qF -- "$1" "$LOG" 2>/dev/null
 }
 
+# 直接写本机保存的自选列表（JSON），模拟用户在界面里改过。
+write_watchlist() {
+  defaults write "$DOMAIN" watchlist.v1 -data "$(printf '%s' "$1" | xxd -p | tr -d '\n')"
+}
+
 # 启动一次（直接运行 .app 里的二进制，环境变量才能传进去），14 秒后记下内存、截屏、退出。
 # 用法: [变量=值 ...] run_case 名字 [参数...]
 run_case() {
@@ -81,6 +86,27 @@ smoke() {
   defaults delete "$DOMAIN" ticker.hidden
   grep -q 'status_title="" image=true' shots/hidden.log || fail "隐藏行情后菜单栏应该只有图标"
   grep -q "panel_frame=" shots/hidden.log || fail "只显示图标时面板没有打开"
+
+  # 粘贴多个代码：列出认出的代码，等回车全部添加；认不出的单独列出来。
+  run_case batch --show-panel --search "601318 09988 TSLA 茅台"
+  grep -q "items=8 " shots/batch.log || fail "批量添加在确认前不应该改动自选"
+
+  # 持仓：列表上方按币种合计，展开后显示持仓盈亏。
+  write_watchlist '[{"symbol":"sh000001","name":"上证指数","alias":"上证","pinned":true},
+    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200}},
+    {"symbol":"sz000001","name":"平安银行","holding":{"shares":2000,"cost":12.5}},
+    {"symbol":"hk00700","name":"腾讯控股","holding":{"shares":200,"cost":380}},
+    {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'
+  run_case holdings --show-panel --expand sh600519
+  grep -Eq "items=5 quotes=[0-9]+ holdings=4" shots/holdings.log || fail "持仓没有读出来"
+
+  # 外观选深色：面板和设置窗口用深色，菜单栏不受影响。
+  defaults write "$DOMAIN" appearance -string dark
+  run_case panel-dark --show-panel --expand sh600519
+  run_case settings-dark --show-settings display
+  defaults delete "$DOMAIN" appearance
+  grep -q "panel_frame=" shots/panel-dark.log || fail "深色模式下面板没有打开"
+  defaults delete "$DOMAIN" watchlist.v1
 }
 
 sync_test() {
@@ -134,6 +160,21 @@ JSON
 
   STOX_SYNC_DIR="$cloud" run_case settings-sync --show-settings sync
   grep -q "settings_page=sync" shots/settings-sync.log || fail "同步设置页没有打开"
+
+  # 本机改了但没来得及写上去就退出了（比如改完马上退出）：下次启动时应该把本机的写上去，
+  # 而不是被 iCloud 里的旧内容覆盖。
+  write_watchlist '[{"symbol":"sz000001","name":"平安银行","pinned":true},{"symbol":"usTSLA","name":"特斯拉"},{"symbol":"hk09988","name":"阿里巴巴"}]'
+  : > "$LOG"
+  STOX_SYNC_DIR="$cloud" "$APP/Contents/MacOS/Stox" > shots/sync-offline.log 2>&1 &
+  pid=$!
+  wait_for 20 log_has "已写入本机的自选和设置（3 只）" || fail "启动时没有把本机没写上去的改动写到 iCloud"
+  grep -q '"hk09988"' "$cloud/sync.json" || fail "iCloud 里没有本机新加的自选"
+  if log_has "应用了来自"; then
+    fail "不应该用 iCloud 里的旧内容覆盖本机的改动"
+  fi
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  log_has "Stox 已退出" || fail "收到 kill 后没有正常退出"
   echo "===== stox.log ====="
   cat "$LOG"
   defaults delete "$DOMAIN" 2>/dev/null || true
