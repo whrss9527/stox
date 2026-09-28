@@ -3,18 +3,59 @@ import XCTest
 
 final class IntradayTests: XCTestCase {
     func testParsesAShareMinutes() throws {
+        // 头两条是 2026-09-28 抓取的原样。
         let json = #"""
         {"code":0,"msg":"","data":{"sh600519":{"data":{"data":["0930 1236.00 349 43136400.00","0931 1234.06 1635 201743930.45",
-        "1130 1238.10 9000 1111.00","1300 1239.00 9100 2222.00","1500 1239.58 22537 2783140281.00","bad row","2561 1.0 1 1"],
+        "1130 1238.10 9000 1113600000.00","1300 1239.00 9100 1126000000.00","1500 1239.58 22537 2783140281.00","bad row","2561 1.0 1 1"],
         "date":"20260928"},"qt":{"sh600519":["1","贵州茅台"]}}}}
         """#
         let series = try XCTUnwrap(TencentMinuteParser.parse(Data(json.utf8), symbol: Symbol("sh600519")!))
         XCTAssertEqual(series.date, "20260928")
         XCTAssertEqual(series.points.count, 5, "格式不对的行跳过")
-        XCTAssertEqual(series.points.first, IntradayPoint(minute: 570, price: 1236))
-        XCTAssertEqual(series.points.last, IntradayPoint(minute: 900, price: 1239.58))
+        XCTAssertEqual(series.points.first?.minute, 570)
+        XCTAssertEqual(series.points.first?.price, 1236)
+        XCTAssertEqual(series.points.last?.minute, 900)
+        XCTAssertEqual(series.points.last?.price, 1239.58)
         XCTAssertEqual(series.high, 1239.58)
         XCTAssertEqual(series.low, 1234.06)
+
+        // A 股的成交量是手：均价 = 成交额 / (手数 × 100)。
+        XCTAssertEqual(try XCTUnwrap(series.points[0].average), 43_136_400 / 34_900, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(series.points[1].average), 201_743_930.45 / 163_500, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(series.latestAverage), 2_783_140_281 / 2_253_700, accuracy: 1e-9)
+    }
+
+    func testHongKongAverageUsesShares() throws {
+        // 2026-09-28 抓取的腾讯控股前两分钟：港股的成交量是股数。
+        let json = #"""
+        {"code":0,"msg":"","data":{"hk00700":{"data":{"data":["0930 441.400 380150 167797970.000","0931 443.400 982872 434286946.200"],
+        "date":"20260928"}}}}
+        """#
+        let series = try XCTUnwrap(TencentMinuteParser.parse(Data(json.utf8), symbol: Symbol("hk00700")!))
+        XCTAssertEqual(try XCTUnwrap(series.points[0].average), 167_797_970 / 380_150, accuracy: 1e-9)
+        XCTAssertEqual(try XCTUnwrap(series.points[1].average), 434_286_946.2 / 982_872, accuracy: 1e-9)
+    }
+
+    func testIndexHasNoAverage() throws {
+        let json = #"""
+        {"code":0,"msg":"","data":{"sh000001":{"data":{"data":["0930 3878.41 3901496 6172666205.40","0931 3869.86 20844108 35445662366.20"],
+        "date":"20260928"}}}}
+        """#
+        let series = try XCTUnwrap(TencentMinuteParser.parse(Data(json.utf8), symbol: Symbol("sh000001")!))
+        XCTAssertEqual(series.points.count, 2)
+        XCTAssertTrue(series.points.allSatisfy { $0.average == nil }, "指数的成交额是成分股加起来的")
+        XCTAssertNil(series.latestAverage)
+    }
+
+    func testImplausibleAveragesAreDropped() throws {
+        // 成交额对不上（比如接口只给了一部分）时算出来的均价不在当天价格范围里，不要。
+        let json = #"""
+        {"code":0,"msg":"","data":{"sz000001":{"data":{"data":["0930 11.30 100 1130.00","0931 11.31 200 50.00","0932 11.32 300 339300.00"],
+        "date":"20260928"}}}}
+        """#
+        let series = try XCTUnwrap(TencentMinuteParser.parse(Data(json.utf8), symbol: Symbol("sz000001")!))
+        XCTAssertNil(series.points[1].average)
+        XCTAssertEqual(try XCTUnwrap(series.points[2].average), 339_300 / 30_000, accuracy: 1e-9)
     }
 
     func testParsesUSMinutesWithoutAmount() throws {
@@ -25,6 +66,14 @@ final class IntradayTests: XCTestCase {
         let series = try XCTUnwrap(TencentMinuteParser.parse(Data(json.utf8), symbol: Symbol("usAAPL")!))
         XCTAssertEqual(series.points.map(\.minute), [570, 571, 646])
         XCTAssertEqual(series.points.last?.price, 340.14)
+
+        // 美股没有成交额，按每分钟新增的成交量给价格加权。
+        XCTAssertEqual(series.points[0].average, 341.58)
+        XCTAssertEqual(try XCTUnwrap(series.points[1].average), 341.58, accuracy: 1e-9)
+        let first: Double = 341.58 * 1_392_198
+        let second: Double = 340.14 * Double(7_887_853 - 1_392_198)
+        let expected = (first + second) / 7_887_853
+        XCTAssertEqual(try XCTUnwrap(series.points[2].average), expected, accuracy: 1e-9)
     }
 
     func testEmptyOrGarbage() {

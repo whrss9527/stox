@@ -211,7 +211,7 @@ final class SettingsStore: ObservableObject {
     @Published var flashOnChange: Bool {
         didSet { defaults.set(flashOnChange, forKey: Keys.flashOnChange) }
     }
-    /// K 线上画 5、10、20 根的收盘价均线。
+    /// K 线上画 5、10、20 根的收盘价均线，分时图上画成交均价。
     @Published var showMovingAverages: Bool {
         didSet { defaults.set(showMovingAverages, forKey: Keys.showMovingAverages) }
     }

@@ -1,26 +1,34 @@
 import SwiftUI
 import StoxCore
 
-/// 展开后的分时图：当天的价格走势，虚线是昨收。横轴按交易时段排，午休不占位置，
-/// 所以上午收盘和下午开盘接在一起，还没到的时间留空。鼠标指着的点画一条竖线和一个圆点。
+/// 展开后的分时图：当天的价格走势，虚线是昨收，橙色的线是成交均价（个股才有）。横轴按交易时段排，
+/// 午休不占位置，所以上午收盘和下午开盘接在一起，还没到的时间留空。鼠标指着的点画一条竖线和一个圆点。
 struct IntradayChart: View {
     static let height: CGFloat = 56
+    static let averageColor = Color.orange
 
     let series: IntradaySeries?
     let previousClose: Double
     let region: MarketRegion
     let color: Color
     var hovered: IntradayPoint?
+    var showAverage = true
 
     var body: some View {
         GeometryReader { proxy in
-            if let scale = Self.scale(series: series, previousClose: previousClose, region: region, size: proxy.size) {
+            if let scale = Self.scale(
+                series: series, previousClose: previousClose, region: region, size: proxy.size, includingAverages: showAverage
+            ) {
                 let paths = scale.paths
                 ZStack {
                     paths.area
                         .fill(LinearGradient(colors: [color.opacity(0.22), color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                     paths.baseline
                         .stroke(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
+                    if showAverage {
+                        paths.average
+                            .stroke(Self.averageColor.opacity(0.9), style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round))
+                    }
                     paths.line
                         .stroke(color, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
                     if let hovered {
@@ -51,6 +59,8 @@ struct IntradayChart: View {
         var line: Path
         var area: Path
         var baseline: Path
+        /// 均价线；没有均价的点断开。
+        var average: Path
     }
 
     /// 价格和时刻到图上坐标的换算。纵轴包含昨收，涨跌很小时至少留出昨收 0.4% 的范围，免得一点波动就撑满。
@@ -86,13 +96,33 @@ struct IntradayChart: View {
             var baseline = Path()
             baseline.move(to: CGPoint(x: 0, y: baseY))
             baseline.addLine(to: CGPoint(x: size.width, y: baseY))
-            return ChartPaths(line: line, area: area, baseline: baseline)
+            var average = Path()
+            var drawing = false
+            for (point, location) in zip(points, locations) {
+                guard let value = point.average else {
+                    drawing = false
+                    continue
+                }
+                let target = CGPoint(x: location.x, y: y(value))
+                if drawing {
+                    average.addLine(to: target)
+                } else {
+                    average.move(to: target)
+                    drawing = true
+                }
+            }
+            return ChartPaths(line: line, area: area, baseline: baseline, average: average)
         }
     }
 
-    static func scale(series: IntradaySeries?, previousClose: Double, region: MarketRegion, size: CGSize) -> Scale? {
+    /// 纵轴包含价格、昨收，画均价线时也包含均价。
+    static func scale(
+        series: IntradaySeries?, previousClose: Double, region: MarketRegion, size: CGSize, includingAverages: Bool = false
+    ) -> Scale? {
         guard let points = series?.points, points.count > 1, size.width > 0, size.height > 0 else { return nil }
-        let prices = points.map(\.price) + (previousClose > 0 ? [previousClose] : [])
+        var prices = points.map(\.price)
+        if previousClose > 0 { prices.append(previousClose) }
+        if includingAverages { prices += points.compactMap(\.average) }
         guard let low = prices.min(), let high = prices.max() else { return nil }
         let reference = previousClose > 0 ? previousClose : (high + low) / 2
         let span = max(high - low, reference * 0.004)

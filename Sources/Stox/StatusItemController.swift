@@ -484,7 +484,9 @@ final class StatusItemController: NSObject {
         let ma20 = router.expanded
             .flatMap { symbol in settings.chartPeriod.klinePeriod.flatMap { store.klines[KlineKey(symbol: symbol, period: $0)] } }
             .map { KlineChartData(series: $0).averages.last?.compactMap { $0 }.count ?? 0 } ?? 0
-        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) ma20=\(ma20) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
+        // 展开的那只分时图上有几分钟有均价。
+        let averages = router.expanded.flatMap { store.intraday[$0] }?.points.filter { $0.average != nil }.count ?? 0
+        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }
 
