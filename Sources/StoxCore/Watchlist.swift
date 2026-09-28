@@ -144,11 +144,14 @@ public struct TickerOptions: Sendable, Equatable {
 }
 
 public enum MenuBarTicker {
-    /// 菜单栏上的今日盈亏，例如“今日 +¥688 -HK$120”，每种货币一段。没有持仓时返回空数组。
-    public static func dayProfitParts(_ summaries: [PortfolioSummary]) -> [TickerPart] {
+    /// 菜单栏上的今日盈亏，例如“今日 +¥688 -HK$120”，每种货币一段；给了汇率时折成人民币合成一段。
+    /// 没有持仓时返回空数组。
+    public static func dayProfitParts(_ summaries: [PortfolioSummary], rates: ExchangeRates? = nil) -> [TickerPart] {
         guard !summaries.isEmpty else { return [] }
         var parts = [TickerPart(role: .name, text: "今日", direction: .flat)]
-        for summary in summaries {
+        // 有好几种货币并且拿到了汇率时，折成人民币只显示一个数，省地方。
+        let shown = Portfolio.combined(summaries, rates: rates).map { [$0] } ?? summaries
+        for summary in shown {
             let value = summary.dayProfit
             // 颜色和正负号一致：不到一分钱的算平。
             let direction: PriceDirection = value >= 0.005 ? .up : (value <= -0.005 ? .down : .flat)

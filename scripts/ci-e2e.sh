@@ -113,10 +113,13 @@ smoke() {
   defaults write "$DOMAIN" tips.dismissed -bool true
   defaults delete "$DOMAIN" update.whatsNew 2>/dev/null || true
 
-  # 按涨幅排序。
+  # 按涨幅排序，右边的色块显示总市值（指数没有市值）。
   defaults write "$DOMAIN" list.sort -string gainers
+  defaults write "$DOMAIN" list.pill -string marketCap
   run_case sorted --show-panel
   defaults delete "$DOMAIN" list.sort
+  defaults delete "$DOMAIN" list.pill
+  grep -q "pill=marketCap" shots/sorted.log || fail "色块没有切到总市值"
 
   # 粘贴多个代码：列出认出的代码，等回车全部添加；认不出的单独列出来。
   run_case batch --show-panel --search "601318 09988 TSLA 茅台"
@@ -133,6 +136,12 @@ smoke() {
   defaults delete "$DOMAIN" ticker.dayProfit
   grep -Eq "items=5 quotes=[0-9]+ holdings=4" shots/holdings.log || fail "持仓没有读出来"
   grep -q 'status_title="上证 .* 今日 ' shots/holdings.log || fail "菜单栏没有显示今日盈亏"
+  # 人民币、港币、美元都有持仓：取汇率折成人民币，列表上方多一行合计，菜单栏只显示一个数。
+  if grep -q "rates=USDCNY:" shots/holdings.log; then
+    grep -Eq 'status_title="[^"]* 今日 [+-]?¥[0-9.万亿]+"' shots/holdings.log || fail "有汇率时菜单栏的今日盈亏应该折成一个人民币数"
+  else
+    echo "::warning::没有取到汇率"
+  fi
 
   # 钉住的面板放回上次拖到的位置（左上角 x=100，离屏幕底边 600）。
   defaults write "$DOMAIN" panel.pinned -bool true

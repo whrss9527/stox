@@ -436,6 +436,7 @@ struct TipsCards: View {
                 tip("右键单击菜单栏图标，在显示行情和只显示图标之间切换")
                 tip("\(settings.toggleHotkey.display) 在任何 App 里打开或关闭这个面板")
                 tip("右键单击一只可以固定到菜单栏，或者填持仓和价格提醒")
+                tip("点右边的色块，在涨跌幅、涨跌额和总市值之间切换")
                 tip("一次粘贴多个代码，回车全部添加")
                 tip("↑ ↓ 选择，回车添加或展开；展开后 ← → 切换分时和 K 线")
                 tip("点右上角的图钉，面板就一直显示，可以拖到任何位置")
@@ -489,27 +490,44 @@ struct HoldingsSummaryView: View {
                         .gridColumnAlignment(.trailing)
                 }
                 ForEach(summaries, id: \.region) { summary in
-                    GridRow(alignment: .firstTextBaseline) {
-                        if showsCurrency {
-                            Text(summary.region.currencyName)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.secondary)
-                        }
-                        profit(summary.dayProfit, percent: summary.dayProfitPercent)
-                        profit(summary.totalProfit, percent: summary.totalProfitPercent)
-                        Text(QuoteFormatter.money(summary.marketValue))
-                            .font(.system(size: 12.5, weight: .medium).monospacedDigit())
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
+                    row(summary.region.currencyName, summary, showsCurrency: showsCurrency)
+                }
+                // 几种货币都有时，按现在的汇率折成人民币再合计一行。
+                if let total = Portfolio.combined(summaries, rates: store.rates) {
+                    Divider()
+                        .gridCellUnsizedAxes(.horizontal)
+                    row("合计", total, showsCurrency: true, help: combinedHelp)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .glassCard()
-            .help("按现价计算。人民币、港币、美元分别合计，不换算")
+            .help("按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币")
         }
+    }
+
+    private func row(_ title: String, _ summary: PortfolioSummary, showsCurrency: Bool, help: String = "") -> some View {
+        GridRow(alignment: .firstTextBaseline) {
+            if showsCurrency {
+                Text(title)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .help(help)
+            }
+            profit(summary.dayProfit, percent: summary.dayProfitPercent)
+            profit(summary.totalProfit, percent: summary.totalProfitPercent)
+            Text(QuoteFormatter.money(summary.marketValue))
+                .font(.system(size: 12.5, weight: .medium).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+    }
+
+    private var combinedHelp: String {
+        guard let rates = store.rates else { return "" }
+        return "按现在的汇率折成人民币：1 港币 = \(QuoteFormatter.fixed(rates.hkdCNY, decimals: 4)) 元，"
+            + "1 美元 = \(QuoteFormatter.fixed(rates.usdCNY, decimals: 4)) 元。成本也按现在的汇率折算"
     }
 
     private func header(_ title: String) -> some View {
@@ -597,8 +615,18 @@ struct PanelFooter: View {
                 .lineLimit(1)
             Spacer(minLength: 4)
             Menu {
+                Text("排序")
                 Picker("排序", selection: $settings.sortMode) {
                     ForEach(WatchlistSort.allCases, id: \.self) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+                Divider()
+                Text("右边的色块显示")
+                Picker("右边的色块显示", selection: $settings.changeDisplay) {
+                    ForEach(ChangeDisplay.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
                 }
@@ -613,7 +641,7 @@ struct PanelFooter: View {
             .buttonStyle(IconButtonStyle())
             .frame(width: 30, height: 30)
             .background(Circle().fill(Color.primary.opacity(0.05)))
-            .help("排序：\(settings.sortMode.title)")
+            .help("排序：\(settings.sortMode.title)；色块显示\(settings.changeDisplay.title)")
             Button {
                 actions.openSettings(nil)
             } label: {
