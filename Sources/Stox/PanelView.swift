@@ -235,9 +235,9 @@ struct WatchlistView: View {
                                 .listRowBackground(Color.clear)
                                 .id(item.symbol)
                         }
-                        // 按涨跌幅排序或者筛选着的时候不能拖动。
-                        .onMove(perform: settings.sortMode == .custom && filter == .all ? { source, destination in
-                            store.move(fromOffsets: source, toOffset: destination)
+                        // 按涨跌幅排序的时候不能拖动；筛选着的时候只在看得见的几只之间换位置。
+                        .onMove(perform: settings.sortMode == .custom ? { source, destination in
+                            store.move(visible: visible.map(\.symbol), fromOffsets: source, toOffset: destination)
                         } : nil)
                     }
                     .listStyle(.plain)

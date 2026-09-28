@@ -142,6 +142,26 @@ public enum Watchlist {
         }
     }
 
+    /// 筛选着的时候拖动排序。visible 是列表里看得见的那几只（按显示的顺序，也就是它们在自选里的先后），
+    /// 把其中 source 那几只挪到 destination（都按看得见的算）。看得见的几只只在它们原来占的那些位置之间换，
+    /// 看不见的原地不动。visible 和自选对不上时不改。
+    public static func moving(_ items: [WatchItem], visible: [Symbol], fromOffsets source: IndexSet, toOffset destination: Int) -> [WatchItem] {
+        let wanted = Set(visible)
+        let slots = items.indices.filter { wanted.contains(items[$0].symbol) }
+        guard slots.map({ items[$0].symbol }) == visible,
+              source.allSatisfy({ $0 < visible.count }), (0...visible.count).contains(destination)
+        else { return items }
+        let shown = slots.map { items[$0] }
+        let moved = source.map { shown[$0] }
+        var rest = shown.indices.filter { !source.contains($0) }.map { shown[$0] }
+        rest.insert(contentsOf: moved, at: destination - source.filter { $0 < destination }.count)
+        var result = items
+        for (slot, item) in zip(slots, rest) {
+            result[slot] = item
+        }
+        return result
+    }
+
     /// 复制出去的代码，用空格分开，粘贴到搜索框就能一次全部加回来（见 SymbolInput.parseList）。
     public static func exportText(_ items: [WatchItem]) -> String {
         items.map(\.symbol.rawValue).joined(separator: " ")

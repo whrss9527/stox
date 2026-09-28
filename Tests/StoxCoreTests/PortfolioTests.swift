@@ -332,6 +332,31 @@ final class FilterTests: XCTestCase {
         XCTAssertEqual(dissolved.map(\.group), ["白酒", nil, nil])
     }
 
+    func testMovingWhileFiltered() {
+        let codes = ["sh600519", "sh000001", "hk00700", "hkHSI", "usAAPL"]
+        let items = codes.map { WatchItem(symbol: Symbol($0)!) }
+        func raw(_ items: [WatchItem]) -> [String] { items.map(\.symbol.rawValue) }
+        let visible = [Symbol("sh600519")!, Symbol("hk00700")!, Symbol("usAAPL")!]
+
+        // 把看得见的最后一只（苹果）拖到最前：它占了茅台原来的位置，其余看得见的依次往后挪，指数原地不动。
+        let top = Watchlist.moving(items, visible: visible, fromOffsets: [2], toOffset: 0)
+        XCTAssertEqual(raw(top), ["usAAPL", "sh000001", "sh600519", "hkHSI", "hk00700"])
+
+        // 把第一只拖到最后。
+        let bottom = Watchlist.moving(items, visible: visible, fromOffsets: [0], toOffset: 3)
+        XCTAssertEqual(raw(bottom), ["hk00700", "sh000001", "usAAPL", "hkHSI", "sh600519"])
+
+        // 放回原处不变；和自选对不上时不改。
+        XCTAssertEqual(raw(Watchlist.moving(items, visible: visible, fromOffsets: [1], toOffset: 1)), codes)
+        XCTAssertEqual(raw(Watchlist.moving(items, visible: visible.reversed(), fromOffsets: [0], toOffset: 2)), codes)
+        XCTAssertEqual(raw(Watchlist.moving(items, visible: visible, fromOffsets: [5], toOffset: 0)), codes)
+
+        // 什么都没筛选时和普通的拖动一样。
+        let all = items.map(\.symbol)
+        XCTAssertEqual(raw(Watchlist.moving(items, visible: all, fromOffsets: [4], toOffset: 1)),
+                       ["sh600519", "usAAPL", "sh000001", "hk00700", "hkHSI"])
+    }
+
     func testGroupsSurviveEncoding() throws {
         let item = WatchItem(symbol: Symbol("sh600519")!, name: "贵州茅台", group: "白酒")
         let data = try XCTUnwrap(Watchlist.encode([item]))

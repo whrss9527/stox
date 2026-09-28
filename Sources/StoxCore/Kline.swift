@@ -12,13 +12,16 @@ public struct Candle: Equatable, Sendable {
     public var close: Double
     public var high: Double
     public var low: Double
+    /// 成交量：A 股是手，港股、美股是股；没有时为 nil。
+    public var volume: Double?
 
-    public init(date: String, open: Double, close: Double, high: Double, low: Double) {
+    public init(date: String, open: Double, close: Double, high: Double, low: Double, volume: Double? = nil) {
         self.date = date
         self.open = open
         self.close = close
         self.high = high
         self.low = low
+        self.volume = volume
     }
 
     /// 阳线还是阴线：收盘相对开盘。
@@ -60,12 +63,14 @@ public struct KlineSeries: Equatable, Sendable {
         switch period {
         case .day:
             guard quote.hasTraded, day == last.date || opened else { return self }
+            // 成交量和行情的单位不一样（A 股行情里是股、K 线里是手），沿用接口给的，下一次请求时更新；新补的一根先不画。
             let today = Candle(
                 date: day,
                 open: quote.open > 0 ? quote.open : quote.price,
                 close: quote.price,
                 high: max(quote.high, quote.price),
-                low: quote.low > 0 ? min(quote.low, quote.price) : quote.price
+                low: quote.low > 0 ? min(quote.low, quote.price) : quote.price,
+                volume: day == last.date ? last.volume : nil
             )
             if day == last.date {
                 result.candles[result.candles.count - 1] = today
@@ -144,6 +149,11 @@ public struct KlineChartData: Equatable, Sendable {
         return (low, high)
     }
 
+    /// 图上最大的成交量，成交量柱按它的比例画；都没有成交量时为 nil。
+    public var maxVolume: Double? {
+        candles.compactMap(\.volume).filter { $0 > 0 }.max()
+    }
+
     /// 这一段的涨跌幅（%）：最后一根的收盘相对第一根的开盘。
     public var totalChangePercent: Double? {
         guard candles.count > 1, let first = candles.first, let last = candles.last, first.open > 0 else { return nil }
@@ -217,7 +227,8 @@ public enum TencentKlineParser {
         guard let open = number(1), let close = number(2), let high = number(3), let low = number(4),
               open > 0, close > 0, high > 0, low > 0
         else { return nil }
-        return Candle(date: date, open: open, close: close, high: max(high, open, close), low: min(low, open, close))
+        let volume = row.count > 5 ? number(5).flatMap { $0 >= 0 ? $0 : nil } : nil
+        return Candle(date: date, open: open, close: close, high: max(high, open, close), low: min(low, open, close), volume: volume)
     }
 }
 
