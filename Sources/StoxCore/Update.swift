@@ -125,6 +125,26 @@ public enum UpdateCheck {
         return release
     }
 
+    /// 某个版本的发布页接口，用来在“已更新到 x.y.z”里直接显示这个版本的更新内容。
+    public static func releaseURL(version: String) -> URL? {
+        URL(string: "https://api.github.com/repos/\(repository)/releases/tags/v\(version)")
+    }
+
+    public static func release(version: String, currentVersion: String, session: URLSession = .shared) async throws -> ReleaseInfo {
+        guard let url = releaseURL(version: version) else { throw UpdateError.badResponse }
+        let data: Data
+        do {
+            data = try await HTTP.get(url, session: session, timeout: 15, headers: [
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "Stox/\(currentVersion) (macOS)",
+            ])
+        } catch ProviderError.badStatus(let code) {
+            throw UpdateError.server(code)
+        }
+        guard let release = parse(data) else { throw UpdateError.badResponse }
+        return release
+    }
+
     /// 下载发布附带的校验文件 SHA256SUMS.txt 并解析。
     public static func checksums(at url: URL, currentVersion: String, session: URLSession = .shared) async throws -> [String: String] {
         let data: Data
