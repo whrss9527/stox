@@ -168,9 +168,15 @@ final class StatusItemController: NSObject {
             let current = min(WatchlistView.naturalHeight(store: store, expanded: router.expanded), router.listMaxHeight)
             let limit = max(minimum, floor(current - (height - available)))
             if limit < router.listMaxHeight {
-                // 在 SwiftUI 量尺寸的回调里，放到下一轮再改，避免在视图更新期间发布变化。
+                // 在 SwiftUI 量尺寸的回调里，放到下一轮再改，避免在视图更新期间发布变化；
+                // 改完再等一轮让 SwiftUI 重新布局，然后主动量一次，不指望它再回调。
                 DispatchQueue.main.async { [weak self] in
                     self?.router.listMaxHeight = limit
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, let hostingView = self.hostingView else { return }
+                        hostingView.layoutSubtreeIfNeeded()
+                        self.resizePanel(to: hostingView.fittingSize)
+                    }
                 }
             }
             height = floor(available)
@@ -300,7 +306,8 @@ final class StatusItemController: NSObject {
         }
         let panelFrame = panel?.isVisible == true ? panel?.frame : nil
         if let panelFrame {
-            print("STOX_DIAG panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) list_max=\(Int(router.listMaxHeight)) available=\(Int(availableHeight() ?? -1))")
+            let fitting = hostingView?.fittingSize ?? .zero
+            print("STOX_DIAG panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) fitting=\(Int(fitting.height)) list_max=\(Int(router.listMaxHeight)) available=\(Int(availableHeight() ?? -1))")
         }
         let frames = [statusFrame, panelFrame].compactMap { $0 }
         if let first = frames.first {
