@@ -133,7 +133,7 @@ smoke() {
 
   # 持仓：列表上方按币种合计，展开后显示持仓盈亏。
   write_watchlist '[{"symbol":"sh000001","name":"上证指数","alias":"上证","pinned":true},
-    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},"note":"等回调到 1200 附近再加仓"},
+    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},"note":"等回调到 1200 附近再加仓","alert":{"profitAbove":1}},
     {"symbol":"sz000001","name":"平安银行","holding":{"shares":2000,"cost":12.5}},
     {"symbol":"hk00700","name":"腾讯控股","holding":{"shares":200,"cost":380}},
     {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'
@@ -141,6 +141,8 @@ smoke() {
   run_case holdings --show-panel --expand sh600519
   defaults delete "$DOMAIN" ticker.dayProfit
   grep -Eq "items=5 quotes=[0-9]+ holdings=4" shots/holdings.log || fail "持仓没有读出来"
+  # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来。
+  grep -Eq "alerts=[1-9]" shots/holdings.log || fail "持仓盈利达到阈值时没有提醒"
   grep -q 'status_title="上证 .* 今日 ' shots/holdings.log || fail "菜单栏没有显示今日盈亏"
   # 人民币、港币、美元都有持仓：取汇率折成人民币，列表上方多一行合计，菜单栏只显示一个数。
   if grep -q "rates=USDCNY:" shots/holdings.log; then

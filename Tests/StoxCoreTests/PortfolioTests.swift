@@ -155,3 +155,15 @@ final class MenuBarProfitTests: XCTestCase {
         XCTAssertNil(decoded[1].note, "备注读不懂时只丢掉备注")
     }
 }
+
+final class ExportTests: XCTestCase {
+    func testExportedCodesPasteBackIn() throws {
+        let text = Watchlist.exportText(Watchlist.defaults)
+        XCTAssertEqual(text, "sh000001 sz399001 sz399006 hkHSI us.IXIC sh600519 hk00700 usAAPL")
+        let parsed = try XCTUnwrap(SymbolInput.parseList(text))
+        XCTAssertEqual(parsed.symbols, Watchlist.defaults.map(\.symbol), "粘贴回搜索框能认出全部代码，顺序不变")
+        XCTAssertTrue(parsed.rejected.isEmpty)
+        let brk = [WatchItem(symbol: Symbol("usBRK.B")!), WatchItem(symbol: Symbol("bj920819")!)]
+        XCTAssertEqual(SymbolInput.parseList(Watchlist.exportText(brk))?.symbols, brk.map(\.symbol))
+    }
+}

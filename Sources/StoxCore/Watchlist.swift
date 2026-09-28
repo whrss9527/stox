@@ -100,6 +100,11 @@ public enum Watchlist {
         return items.filter { seen.insert($0.symbol).inserted }
     }
 
+    /// 复制出去的代码，用空格分开，粘贴到搜索框就能一次全部加回来（见 SymbolInput.parseList）。
+    public static func exportText(_ items: [WatchItem]) -> String {
+        items.map(\.symbol.rawValue).joined(separator: " ")
+    }
+
     public static func encode(_ items: [WatchItem]) -> Data? {
         try? JSONEncoder().encode(items)
     }

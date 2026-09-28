@@ -282,7 +282,10 @@ final class QuoteStore: ObservableObject {
     /// 保存编辑页的修改。提醒条件变化时清掉当天的提醒记录，让新阈值立刻生效。
     func update(_ updated: WatchItem) {
         guard let index = items.firstIndex(where: { $0.symbol == updated.symbol }) else { return }
-        let alertChanged = items[index].alert != updated.alert
+        // 改了成本也算：止盈止损的比例是按成本算的。
+        let costChanged = items[index].holding != updated.holding
+            && (updated.alert.profitAbove != nil || updated.alert.lossBelow != nil)
+        let alertChanged = items[index].alert != updated.alert || costChanged
         items[index] = updated
         save()
         if alertChanged {
@@ -350,10 +353,14 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 这次运行发出的提醒条数，CI 的诊断信息里用。
+    private(set) var firedAlertCount = 0
+
     private func evaluateAlerts() {
         guard settings.alertsEnabled else { return }
         let triggers = alertEngine.evaluate(items: items, quotes: quotes, now: Date())
         guard !triggers.isEmpty else { return }
+        firedAlertCount += triggers.count
         saveAlertState()
         triggers.forEach { onAlert?($0) }
     }
