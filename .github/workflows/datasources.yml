@@ -3,6 +3,11 @@ name: datasources
 # 定期检查行情数据源是否可用、格式是否变化。
 on:
   workflow_dispatch:
+    inputs:
+      only:
+        description: "只跑标题匹配这个正则的探测，留空全部跑"
+        required: false
+        default: ""
   schedule:
     - cron: "17 2 * * 1"
   push:
@@ -17,3 +22,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: ./scripts/check-datasources.sh
+        env:
+          ONLY: ${{ inputs.only }}
