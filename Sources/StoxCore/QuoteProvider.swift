@@ -13,12 +13,15 @@ public protocol QuoteProvider: Sendable {
     func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries?
     /// 港币、美元兑人民币的汇率，用来把持仓折合成人民币；数据源不支持时返回 nil。
     func fetchExchangeRates() async throws -> ExchangeRates?
+    /// 最近五个交易日的分时；数据源不支持时返回 nil。exchangeCode 同 fetchKline。
+    func fetchFiveDay(for symbol: Symbol, exchangeCode: String?) async throws -> MultiDaySeries?
 }
 
 extension QuoteProvider {
     public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? { nil }
     public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? { nil }
     public func fetchExchangeRates() async throws -> ExchangeRates? { nil }
+    public func fetchFiveDay(for symbol: Symbol, exchangeCode: String?) async throws -> MultiDaySeries? { nil }
 }
 
 public enum ProviderError: Error, LocalizedError, Equatable {
@@ -89,6 +92,20 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
         return URL(string: "\(endpoint)\(encoded),\(period.rawValue),,,\(max(count, 1)),qfq")
     }
 
+    /// 五日分时：A 股、港股是 `day/query`，美股是 `dayus/query`，美股个股同样要带交易所后缀。
+    public static func fiveDayURL(for symbol: Symbol, exchangeCode: String? = nil) -> URL? {
+        var code = symbol.rawValue
+        var endpoint = "https://web.ifzq.gtimg.cn/appstock/app/day/query?code="
+        if symbol.market.region == .us {
+            endpoint = "https://web.ifzq.gtimg.cn/appstock/app/dayus/query?code="
+            if let exchangeCode, exchangeCode.contains(".") { code = "us" + exchangeCode }
+        }
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: ".")
+        guard let encoded = code.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+        return URL(string: endpoint + encoded)
+    }
+
     public static func searchURL(for query: String) -> URL? {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-_.")
@@ -142,6 +159,15 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
         }
         guard let url = Self.klineURL(for: symbol, period: period, count: count, exchangeCode: code) else { throw URLError(.badURL) }
         return TencentKlineParser.parse(try await get(url), symbol: symbol, period: period)
+    }
+
+    public func fetchFiveDay(for symbol: Symbol, exchangeCode: String?) async throws -> MultiDaySeries? {
+        var code = exchangeCode
+        if code == nil, symbol.market.region == .us, !symbol.isIndex {
+            code = try await fetchQuotes(for: [symbol])[symbol]?.exchangeCode
+        }
+        guard let url = Self.fiveDayURL(for: symbol, exchangeCode: code) else { throw URLError(.badURL) }
+        return TencentMultiDayParser.parse(try await get(url), symbol: symbol)
     }
 
     public func fetchExchangeRates() async throws -> ExchangeRates? {

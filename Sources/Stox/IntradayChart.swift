@@ -103,3 +103,125 @@ struct IntradayChart: View {
         )
     }
 }
+
+/// 五日图：最近五个交易日的分时连在一起，每天占一样宽，竖线分开各天，虚线是第一天的昨收。
+struct FiveDayChart: View {
+    let series: MultiDaySeries?
+    let region: MarketRegion
+    let color: Color
+    /// 鼠标指着的那一天和那一点。
+    var hovered: (day: Int, point: IntradayPoint)?
+
+    var body: some View {
+        GeometryReader { proxy in
+            if let series, let scale = Scale(series: series, region: region, size: proxy.size) {
+                ZStack {
+                    scale.separators
+                        .stroke(Color.secondary.opacity(0.3), lineWidth: 0.5)
+                    scale.area
+                        .fill(LinearGradient(colors: [color.opacity(0.22), color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
+                    if let baseline = scale.baseline {
+                        baseline
+                            .stroke(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
+                    }
+                    scale.line
+                        .stroke(color, style: StrokeStyle(lineWidth: 1.1, lineCap: .round, lineJoin: .round))
+                    if let hovered {
+                        let location = scale.location(day: hovered.day, point: hovered.point)
+                        Path { path in
+                            path.move(to: CGPoint(x: location.x, y: 0))
+                            path.addLine(to: CGPoint(x: location.x, y: proxy.size.height))
+                        }
+                        .stroke(Color.secondary.opacity(0.7), lineWidth: 0.6)
+                        Circle()
+                            .fill(color)
+                            .frame(width: 5, height: 5)
+                            .position(location)
+                    }
+                }
+            } else {
+                Text(series == nil ? "正在加载五日…" : "暂时没有五日数据")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(height: IntradayChart.height)
+        .accessibilityLabel("五日走势")
+    }
+
+    /// 坐标换算。纵轴包含第一天的昨收，和分时图一样至少留出 0.4% 的范围。
+    struct Scale {
+        let series: MultiDaySeries
+        let region: MarketRegion
+        let size: CGSize
+        let top: Double
+        let bottom: Double
+
+        init?(series: MultiDaySeries, region: MarketRegion, size: CGSize) {
+            let prices = series.days.flatMap { $0.points.map(\.price) } + (series.previousClose.map { [$0] } ?? [])
+            guard series.pointCount > 1, size.width > 0, size.height > 0,
+                  let low = prices.min(), let high = prices.max()
+            else { return nil }
+            let reference = series.previousClose ?? (high + low) / 2
+            let span = max(high - low, reference * 0.004)
+            let middle = (high + low) / 2
+            self.series = series
+            self.region = region
+            self.size = size
+            top = middle + span * 0.55
+            bottom = middle - span * 0.55
+        }
+
+        func y(_ price: Double) -> CGFloat {
+            CGFloat((top - price) / (top - bottom)) * size.height
+        }
+
+        func location(day: Int, point: IntradayPoint) -> CGPoint {
+            let x = MultiDayAxis.position(day: day, minute: point.minute, days: series.days.count, region: region)
+            return CGPoint(x: CGFloat(x) * size.width, y: y(point.price))
+        }
+
+        private var locations: [CGPoint] {
+            series.days.enumerated().flatMap { day, daySeries in daySeries.points.map { location(day: day, point: $0) } }
+        }
+
+        var line: Path {
+            var path = Path()
+            path.addLines(locations)
+            return path
+        }
+
+        var area: Path {
+            let points = locations
+            var path = Path()
+            path.addLines(points)
+            if let first = points.first, let last = points.last {
+                path.addLine(to: CGPoint(x: last.x, y: size.height))
+                path.addLine(to: CGPoint(x: first.x, y: size.height))
+                path.closeSubpath()
+            }
+            return path
+        }
+
+        var baseline: Path? {
+            guard let previousClose = series.previousClose else { return nil }
+            var path = Path()
+            path.move(to: CGPoint(x: 0, y: y(previousClose)))
+            path.addLine(to: CGPoint(x: size.width, y: y(previousClose)))
+            return path
+        }
+
+        var separators: Path {
+            var path = Path()
+            let count = series.days.count
+            guard count > 1 else { return path }
+            for day in 1..<count {
+                let x = (CGFloat(day) / CGFloat(count) * size.width * 2).rounded() / 2
+                path.move(to: CGPoint(x: x, y: 0))
+                path.addLine(to: CGPoint(x: x, y: size.height))
+            }
+            return path
+        }
+    }
+}

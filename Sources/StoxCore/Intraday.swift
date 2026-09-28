@@ -98,3 +98,73 @@ extension IntradaySeries {
         }
     }
 }
+
+/// 最近几个交易日的分时（五日图），从早到晚排列。
+public struct MultiDaySeries: Equatable, Sendable {
+    public var symbol: Symbol
+    public var days: [IntradaySeries]
+    /// 第一天之前的收盘价，五日图的基准线；接口没给时为 nil。
+    public var previousClose: Double?
+    /// 每一天各自的昨收，和 days 一一对应，用来算那一天的涨跌幅。
+    public var dayPreviousCloses: [Double?]
+
+    public init(symbol: Symbol, days: [IntradaySeries], previousClose: Double?, dayPreviousCloses: [Double?]) {
+        self.symbol = symbol
+        self.days = days
+        self.previousClose = previousClose
+        self.dayPreviousCloses = dayPreviousCloses
+    }
+
+    public var pointCount: Int { days.reduce(0) { $0 + $1.points.count } }
+
+    /// 横轴位置 fraction（0 到 1）最近的点：第几天、哪个点。每天占一样宽。
+    public func point(nearest fraction: Double, region: MarketRegion) -> (day: Int, point: IntradayPoint)? {
+        guard !days.isEmpty else { return nil }
+        let length = Double(IntradayAxis.length(for: region))
+        let offset = min(max(fraction, 0), 1) * Double(days.count) * length
+        var day = min(Int(offset / length), days.count - 1)
+        // 那一天还没有数据（比如今天还没开盘）时往前找。
+        while day > 0, days[day].points.isEmpty { day -= 1 }
+        guard let point = days[day].point(nearest: offset - Double(day) * length, region: region) else { return nil }
+        return (day, point)
+    }
+}
+
+/// 五日图的横轴：每天一段，只包含连续交易时段。
+public enum MultiDayAxis {
+    /// 第 day 天（最早的一天是 0）的 minute 在横轴上的位置（0 到 1）。
+    public static func position(day: Int, minute: Int, days: Int, region: MarketRegion) -> Double {
+        guard days > 0 else { return 0 }
+        let length = Double(IntradayAxis.length(for: region))
+        return (Double(day) * length + Double(IntradayAxis.offset(of: minute, region: region))) / (Double(days) * length)
+    }
+}
+
+/// 解析腾讯五日分时接口的返回。
+///
+/// - A 股、港股：`https://web.ifzq.gtimg.cn/appstock/app/day/query?code=sh600519`
+/// - 美股：`https://web.ifzq.gtimg.cn/appstock/app/dayus/query?code=usAAPL.OQ`（带交易所后缀）
+///
+/// 返回 `{"data":{"sh600519":{"data":[{"date":"20260928","data":["0930 1236.00 349 43136400.00", …],"prec":"1237.00"}, …]}}}`，
+/// 最近的一天在最前面，每天带着那一天的昨收 `prec`。
+public enum TencentMultiDayParser {
+    public static func parse(_ data: Data, symbol: Symbol) -> MultiDaySeries? {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let all = json["data"] as? [String: Any],
+              let entry = (all[symbol.rawValue] ?? (all.count == 1 ? all.values.first : nil)) as? [String: Any],
+              let list = entry["data"] as? [Any]
+        else { return nil }
+        var days: [IntradaySeries] = []
+        var closes: [Double?] = []
+        for case let day as [String: Any] in list {
+            guard let rows = day["data"] as? [String] else { continue }
+            let date = (day["date"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            days.append(IntradaySeries(symbol: symbol, date: date, points: rows.compactMap(TencentMinuteParser.point(from:))))
+            closes.append((day["prec"] as? String).flatMap(Double.init).flatMap { $0 > 0 ? $0 : nil })
+        }
+        // 接口是最近的一天在前，画图要从早到晚。
+        days.reverse()
+        closes.reverse()
+        return MultiDaySeries(symbol: symbol, days: days, previousClose: closes.first ?? nil, dayPreviousCloses: closes)
+    }
+}

@@ -167,7 +167,7 @@ final class StatusItemController: NSObject {
     }
 
     /// 键盘操作：搜索时上下选择搜索结果、回车添加；没在搜索时上下选择自选、回车展开或收起，
-    /// 展开着的时候左右切换分时和日 K、周 K、月 K。返回 false 的键照常交给搜索框。
+    /// 展开着的时候左右切换分时、五日和日 K、周 K、月 K。返回 false 的键照常交给搜索框。
     private func handleNavigation(_ key: PanelKey) -> Bool {
         guard router.route == .list else { return false }
         if !router.trimmedQuery.isEmpty {
@@ -440,7 +440,8 @@ final class StatusItemController: NSObject {
         let holdings = store.items.filter { $0.holding != nil }.count
         let intraday = store.intraday.values.map(\.points.count).max() ?? 0
         let kline = store.klines.values.map(\.candles.count).max() ?? 0
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) error=\(store.lastError ?? "none")")
+        let fiveDay = store.fiveDay.values.map(\.pointCount).max() ?? 0
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount)")
         print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
