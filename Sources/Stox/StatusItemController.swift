@@ -128,9 +128,6 @@ final class StatusItemController: NSObject {
             .environmentObject(updater)
             .environmentObject(sync)
         let hosting = NSHostingView(rootView: AnyView(root))
-        // 窗口大小由我们按 SwiftUI 量出的尺寸来定。默认情况下 NSHostingView 会按内容的最小尺寸撑大窗口，
-        // 内容比屏幕高时窗口会往上长，盖住菜单栏。
-        hosting.sizingOptions = []
         hostingView = hosting
         let panel = PanelWindow(contentView: hosting)
         panel.appearance = settings.appearance.nsAppearance
@@ -284,7 +281,7 @@ final class StatusItemController: NSObject {
         }
         let panelFrame = panel?.isVisible == true ? panel?.frame : nil
         if let panelFrame {
-            print("STOX_DIAG panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) list_max=\(Int(router.listMaxHeight))")
+            print("STOX_DIAG panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) list_max=\(Int(router.listMaxHeight)) available=\(Int(availableHeight() ?? -1))")
         }
         let frames = [statusFrame, panelFrame].compactMap { $0 }
         if let first = frames.first {
