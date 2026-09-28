@@ -40,7 +40,8 @@ final class StatusItemController: NSObject {
 
         // 面板的开关完全由自己控制：transient 行为下点击菜单栏图标会先关闭再立刻重新打开。
         popover.behavior = .applicationDefined
-        popover.animates = true
+        // 不要淡入淡出：一键开关要干脆，也避免快速连点时开关动画交错。
+        popover.animates = false
         let rootView = PanelView()
             .environmentObject(store)
             .environmentObject(settings)
@@ -143,6 +144,8 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func popoverDidClose(_ notification: Notification) {
+        // 快速连点时，上一次关闭的通知可能在面板重新打开之后才到。
+        guard !popover.isShown else { return }
         stopMonitors()
         router.panelDidClose()
     }
@@ -355,13 +358,16 @@ final class PanelRouter: ObservableObject {
     }
 
     /// 回车要添加的证券：搜索结果已就绪时取第一条未添加的结果；
-    /// 还在防抖或请求中时，只有输入本身是合法代码才直接添加。
+    /// 还在防抖或请求中时，只有明确是代码的输入（含数字，或带 us/hk 前缀）才直接添加，
+    /// 纯字母可能是拼音缩写，要等搜索结果。
     func submissionCandidate(excluding contains: (Symbol) -> Bool) -> SearchResult? {
         let query = trimmedQuery
         guard !query.isEmpty else { return nil }
         if resultsQuery == query {
             return searchResults.first { !contains($0.symbol) }
         }
+        let isExplicitCode = query.contains(where: \.isNumber) || query.hasPrefix("us") || query.hasPrefix("hk")
+        guard isExplicitCode else { return nil }
         return directCandidate(for: query).first { !contains($0.symbol) }
     }
 
