@@ -185,31 +185,31 @@ final class TencentSearchParserTests: XCTestCase {
 }
 
 final class ExtendedHoursTests: XCTestCase {
-    // pandata 是 2026-09-28 美东 16:03 从 usfqkline 抓取的原样，那一根 K 线按同一时刻的行情补上。
+    // 2026-09-28 美东 16:14 从 usfqkline 抓取的原样返回（只要一根日 K）。
     static let afterHours = #"""
-    {"code":0,"msg":"","data":{"usAAPL.OQ":{"qfqday":[["2026-09-28","340.370","338.400","342.990","338.040","31448642.000"]],"pandata":{"last":"338.43","volume":"31458547","pct":"-0.77","netchange":"-2.64","time":"2026-09-28 16:03:14","tag":"after","season":"EST"},"version":"12"}}}
+    {"code":0,"msg":"","data":{"usTSLA.OQ":{"qfqday":[["2026-09-28","368.06","357.45","369.43","356.80","38204256.00"]],"qt":{"usTSLA.OQ":["real","特斯拉","TSLA.OQ","357.45","372.11","368.06","38204256","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","0","","2026-09-28 16:00:01","-14.66","-3.94","369.43","356.80","USD","38204256","13763043405","0.97","330.97","","330.97","","3.39","12629.07406","14117.65716","Tesla, Inc.","1.08","498.83","297.38","0","16.25","","14117.65716","-20.52","-4.76","GP","4.64","2.75","-0.42","2.49","-9.15","3949547394","3533102268","1.12","397.17","","360.25","","","","",""],"market":["2026-09-29 04:14:28|HK_close_未开盘|SH_close_未开盘|SZ_close_未开盘|US_close_已收盘|SQ_close_未开盘|DS_close_未开盘|ZS_close_未开盘|NEWSH_close_未开盘|NEWSZ_close_未开盘|NEWHK_close_未开盘|NEWUS_close_已收盘|REPO_close_未开盘|UK_close_已收盘|KCB_close_未开盘|HSZB_close_未开盘|IT_close_已收盘|MY_close_未开盘|EU_close_已收盘|AH_close_未开盘|DE_close_已收盘|JW_close_未开盘|CYB_close_未开盘|USA_open_盘后交易|USB_close_已收盘|ZQ_close_未开盘"]},"pandata":{"last":"357.19","volume":"38204246","pct":"-4.01","netchange":"-14.92","time":"2026-09-28 16:14:25","tag":"after","season":"EST"},"version":"12"}}}
     """#
 
     private func usTime(_ text: String) -> Date? {
         TencentQuoteParser.parseTimestamp(text, timeZone: MarketRegion.us.timeZone)
     }
 
-    /// 2026-09-28（周一）收盘时苹果的行情。
-    private var appleClose: Quote {
-        Quote(symbol: Symbol("usAAPL")!, name: "苹果", price: 338.40, previousClose: 341.07, timestamp: usTime("2026-09-28 16:00:01"))
+    /// 同一时刻特斯拉的行情：现价停在 16:00 的收盘价。
+    private var teslaClose: Quote {
+        Quote(symbol: Symbol("usTSLA")!, name: "特斯拉", price: 357.45, previousClose: 372.11, timestamp: usTime("2026-09-28 16:00:01"))
     }
 
     func testParsesAfterHours() throws {
         let extended = try XCTUnwrap(TencentExtendedHoursParser.parse(Data(Self.afterHours.utf8)))
         XCTAssertEqual(extended.session, .afterHours)
         XCTAssertEqual(extended.session.displayName, "盘后")
-        XCTAssertEqual(extended.price, 338.43)
-        XCTAssertEqual(extended.time, usTime("2026-09-28 16:03:14"))
+        XCTAssertEqual(extended.price, 357.19)
+        XCTAssertEqual(extended.time, usTime("2026-09-28 16:14:25"))
 
-        // 涨跌相对当天的收盘价，不用接口里相对前一天收盘的 pct。
-        let change = try XCTUnwrap(extended.change(from: appleClose))
-        XCTAssertEqual(change.change, 0.03, accuracy: 1e-9)
-        XCTAssertEqual(change.percent, 0.03 / 338.40 * 100, accuracy: 1e-9)
+        // 涨跌相对当天的收盘价，不用接口里相对前一天收盘的 pct（-4.01%）。
+        let change = try XCTUnwrap(extended.change(from: teslaClose))
+        XCTAssertEqual(change.change, 357.19 - 357.45, accuracy: 1e-9)
+        XCTAssertEqual(change.percent, (357.19 - 357.45) / 357.45 * 100, accuracy: 1e-9)
     }
 
     func testRegularHoursHaveNone() {
@@ -232,7 +232,7 @@ final class ExtendedHoursTests: XCTestCase {
     }
 
     func testOnlyFollowingTradesCount() {
-        let quote = appleClose
+        let quote = teslaClose
         func trade(_ session: ExtendedHoursQuote.Session, _ time: String) -> ExtendedHoursQuote {
             ExtendedHoursQuote(session: session, price: 339, time: usTime(time))
         }
