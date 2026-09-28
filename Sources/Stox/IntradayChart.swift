@@ -13,6 +13,8 @@ struct IntradayChart: View {
     let color: Color
     var hovered: IntradayPoint?
     var showAverage = true
+    /// 左上、左下角标的价格用几位小数。
+    var decimals = 2
 
     var body: some View {
         GeometryReader { proxy in
@@ -25,6 +27,7 @@ struct IntradayChart: View {
                         .fill(LinearGradient(colors: [color.opacity(0.22), color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                     paths.baseline
                         .stroke(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
+                    ChartRangeLabels(high: scale.high, low: scale.low, reference: previousClose, decimals: decimals)
                     if showAverage {
                         paths.average
                             .stroke(Self.averageColor.opacity(0.9), style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round))
@@ -71,6 +74,9 @@ struct IntradayChart: View {
         let top: Double
         let bottom: Double
         let reference: Double
+        /// 图上画出来的最高、最低的值（价格、均价、昨收），标在左上角和左下角。
+        let high: Double
+        let low: Double
 
         func location(of point: IntradayPoint) -> CGPoint {
             let length = CGFloat(IntradayAxis.length(for: region))
@@ -129,7 +135,8 @@ struct IntradayChart: View {
         let middle = (high + low) / 2
         return Scale(
             points: points, region: region, size: size,
-            top: middle + span * 0.55, bottom: middle - span * 0.55, reference: reference
+            top: middle + span * 0.55, bottom: middle - span * 0.55, reference: reference,
+            high: high, low: low
         )
     }
 }
@@ -143,6 +150,7 @@ struct FiveDayChart: View {
     /// 鼠标指着的那一天和那一点。
     var hovered: (day: Int, point: IntradayPoint)?
     var showAverage = true
+    var decimals = 2
 
     var body: some View {
         GeometryReader { proxy in
@@ -156,6 +164,7 @@ struct FiveDayChart: View {
                         baseline
                             .stroke(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
                     }
+                    ChartRangeLabels(high: scale.high, low: scale.low, reference: series.previousClose ?? 0, decimals: decimals)
                     if showAverage {
                         scale.averages
                             .stroke(IntradayChart.averageColor.opacity(0.9), style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round))
@@ -193,6 +202,8 @@ struct FiveDayChart: View {
         let size: CGSize
         let top: Double
         let bottom: Double
+        let high: Double
+        let low: Double
 
         init?(series: MultiDaySeries, region: MarketRegion, size: CGSize, includingAverages: Bool = false) {
             var prices = series.days.flatMap { $0.points.map(\.price) }
@@ -209,6 +220,8 @@ struct FiveDayChart: View {
             self.size = size
             top = middle + span * 0.55
             bottom = middle - span * 0.55
+            self.high = high
+            self.low = low
         }
 
         func y(_ price: Double) -> CGFloat {
@@ -283,5 +296,64 @@ struct FiveDayChart: View {
             }
             return path
         }
+    }
+}
+
+/// 分时图、五日图四个角上的小字：左边是图上最高、最低的价格，右边是它们相对基准（昨收）的涨跌幅。
+struct ChartRangeLabels: View {
+    let high: Double
+    let low: Double
+    /// 算涨跌幅的基准；没有时（为 0）右边不标。
+    let reference: Double
+    let decimals: Int
+
+    var body: some View {
+        VStack(spacing: 0) {
+            row(high)
+            Spacer(minLength: 0)
+            row(low)
+        }
+        .font(.system(size: 8).monospacedDigit())
+        .foregroundStyle(.tertiary)
+        .padding(.horizontal, 1)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func row(_ value: Double) -> some View {
+        HStack(spacing: 0) {
+            Text(QuoteFormatter.price(value, decimals: decimals))
+            Spacer(minLength: 4)
+            if reference > 0 {
+                Text(QuoteFormatter.percent((value - reference) / reference * 100))
+            }
+        }
+        .lineLimit(1)
+    }
+}
+
+/// 走势图下面的横轴文字：第一个靠左、最后一个靠右，中间的居中对在位置上，都不超出图的两边。
+struct ChartAxis: View {
+    let ticks: [AxisTick]
+
+    var body: some View {
+        GeometryReader { proxy in
+            ZStack(alignment: .topLeading) {
+                ForEach(ticks.indices, id: \.self) { index in
+                    let tick = ticks[index]
+                    Text(tick.label)
+                        .font(.system(size: 8.5).monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .alignmentGuide(.leading) { dimensions in
+                            let x = CGFloat(tick.position) * proxy.size.width
+                            return -min(max(x - dimensions.width / 2, 0), max(proxy.size.width - dimensions.width, 0))
+                        }
+                }
+            }
+            .frame(width: proxy.size.width, alignment: .topLeading)
+        }
+        .accessibilityHidden(true)
     }
 }

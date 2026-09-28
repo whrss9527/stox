@@ -84,6 +84,17 @@ final class IntradayTests: XCTestCase {
         XCTAssertNil(TencentMinuteParser.parse(Data("<html>".utf8), symbol: Symbol("usAAPL")!))
     }
 
+    func testAxisTicks() {
+        XCTAssertEqual(IntradayAxis.ticks(for: .cn), [
+            AxisTick(position: 0, label: "09:30"), AxisTick(position: 0.5, label: "11:30/13:00"), AxisTick(position: 1, label: "15:00"),
+        ])
+        XCTAssertEqual(IntradayAxis.ticks(for: .hk).map(\.label), ["09:30", "12:00/13:00", "16:00"])
+        XCTAssertEqual(IntradayAxis.ticks(for: .hk)[1].position, 150.0 / 330, accuracy: 1e-9, "港股上午 150 分钟、下午 180 分钟")
+        XCTAssertEqual(IntradayAxis.ticks(for: .us), [
+            AxisTick(position: 0, label: "09:30"), AxisTick(position: 0.5, label: "12:45"), AxisTick(position: 1, label: "16:00"),
+        ])
+    }
+
     func testAxisSkipsLunchBreak() {
         XCTAssertEqual(IntradayAxis.length(for: .cn), 240)
         XCTAssertEqual(IntradayAxis.length(for: .hk), 330)
