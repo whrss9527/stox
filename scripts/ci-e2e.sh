@@ -99,6 +99,12 @@ smoke() {
   grep -q 'highlight=sz399001 expanded=sz399001' shots/keys-list.log || fail "方向键和回车没有展开第二只"
   grep -q 'chart=day' shots/keys-list.log || fail "右方向键没有切到日 K"
 
+  # 腾讯的行情接口不可用（指向一个连不上的地址）：自动改用新浪的行情，列表照常显示。
+  STOX_QUOTE_ENDPOINT="http://127.0.0.1:9/q=" run_case failover --show-panel
+  grep -q "source=backup" shots/failover.log || fail "腾讯行情不可用时没有改用新浪"
+  grep -Eq "items=8 quotes=[1-9]" shots/failover.log || fail "改用新浪后没有行情"
+  grep -q "items=8 quotes=8 " shots/failover.log || echo "::warning::新浪没有返回全部 8 只的行情"
+
   # 右键单击切换的“只显示图标”：菜单栏只剩图标，左键照样能打开面板。
   defaults write "$DOMAIN" ticker.hidden -bool true
   run_case hidden --show-panel

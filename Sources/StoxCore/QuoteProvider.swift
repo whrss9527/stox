@@ -41,16 +41,22 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     /// 单次请求的最大代码数，超出后分批并发请求。
     static let batchSize = 60
 
+    /// 调试用：设置这个环境变量可以换掉行情接口的地址，CI 用它模拟腾讯接口不可用。
+    public static let endpointOverrideVariable = "STOX_QUOTE_ENDPOINT"
+
     private let session: URLSession
     private let timeout: TimeInterval
+    private let endpoint: String
 
-    public init(session: URLSession = .shared, timeout: TimeInterval = 8) {
+    public init(session: URLSession = .shared, timeout: TimeInterval = 8, quoteEndpoint: String? = nil) {
         self.session = session
         self.timeout = timeout
+        let override = ProcessInfo.processInfo.environment[Self.endpointOverrideVariable].flatMap { $0.isEmpty ? nil : $0 }
+        endpoint = quoteEndpoint ?? override ?? Self.quoteEndpoint
     }
 
-    public static func quoteURL(for symbols: [Symbol]) -> URL? {
-        URL(string: quoteEndpoint + symbols.map(\.rawValue).joined(separator: ","))
+    public static func quoteURL(for symbols: [Symbol], endpoint: String = quoteEndpoint) -> URL? {
+        URL(string: endpoint + symbols.map(\.rawValue).joined(separator: ","))
     }
 
     public static let minuteEndpoint = "https://web.ifzq.gtimg.cn/appstock/app/minute/query?code="
@@ -112,7 +118,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchRaw(for symbols: [Symbol]) async throws -> String {
-        guard let url = Self.quoteURL(for: symbols) else { throw URLError(.badURL) }
+        guard let url = Self.quoteURL(for: symbols, endpoint: endpoint) else { throw URLError(.badURL) }
         return Self.decodeText(try await get(url))
     }
 
@@ -143,7 +149,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     private func fetchBatch(_ symbols: [Symbol]) async throws -> [Symbol: Quote] {
-        guard let url = Self.quoteURL(for: symbols) else { throw URLError(.badURL) }
+        guard let url = Self.quoteURL(for: symbols, endpoint: endpoint) else { throw URLError(.badURL) }
         return TencentQuoteParser.parse(Self.decodeText(try await get(url)))
     }
 
