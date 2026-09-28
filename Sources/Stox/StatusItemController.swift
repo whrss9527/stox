@@ -479,7 +479,7 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
-        print("STOX_DIAG filter=\(filter.rawValue) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count)")
+        print("STOX_DIAG filter=\(filter.id) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count)")
         // 展开的那只在 K 线图上有几根有 MA20。
         let ma20 = router.expanded
             .flatMap { symbol in settings.chartPeriod.klinePeriod.flatMap { store.klines[KlineKey(symbol: symbol, period: $0)] } }

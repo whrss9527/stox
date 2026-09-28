@@ -276,6 +276,51 @@ final class FilterTests: XCTestCase {
         XCTAssertEqual(WatchlistFilter.effective(.us, items: onlyCN), .all, "选中的市场没有了就回到全部")
         XCTAssertEqual(WatchlistFilter.effective(.hk, items: items), .hk)
     }
+
+    func testGroups() {
+        var items = Watchlist.defaults
+        items[5].group = "  白酒  "
+        items[6].group = "科技"
+        items[7].group = "科技"
+        XCTAssertEqual(items[5].group, "白酒", "去掉首尾空白")
+        XCTAssertEqual(Watchlist.groups(in: items), ["白酒", "科技"])
+        XCTAssertEqual(WatchlistFilter.available(for: items), [.all, .cn, .hk, .us, .group("白酒"), .group("科技")])
+        XCTAssertEqual(WatchlistFilter.group("科技").apply(items).map(\.symbol.rawValue), ["hk00700", "usAAPL"])
+        XCTAssertEqual(WatchlistFilter.effective(.group("消费"), items: items), .all, "没有这个分组了就回到全部")
+        XCTAssertEqual(WatchlistFilter.effective(.group("科技"), items: items), .group("科技"))
+
+        // 存进设置里的写法。
+        XCTAssertEqual(WatchlistFilter.group("科技").id, "group:科技")
+        XCTAssertEqual(WatchlistFilter(id: "group:科技"), .group("科技"))
+        XCTAssertEqual(WatchlistFilter(id: "hk"), .hk)
+        XCTAssertEqual(WatchlistFilter(id: "holdings"), .holdings)
+        XCTAssertNil(WatchlistFilter(id: "group: "))
+        XCTAssertNil(WatchlistFilter(id: "nope"))
+
+        // 整个自选都在一个分组里时不列这个分组。
+        let allTech = items.map { item -> WatchItem in
+            var copy = item
+            copy.group = "科技"
+            return copy
+        }
+        XCTAssertFalse(WatchlistFilter.available(for: allTech).contains(.group("科技")))
+
+        // 太长的截断，空的当作不分组。
+        var item = WatchItem(symbol: Symbol("sh600519")!, group: "一二三四五六七八九十十一")
+        XCTAssertEqual(item.group, "一二三四五六七八九十")
+        item.group = "   "
+        XCTAssertNil(item.group)
+    }
+
+    func testGroupsSurviveEncoding() throws {
+        let item = WatchItem(symbol: Symbol("sh600519")!, name: "贵州茅台", group: "白酒")
+        let data = try XCTUnwrap(Watchlist.encode([item]))
+        XCTAssertEqual(Watchlist.decode(data)?.first?.group, "白酒")
+        // 旧版本写的数据没有分组。
+        let old = #"[{"symbol":"sh600519","name":"贵州茅台","pinned":false,"alert":{}}]"#
+        XCTAssertEqual(Watchlist.decode(Data(old.utf8))?.count, 1)
+        XCTAssertNil(Watchlist.decode(Data(old.utf8))?.first?.group)
+    }
 }
 
 final class TableTests: XCTestCase {

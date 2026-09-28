@@ -42,6 +42,7 @@ extension WatchlistFilter {
         case .hk: return "港股"
         case .us: return "美股"
         case .holdings: return "持仓"
+        case .group(let name): return name
         }
     }
 }
@@ -199,9 +200,9 @@ final class SettingsStore: ObservableObject {
     @Published var sortMode: WatchlistSort {
         didSet { defaults.set(sortMode.rawValue, forKey: Keys.sortMode) }
     }
-    /// 列表上方选的筛选：全部、某个市场或持仓。
+    /// 列表上方选的筛选：全部、某个市场、持仓或某个分组。
     @Published var listFilter: WatchlistFilter {
-        didSet { defaults.set(listFilter.rawValue, forKey: Keys.listFilter) }
+        didSet { defaults.set(listFilter.id, forKey: Keys.listFilter) }
     }
     /// 列表右边色块里显示涨跌幅、涨跌额还是总市值。
     @Published var changeDisplay: ChangeDisplay {
@@ -277,7 +278,7 @@ final class SettingsStore: ObservableObject {
         syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
         appearance = defaults.string(forKey: Keys.appearance).flatMap(AppearanceMode.init(rawValue:)) ?? .system
         sortMode = defaults.string(forKey: Keys.sortMode).flatMap(WatchlistSort.init(rawValue:)) ?? .custom
-        listFilter = defaults.string(forKey: Keys.listFilter).flatMap(WatchlistFilter.init(rawValue:)) ?? .all
+        listFilter = defaults.string(forKey: Keys.listFilter).flatMap(WatchlistFilter.init(id:)) ?? .all
         changeDisplay = defaults.string(forKey: Keys.changeDisplay).flatMap(ChangeDisplay.init(rawValue:)) ?? .percent
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showMovingAverages = defaults.object(forKey: Keys.showMovingAverages) as? Bool ?? true

@@ -240,6 +240,31 @@ struct QuoteRow: View {
         Button(item.symbol.isIndex ? "价格提醒与简称…" : "持仓、提醒与简称…") {
             router.route = .edit(item.symbol)
         }
+        Menu("分组") {
+            let groups = Watchlist.groups(in: store.items)
+            ForEach(groups, id: \.self) { name in
+                Button {
+                    store.setGroup(name, for: item.symbol)
+                } label: {
+                    if item.group == name {
+                        Label(name, systemImage: "checkmark")
+                    } else {
+                        Text(name)
+                    }
+                }
+            }
+            if !groups.isEmpty {
+                Divider()
+            }
+            Button("新建分组…") {
+                router.route = .edit(item.symbol)
+            }
+            if item.group != nil {
+                Button("移出分组") {
+                    store.setGroup(nil, for: item.symbol)
+                }
+            }
+        }
         Button("在雪球中查看") {
             if let url = QuoteLinks.xueqiu(item.symbol) { NSWorkspace.shared.open(url) }
         }

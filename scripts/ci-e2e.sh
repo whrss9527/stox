@@ -154,6 +154,14 @@ smoke() {
   defaults delete "$DOMAIN" list.filter
   grep -q "filter=hk visible=2" shots/filtered.log || fail "筛选港股后应该只剩两只"
 
+  # 分组：腾讯和苹果在“科技”里，列表上方选了这个分组。
+  write_watchlist '[{"symbol":"sh600519","name":"贵州茅台"},{"symbol":"hk00700","name":"腾讯控股","group":"科技"},{"symbol":"usAAPL","name":"苹果","group":"科技"}]'
+  defaults write "$DOMAIN" list.filter -string "group:科技"
+  run_case grouped --show-panel
+  defaults delete "$DOMAIN" list.filter
+  defaults delete "$DOMAIN" watchlist.v1
+  grep -q "filter=group:科技 visible=2" shots/grouped.log || fail "选了“科技”分组后应该只剩两只"
+
   # 粘贴多个代码：列出认出的代码，等回车全部添加；认不出的单独列出来。
   run_case batch --show-panel --search "601318 09988 TSLA 茅台"
   grep -q "items=8 " shots/batch.log || fail "批量添加在确认前不应该改动自选"
