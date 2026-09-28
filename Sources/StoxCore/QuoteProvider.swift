@@ -14,8 +14,8 @@ public enum ProviderError: Error, LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .badStatus(let code): return "行情服务返回 HTTP \(code)"
-        case .emptyResponse: return "行情服务没有返回数据"
+        case .badStatus(let code): return "服务器返回 HTTP \(code)"
+        case .emptyResponse: return "服务器没有返回数据"
         }
     }
 }
@@ -86,32 +86,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     private func get(_ url: URL) async throws -> Data {
-        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
-        request.setValue("Mozilla/5.0 (Macintosh) Stox/1.0", forHTTPHeaderField: "User-Agent")
-        let (data, response) = try await load(request)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
-            throw ProviderError.badStatus(http.statusCode)
-        }
-        guard !data.isEmpty else { throw ProviderError.emptyResponse }
-        return data
-    }
-
-    private func load(_ request: URLRequest) async throws -> (Data, URLResponse) {
-        #if canImport(FoundationNetworking)
-        return try await withCheckedThrowingContinuation { continuation in
-            session.dataTask(with: request) { data, response, error in
-                if let error {
-                    continuation.resume(throwing: error)
-                } else if let data, let response {
-                    continuation.resume(returning: (data, response))
-                } else {
-                    continuation.resume(throwing: ProviderError.emptyResponse)
-                }
-            }.resume()
-        }
-        #else
-        return try await session.data(for: request)
-        #endif
+        try await HTTP.get(url, session: session, timeout: timeout)
     }
 
     /// 接口默认返回 UTF-8；万一退回 GBK 也能正确解码。

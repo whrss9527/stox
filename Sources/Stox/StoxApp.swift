@@ -1,46 +1,58 @@
 import AppKit
 import Carbon.HIToolbox
 import Combine
-import SwiftUI
 import StoxCore
 
 @main
-struct StoxApp: App {
-    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-
-    var body: some Scene {
-        // 纯菜单栏 App 不需要窗口。Settings 场景只是为了满足 App 协议，设置入口在面板里。
-        Settings {
-            EmptyView()
-        }
-        .commands {
-            CommandGroup(replacing: .appSettings) {}
-        }
-    }
-}
-
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = AppDelegate()
+        app.delegate = delegate
+        // 只有菜单栏图标，不在 Dock 里显示。Info.plist 里也设了 LSUIElement，这里再设一次，`swift run` 直接运行时同样生效。
+        app.setActivationPolicy(.accessory)
+        app.run()
+    }
+
     private let settings = SettingsStore()
     private lazy var store = QuoteStore(settings: settings)
+    private let updater = Updater()
+    private lazy var sync = SyncManager(store: store, settings: settings)
     private var statusController: StatusItemController?
     private var hotKey: HotKey?
     private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        // Info.plist 里已设置 LSUIElement；这里再设一次，保证 `swift run` 直接运行时也不出现 Dock 图标。
-        NSApp.setActivationPolicy(.accessory)
-
-        let controller = StatusItemController(store: store, settings: settings)
+        MainMenu.install(updater: updater)
+        let controller = StatusItemController(store: store, settings: settings, updater: updater, sync: sync)
         statusController = controller
+        SettingsWindowController.shared.configure(settings: settings, store: store, updater: updater, sync: sync)
 
         Notifier.shared.setUp()
-        Notifier.shared.onOpen = { [weak self] in self?.statusController?.showPopover() }
+        Notifier.shared.onOpen = { [weak self] route in
+            if route == Notifier.aboutRoute {
+                SettingsWindowController.shared.show(page: .about)
+            } else {
+                self?.statusController?.openPanel()
+            }
+        }
         store.onAlert = { [weak self] trigger in
             guard let self, self.settings.alertsEnabled else { return }
             Notifier.shared.post(trigger)
         }
+        updater.notify = { title, body in
+            Notifier.shared.postUpdate(title: title, body: body)
+        }
+        updater.onRelaunch = {
+            NSApp.terminate(nil)
+        }
+
         store.start()
+        sync.start()
+        updater.startAutomaticChecks { [weak self] in
+            self?.settings.autoCheckUpdates ?? false
+        }
 
         settings.$hotKeyEnabled
             .removeDuplicates()
@@ -51,44 +63,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         workspace.addObserver(self, selector: #selector(systemWillSleep), name: NSWorkspace.willSleepNotification, object: nil)
         workspace.addObserver(self, selector: #selector(systemDidWake), name: NSWorkspace.didWakeNotification, object: nil)
 
-        // 调试与 CI 截图用：启动后直接打开面板并打印诊断信息。
-        //   Stox --show-panel [--expand sh600519] [--search 腾讯]
-        //   Stox --show-settings
-        let arguments = ProcessInfo.processInfo.arguments
-        if arguments.contains("--show-panel") || arguments.contains("--show-settings") {
-            func value(after flag: String) -> String? {
-                guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return nil }
-                return arguments[index + 1]
-            }
-            let route: PanelRoute = arguments.contains("--show-settings") ? .settings : .list
-            let expand = value(after: "--expand").flatMap { Symbol($0) }
-            let search = value(after: "--search")
-            Task { @MainActor [weak self] in
-                try? await Task.sleep(nanoseconds: 4_000_000_000)
-                self?.statusController?.showPanel(route: route, expand: expand, search: search, printDiagnostics: true)
-            }
-        }
+        Log.info("Stox 已启动，版本 \(AppInfo.version)（\(Bundle.main.bundleURL.path)）")
+        handleLaunchArguments()
+    }
+
+    /// 再次打开程序（在访达里双击）时打开设置。
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        SettingsWindowController.shared.show(page: nil)
+        return false
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         store.stop()
+        Log.info("Stox 已退出")
     }
 
-    /// 全局快捷键 ⌃⌥S：在任何 App 里一键打开 / 关闭面板。
+    /// 全局快捷键 ⌃⌥S：在任何 App 里一键打开或关闭面板。
     private func setHotKey(enabled: Bool) {
         hotKey = nil
         guard enabled else { return }
         hotKey = HotKey(keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(controlKey | optionKey)) { [weak self] in
-            self?.statusController?.togglePopover()
+            self?.statusController?.togglePanel()
         }
     }
 
-    // 睡眠时停止轮询，唤醒后立即刷新一次。
+    // 睡眠时停止轮询，唤醒后立即刷新一次，顺便看看 iCloud 里有没有别的 Mac 的改动。
     @objc private func systemWillSleep(_ notification: Notification) {
         store.stop()
     }
 
     @objc private func systemDidWake(_ notification: Notification) {
         store.restart()
+        sync.panelWillOpen()
+    }
+
+    /// 调试和 CI 用的启动参数：
+    ///   Stox --show-panel [--expand sh600519] [--search 腾讯]   打开面板并打印诊断信息
+    ///   Stox --show-settings [general|display|sync|about]      打开设置窗口并打印窗口位置
+    ///   Stox --check-update                                    先检查一次更新再打开上面两者
+    ///   Stox --install-update                                  检查并直接安装新版本
+    private func handleLaunchArguments() {
+        let arguments = ProcessInfo.processInfo.arguments
+        func value(after flag: String) -> String? {
+            guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return nil }
+            let next = arguments[index + 1]
+            return next.hasPrefix("--") ? nil : next
+        }
+        let showPanel = arguments.contains("--show-panel")
+        let showSettings = arguments.contains("--show-settings")
+        let checkUpdate = arguments.contains("--check-update")
+        let installUpdate = arguments.contains("--install-update")
+        guard showPanel || showSettings || checkUpdate || installUpdate else { return }
+        let page = value(after: "--show-settings").flatMap(SettingsPage.init(rawValue:))
+        let expand = value(after: "--expand").flatMap { Symbol($0) }
+        let search = value(after: "--search")
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard let self else { return }
+            if installUpdate {
+                await self.updater.checkAndInstall()
+                return
+            }
+            if checkUpdate {
+                await self.updater.check(manual: true)
+            }
+            if showSettings {
+                SettingsWindowController.shared.show(page: page ?? .general)
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                SettingsWindowController.shared.printDiagnostics()
+            } else if showPanel {
+                self.statusController?.openPanel(expand: expand, search: search, printDiagnostics: true)
+            }
+        }
     }
 }

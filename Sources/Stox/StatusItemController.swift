@@ -3,28 +3,31 @@ import Combine
 import SwiftUI
 import StoxCore
 
-/// 菜单栏图标 + 弹出面板。
+/// 菜单栏图标 + 玻璃面板。
 ///
-/// - 左键单击：打开 / 关闭面板（再点一次、点面板外、按 Esc 都会关闭）
-/// - 右键或 Control+单击：快捷菜单（刷新、隐藏行情、设置、退出）
+/// - 左键单击：打开 / 关闭行情面板（再点一次、点到别处、按 Esc 都会关闭）
+/// - 右键或 Control+单击：在“菜单栏显示行情”和“只显示图标”之间切换
 @MainActor
 final class StatusItemController: NSObject {
     private let store: QuoteStore
     private let settings: SettingsStore
+    private let updater: Updater
+    private let sync: SyncManager
     private let router = PanelRouter()
     private let statusItem: NSStatusItem
-    private let popover = NSPopover()
-    private var outsideClickMonitor: Any?
-    private var keyMonitor: Any?
-    /// 打开面板前处于前台的 App，关闭面板后把焦点还给它。
-    private var previousApp: NSRunningApplication?
+    private var panel: PanelWindow?
+    private var hostingView: NSHostingView<AnyView>?
+    /// 面板因为点到别处而关闭的时间：点菜单栏图标关闭面板时，不要紧接着又把它打开。
+    private var lastAutoClose = Date.distantPast
     private var rotationTimer: Timer?
     private var rotationIndex = 0
     private var cancellables = Set<AnyCancellable>()
 
-    init(store: QuoteStore, settings: SettingsStore) {
+    init(store: QuoteStore, settings: SettingsStore, updater: Updater, sync: SyncManager) {
         self.store = store
         self.settings = settings
+        self.updater = updater
+        self.sync = sync
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -32,30 +35,11 @@ final class StatusItemController: NSObject {
         if let button = statusItem.button {
             button.target = self
             button.action = #selector(handleClick(_:))
-            // 和系统菜单一样在按下鼠标时响应，打开更跟手。
+            // 和系统菜单一样在按下鼠标时响应。
             button.sendAction(on: [.leftMouseDown, .rightMouseDown])
             button.imagePosition = .imageLeading
-            button.toolTip = "Stox 行情（⌃⌥S）"
+            button.toolTip = "Stox 行情\n左键：打开 / 关闭行情面板\n右键：隐藏 / 显示菜单栏行情"
         }
-
-        // 面板的开关完全由自己控制：transient 行为下点击菜单栏图标会先关闭再立刻重新打开。
-        popover.behavior = .applicationDefined
-        // 不要淡入淡出：一键开关要干脆，也避免快速连点时开关动画交错。
-        popover.animates = false
-        let rootView = PanelView()
-            .environmentObject(store)
-            .environmentObject(settings)
-            .environmentObject(router)
-        let hosting = NSHostingController(rootView: rootView)
-        hosting.sizingOptions = [.preferredContentSize]
-        popover.contentViewController = hosting
-
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(popoverDidClose(_:)), name: NSPopover.didCloseNotification, object: popover
-        )
-        NotificationCenter.default.addObserver(
-            self, selector: #selector(appDidResignActive(_:)), name: NSApplication.didResignActiveNotification, object: nil
-        )
 
         Publishers.Merge(store.objectWillChange, settings.objectWillChange)
             .receive(on: RunLoop.main)
@@ -69,179 +53,116 @@ final class StatusItemController: NSObject {
         updateButton()
     }
 
-    // MARK: - 面板开关
-
-    func togglePopover() {
-        if popover.isShown {
-            closePopover()
-        } else {
-            showPopover()
-        }
-    }
-
-    func showPopover() {
-        guard let button = statusItem.button, !popover.isShown else { return }
-        store.panelWillOpen()
-        let frontmost = NSWorkspace.shared.frontmostApplication
-        previousApp = frontmost?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : frontmost
-        if #available(macOS 14.0, *) {
-            NSApp.activate()
-        } else {
-            NSApp.activate(ignoringOtherApps: true)
-        }
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-        popover.contentViewController?.view.window?.makeKey()
-        startMonitors()
-    }
-
-    /// - Parameter restoreFocus: 用快捷键、Esc 或菜单栏图标关闭时，把焦点还给之前的 App；
-    ///   因为点击了别的 App 而关闭时不需要。
-    func closePopover(restoreFocus: Bool = true) {
-        let wasShown = popover.isShown
-        if wasShown {
-            popover.performClose(nil)
-        }
-        stopMonitors()
-        if wasShown, restoreFocus, NSApp.isActive, let app = previousApp, !app.isTerminated {
-            app.activate(options: [])
-        }
-        previousApp = nil
-    }
-
-    private func startMonitors() {
-        stopMonitors()
-        // 点击其他 App 或桌面时关闭。
-        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.closePopover(restoreFocus: false)
-            }
-        }
-        // Esc：先清空搜索 / 返回列表，再关闭面板。
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard event.keyCode == 53 else { return event }
-            Task { @MainActor [weak self] in
-                self?.handleEscape()
-            }
-            return nil
-        }
-    }
-
-    private func stopMonitors() {
-        if let outsideClickMonitor {
-            NSEvent.removeMonitor(outsideClickMonitor)
-            self.outsideClickMonitor = nil
-        }
-        if let keyMonitor {
-            NSEvent.removeMonitor(keyMonitor)
-            self.keyMonitor = nil
-        }
-    }
-
-    private func handleEscape() {
-        if !router.handleEscape() {
-            closePopover()
-        }
-    }
-
-    @objc private func popoverDidClose(_ notification: Notification) {
-        // 快速连点时，上一次关闭的通知可能在面板重新打开之后才到。
-        guard !popover.isShown else { return }
-        stopMonitors()
-        router.panelDidClose()
-    }
-
-    @objc private func appDidResignActive(_ notification: Notification) {
-        closePopover(restoreFocus: false)
-    }
-
-    // MARK: - 点击与右键菜单
+    // MARK: - 点击
 
     @objc private func handleClick(_ sender: NSStatusBarButton) {
         let event = NSApp.currentEvent
         if event?.type == .rightMouseDown || event?.modifierFlags.contains(.control) == true {
-            showMenu()
+            settings.hideTicker.toggle()
+            Log.info(settings.hideTicker ? "菜单栏改为只显示图标" : "菜单栏恢复显示行情")
         } else {
-            togglePopover()
+            togglePanel()
         }
     }
 
-    private func showMenu() {
-        closePopover(restoreFocus: false)
-        let menu = NSMenu()
-        menu.addItem(menuItem("打开面板", #selector(openPanel), key: ""))
-        menu.addItem(menuItem("立即刷新", #selector(refreshNow), key: "r"))
-        menu.addItem(menuItem(settings.hideTicker ? "显示菜单栏行情" : "隐藏菜单栏行情", #selector(toggleTicker), key: "h"))
-        menu.addItem(.separator())
-        menu.addItem(menuItem("设置…", #selector(openSettings), key: ","))
-        menu.addItem(.separator())
-        menu.addItem(menuItem("退出 Stox", #selector(quit), key: "q"))
-        statusItem.menu = menu
-        statusItem.button?.performClick(nil)
-        statusItem.menu = nil
+    // MARK: - 面板
+
+    func togglePanel() {
+        if let panel, panel.isVisible {
+            closePanel()
+        } else if Date().timeIntervalSince(lastAutoClose) > 0.3 {
+            openPanel()
+        }
     }
 
-    private func menuItem(_ title: String, _ action: Selector, key: String) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: action, keyEquivalent: key)
-        item.target = self
-        return item
-    }
-
-    @objc private func openPanel() {
-        showPanel(route: .list)
-    }
-
-    /// 打开面板并切到指定页面。后三个参数用于调试和 CI 截图：展开某一行、预填搜索词、打印诊断信息。
-    func showPanel(route: PanelRoute, expand: Symbol? = nil, search: String? = nil, printDiagnostics: Bool = false) {
-        // 先切页面再打开，避免先闪一下列表页。
+    /// 打开面板。后三个参数用于调试和 CI 截图：展开某一行、预填搜索词、打印诊断信息。
+    func openPanel(route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil, printDiagnostics: Bool = false) {
+        if panel == nil {
+            makePanel()
+        }
+        guard let panel else { return }
         router.route = route
         if let expand { router.expanded = expand }
         if let search { router.searchText = search }
-        showPopover()
-        guard printDiagnostics else { return }
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-            self?.printDiagnostics()
+        store.panelWillOpen()
+        sync.panelWillOpen()
+        resizePanel()
+        position(panel)
+        panel.orderFrontRegardless()
+        panel.makeKey()
+        statusItem.button?.highlight(true)
+        if printDiagnostics {
+            Task { @MainActor [weak self] in
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                self?.printDiagnostics()
+            }
         }
     }
 
-    private func printDiagnostics() {
-        let screenHeight = NSScreen.screens.first?.frame.height ?? 0
-        func topLeft(_ rect: NSRect) -> String {
-            "\(Int(rect.minX)) \(Int(screenHeight - rect.maxY)) \(Int(rect.width)) \(Int(rect.height))"
-        }
-        let title = statusItem.button?.attributedTitle.string ?? ""
-        print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil)")
-        if let frame = statusItem.button?.window?.frame {
-            print("STOX_DIAG status_frame=\(topLeft(frame))")
-        }
-        print("STOX_DIAG popover_shown=\(popover.isShown) content_size=\(Int(popover.contentSize.width))x\(Int(popover.contentSize.height))")
-        let popoverFrame = popover.contentViewController?.view.window?.frame
-        if let popoverFrame {
-            print("STOX_DIAG popover_frame=\(topLeft(popoverFrame))")
-        }
-        // 截图裁剪区域：菜单栏按钮与面板的并集。
-        let frames = [statusItem.button?.window?.frame, popoverFrame].compactMap { $0 }
-        if let first = frames.first {
-            print("STOX_DIAG capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
-        }
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) error=\(store.lastError ?? "none")")
-        fflush(stdout)
+    func closePanel() {
+        guard let panel, panel.isVisible else { return }
+        panel.orderOut(nil)
+        statusItem.button?.highlight(false)
+        router.panelDidClose()
     }
 
-    @objc private func refreshNow() {
-        store.restart()
+    func openSettings(_ page: SettingsPage?) {
+        closePanel()
+        SettingsWindowController.shared.show(page: page)
     }
 
-    @objc private func toggleTicker() {
-        settings.hideTicker.toggle()
+    private func makePanel() {
+        let actions = PanelActions(
+            openSettings: { [weak self] page in self?.openSettings(page) },
+            quit: { NSApp.terminate(nil) },
+            sizeChanged: { [weak self] size in self?.resizePanel(to: size) }
+        )
+        let root = PanelView(actions: actions)
+            .environmentObject(store)
+            .environmentObject(settings)
+            .environmentObject(router)
+            .environmentObject(updater)
+            .environmentObject(sync)
+        let hosting = NSHostingView(rootView: AnyView(root))
+        hostingView = hosting
+        let panel = PanelWindow(contentView: hosting)
+        panel.onClose = { [weak self] in self?.panelLostFocus() }
+        panel.onEscape = { [weak self] in self?.router.handleEscape() ?? false }
+        self.panel = panel
     }
 
-    @objc private func openSettings() {
-        showPanel(route: .settings)
+    private func panelLostFocus() {
+        guard let panel, panel.isVisible else { return }
+        lastAutoClose = Date()
+        closePanel()
     }
 
-    @objc private func quit() {
-        NSApp.terminate(nil)
+    private func resizePanel() {
+        guard let hostingView else { return }
+        resizePanel(to: hostingView.fittingSize)
+    }
+
+    /// 顶边不动，按内容尺寸调整窗口。
+    private func resizePanel(to size: CGSize) {
+        guard let panel, size.width > 0, size.height > 0 else { return }
+        let rounded = NSSize(width: ceil(size.width), height: ceil(size.height))
+        guard rounded != panel.frame.size else { return }
+        let origin = NSPoint(x: panel.frame.origin.x, y: panel.frame.maxY - rounded.height)
+        panel.setFrame(NSRect(origin: origin, size: rounded), display: true)
+    }
+
+    /// 放在菜单栏图标正下方，不超出屏幕。
+    private func position(_ panel: PanelWindow) {
+        guard let button = statusItem.button, let buttonWindow = button.window else { return }
+        let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let size = panel.frame.size
+        var origin = NSPoint(x: buttonRect.midX - size.width / 2, y: buttonRect.minY - size.height - 2)
+        if let screen = buttonWindow.screen ?? NSScreen.main {
+            let visible = screen.visibleFrame
+            origin.x = min(max(origin.x, visible.minX + 6), visible.maxX - size.width - 6)
+            origin.y = max(origin.y, visible.minY + 6)
+        }
+        panel.setFrameOrigin(origin)
     }
 
     // MARK: - 菜单栏文字
@@ -281,7 +202,7 @@ final class StatusItemController: NSObject {
                 }
                 let color: NSColor = part.role == .name
                     ? .labelColor
-                    : Theme.nsColor(for: part.direction, convention: settings.colorConvention)
+                    : Theme.tickerColor(for: part.direction, convention: settings.colorConvention)
                 title.append(NSAttributedString(string: part.text, attributes: [.font: font, .foregroundColor: color]))
             }
         }
@@ -310,11 +231,36 @@ final class StatusItemController: NSObject {
         image?.isTemplate = true
         return image
     }()
+
+    // MARK: - 诊断
+
+    /// CI 用：打印菜单栏文字和面板位置，方便检查和截图裁剪。
+    func printDiagnostics() {
+        let screenHeight = NSScreen.screens.first?.frame.height ?? 0
+        func topLeft(_ rect: NSRect) -> String {
+            "\(Int(rect.minX)) \(Int(screenHeight - rect.maxY)) \(Int(rect.width)) \(Int(rect.height))"
+        }
+        let title = statusItem.button?.attributedTitle.string ?? ""
+        print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil) color=\(settings.colorConvention.rawValue)")
+        let statusFrame = statusItem.button?.window?.frame
+        if let statusFrame {
+            print("STOX_DIAG status_frame=\(topLeft(statusFrame))")
+        }
+        let panelFrame = panel?.isVisible == true ? panel?.frame : nil
+        if let panelFrame {
+            print("STOX_DIAG panel_frame=\(topLeft(panelFrame))")
+        }
+        let frames = [statusFrame, panelFrame].compactMap { $0 }
+        if let first = frames.first {
+            print("STOX_DIAG capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
+        }
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) error=\(store.lastError ?? "none")")
+        fflush(stdout)
+    }
 }
 
 enum PanelRoute: Equatable {
     case list
-    case settings
     case edit(Symbol)
 }
 
@@ -394,8 +340,7 @@ final class PanelRouter: ObservableObject {
     }
 
     /// 回车要添加的证券：搜索结果已就绪时取第一条未添加的结果；
-    /// 还在防抖或请求中时，只有明确是代码的输入（含数字，或带 us/hk 前缀）才直接添加，
-    /// 纯字母可能是拼音缩写，要等搜索结果。
+    /// 还在防抖或请求中时，只有明确是代码的输入才直接添加，纯字母可能是拼音缩写，要等搜索结果。
     func submissionCandidate(excluding contains: (Symbol) -> Bool) -> SearchResult? {
         let query = trimmedQuery
         guard !query.isEmpty else { return nil }

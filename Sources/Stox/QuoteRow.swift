@@ -25,7 +25,10 @@ struct QuoteRow: View {
                     .frame(height: Self.detailHeight)
             }
         }
-        .background(hovering || expanded ? Color.primary.opacity(0.05) : Color.clear)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.primary.opacity(expanded ? 0.06 : (hovering ? 0.07 : 0)))
+        )
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture {
@@ -38,7 +41,7 @@ struct QuoteRow: View {
 
     private var direction: PriceDirection { quote?.direction ?? .flat }
 
-    private var color: Color { Theme.color(for: direction, convention: settings.colorConvention) }
+    private var color: Color { Theme.priceColor(for: direction, convention: settings.colorConvention) }
 
     private var summary: some View {
         HStack(spacing: 10) {
@@ -81,16 +84,16 @@ struct QuoteRow: View {
                 .lineLimit(1)
             Text(quote.map { QuoteFormatter.percent($0.changePercent) } ?? "--")
                 .font(.system(size: 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white)
+                .foregroundStyle(Theme.pillForeground(convention: settings.colorConvention))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(width: 70, height: 24)
                 .background(
-                    RoundedRectangle(cornerRadius: 5)
-                        .fill(Theme.pillColor(for: direction, convention: settings.colorConvention))
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Theme.pillBackground(for: direction, convention: settings.colorConvention))
                 )
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 10)
         .frame(height: Self.rowHeight)
     }
 
@@ -170,7 +173,7 @@ struct QuoteDetailView: View {
             .buttonStyle(.borderless)
             .font(.system(size: 11))
         }
-        .padding(.horizontal, 14)
+        .padding(.horizontal, 10)
         .padding(.vertical, 6)
     }
 

@@ -14,6 +14,8 @@ final class QuoteStore: ObservableObject {
 
     /// 价格提醒触发时回调（由 AppDelegate 转成系统通知）。
     var onAlert: ((AlertTrigger) -> Void)?
+    /// 自选列表保存之后调用（由 SyncManager 设置，用来同步到 iCloud）。
+    var onLocalEdit: (() -> Void)?
 
     let provider: QuoteProvider
     private let settings: SettingsStore
@@ -193,6 +195,21 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 用 iCloud 同步来的自选替换本机的。提醒条件变了的证券清掉当天的提醒记录。
+    func replaceWatchlist(_ newItems: [WatchItem]) {
+        guard newItems != items else { return }
+        let oldAlerts = Dictionary(items.map { ($0.symbol, $0.alert) }, uniquingKeysWith: { first, _ in first })
+        let symbols = Set(newItems.map(\.symbol))
+        items = newItems
+        quotes = quotes.filter { symbols.contains($0.key) }
+        for item in newItems where oldAlerts[item.symbol] != item.alert {
+            alertEngine.reset(item.symbol)
+        }
+        save()
+        saveAlertState()
+        restart()
+    }
+
     func search(_ query: String) async throws -> [SearchResult] {
         try await provider.search(query)
     }
@@ -226,6 +243,7 @@ final class QuoteStore: ObservableObject {
         if let data = Watchlist.encode(items) {
             defaults.set(data, forKey: Keys.watchlist)
         }
+        onLocalEdit?()
     }
 
     private func saveAlertState() {
