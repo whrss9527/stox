@@ -228,8 +228,20 @@ struct GeneralPage: View {
                     }
                 }
                 Section("快捷键") {
-                    Toggle("⌃⌥S 打开或关闭行情面板", isOn: $settings.hotKeyEnabled)
-                    FormNote("在任何 App 里都能用，不需要辅助功能权限。")
+                    Toggle("用快捷键打开或关闭行情面板", isOn: $settings.hotKeyEnabled)
+                    HStack {
+                        HotkeyRecorder(binding: $settings.toggleHotkey)
+                            .frame(width: 160, height: 28)
+                        Button("恢复 ⌃⌥S") { settings.toggleHotkey = .defaultToggle }
+                            .disabled(settings.toggleHotkey == .defaultToggle)
+                    }
+                    .disabled(!settings.hotKeyEnabled)
+                    if settings.hotKeyEnabled, settings.hotkeyUnavailable {
+                        Label("\(settings.toggleHotkey.display) 已经被其他程序占用，换一个组合试试", systemImage: "exclamationmark.triangle")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                    FormNote("点方框后按下新的组合键，至少包含 ⌃、⌥、⇧、⌘ 中的一个，按 Esc 取消。在任何 App 里都能用，不需要辅助功能权限。")
                 }
                 Section("启动") {
                     Toggle("登录时自动启动", isOn: launchAtLoginBinding)

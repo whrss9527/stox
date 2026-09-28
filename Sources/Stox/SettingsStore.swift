@@ -91,6 +91,16 @@ final class SettingsStore: ObservableObject {
     @Published var hotKeyEnabled: Bool {
         didSet { defaults.set(hotKeyEnabled, forKey: Keys.hotKeyEnabled) }
     }
+    /// 打开或关闭面板的全局快捷键，默认 ⌃⌥S。
+    @Published var toggleHotkey: HotkeyBinding {
+        didSet {
+            if let data = try? JSONEncoder().encode(toggleHotkey) {
+                defaults.set(data, forKey: Keys.toggleHotkey)
+            }
+        }
+    }
+    /// 快捷键已经被其他程序占用、没注册上。不保存，由 AppDelegate 在注册后设置。
+    @Published var hotkeyUnavailable = false
     @Published var autoCheckUpdates: Bool {
         didSet { defaults.set(autoCheckUpdates, forKey: Keys.autoCheckUpdates) }
     }
@@ -114,6 +124,8 @@ final class SettingsStore: ObservableObject {
         alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
         hideTicker = defaults.object(forKey: Keys.hideTicker) as? Bool ?? false
         hotKeyEnabled = defaults.object(forKey: Keys.hotKeyEnabled) as? Bool ?? true
+        toggleHotkey = defaults.data(forKey: Keys.toggleHotkey)
+            .flatMap { try? JSONDecoder().decode(HotkeyBinding.self, from: $0) } ?? .defaultToggle
         autoCheckUpdates = defaults.object(forKey: Keys.autoCheckUpdates) as? Bool ?? true
         syncEnabled = defaults.object(forKey: Keys.syncEnabled) as? Bool ?? false
         appearance = defaults.string(forKey: Keys.appearance).flatMap(AppearanceMode.init(rawValue:)) ?? .system
@@ -163,6 +175,7 @@ final class SettingsStore: ObservableObject {
         static let rotateTicker = "ticker.rotate"
         static let hideTicker = "ticker.hidden"
         static let hotKeyEnabled = "hotKeyEnabled"
+        static let toggleHotkey = "hotkey.toggle"
         static let alertsEnabled = "alertsEnabled"
         static let autoCheckUpdates = "update.autoCheck"
         static let syncEnabled = "sync.enabled"

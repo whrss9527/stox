@@ -35,4 +35,29 @@ for q in gzmt 600519 00700 aapl tsla nasdaq hsi "%E8%85%BE%E8%AE%AF" "%E7%BA%B3%
   fetch "tencent smartbox: ${q}" "${S}${q}" "UTF-8"
 done
 
+# 分时数据（面板里的分时图用）：返回很长，只打印总长度和开头、结尾各一段。
+fetch_head() {
+  local title="$1" url="$2"
+  echo "=================================================================="
+  echo "## ${title}"
+  echo "## ${url}"
+  if curl -sS -m 15 -A "$UA" -D /tmp/stox-headers.txt "$url" -o /tmp/stox-body.bin; then
+    grep -i -E "^(HTTP|content-type)" /tmp/stox-headers.txt
+    echo "bytes: $(wc -c < /tmp/stox-body.bin)"
+    head -c 1200 /tmp/stox-body.bin
+    echo
+    echo "... tail:"
+    tail -c 500 /tmp/stox-body.bin
+    echo
+  else
+    echo "!! request failed"
+  fi
+}
+
+M="https://web.ifzq.gtimg.cn/appstock/app/minute/query?code="
+for c in sh600519 sh000001 hk00700 hkHSI usAAPL.OQ usAAPL us.IXIC; do
+  fetch_head "tencent minute: ${c}" "${M}${c}"
+done
+fetch_head "tencent US minute: usAAPL.OQ" "https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code=usAAPL.OQ"
+
 fetch "sina quote (fallback candidate)" "https://hq.sinajs.cn/list=sh600519,hk00700,gb_aapl" "GB18030" "https://finance.sina.com.cn/"

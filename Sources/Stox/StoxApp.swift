@@ -56,9 +56,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.settings.autoCheckUpdates ?? false
         }
 
-        settings.$hotKeyEnabled
-            .removeDuplicates()
-            .sink { [weak self] enabled in self?.setHotKey(enabled: enabled) }
+        settings.$hotKeyEnabled.combineLatest(settings.$toggleHotkey)
+            .removeDuplicates { $0 == $1 }
+            .sink { [weak self] enabled, binding in self?.setHotKey(enabled: enabled, binding: binding) }
             .store(in: &cancellables)
 
         let workspace = NSWorkspace.shared.notificationCenter
@@ -95,12 +95,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 全局快捷键 ⌃⌥S：在任何 App 里一键打开或关闭面板。
-    private func setHotKey(enabled: Bool) {
+    /// 全局快捷键（默认 ⌃⌥S）：在任何 App 里一键打开或关闭面板。被其他程序占用时在设置里提示。
+    private func setHotKey(enabled: Bool, binding: HotkeyBinding) {
         hotKey = nil
-        guard enabled else { return }
-        hotKey = HotKey(keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(controlKey | optionKey)) { [weak self] in
+        guard enabled else {
+            settings.hotkeyUnavailable = false
+            return
+        }
+        hotKey = HotKey(keyCode: binding.keyCode, modifiers: binding.modifiers) { [weak self] in
             self?.statusController?.togglePanel()
+        }
+        settings.hotkeyUnavailable = hotKey == nil
+        if hotKey == nil {
+            Log.error("快捷键 \(binding.display) 注册失败，可能已被其他程序占用")
         }
     }
 
