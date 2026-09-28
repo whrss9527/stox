@@ -17,7 +17,8 @@ final class KlineTests: XCTestCase {
         let series = try XCTUnwrap(TencentKlineParser.parse(Data(json.utf8), symbol: Symbol("sz000001")!, period: .day))
         XCTAssertEqual(series.period, .day)
         XCTAssertEqual(series.candles.count, 3)
-        XCTAssertEqual(series.candles[1], Candle(date: "2026-09-24", open: 11.35, close: 11.30, high: 11.47, low: 11.29), "开 收 高 低的顺序")
+        XCTAssertEqual(series.candles[1], Candle(date: "2026-09-24", open: 11.35, close: 11.30, high: 11.47, low: 11.29, volume: 1_043_819),
+                       "开 收 高 低 成交量的顺序")
         XCTAssertEqual(series.candles[1].direction, .down)
         XCTAssertEqual(series.candles[2].direction, .up)
         XCTAssertNil(series.changePercent(at: 0), "第一根没有前一根")
@@ -51,7 +52,8 @@ final class KlineTests: XCTestCase {
         {"cqr":"2026-09-28","HGcontent":"回购22.70万股"},"0.170","677406.336"]],"fsStartDate":"","qt":{}}}}
         """#
         let series = try XCTUnwrap(TencentKlineParser.parse(Data(json.utf8), symbol: Symbol("hk00700")!, period: .month))
-        XCTAssertEqual(series.candles, [Candle(date: "2026-09-28", open: 441.4, close: 439.8, high: 447, low: 438.6)])
+        XCTAssertEqual(series.candles, [Candle(date: "2026-09-28", open: 441.4, close: 439.8, high: 447, low: 438.6, volume: 15_335_550)],
+                       "港股的成交量是股数，后面的回购信息不影响")
     }
 
     func testSkipsBrokenRows() throws {
@@ -214,6 +216,36 @@ final class ChartLayoutTests: XCTestCase {
         XCTAssertEqual(series.point(nearest: 119, region: .cn)?.price, 3, "11:30 在第 120 分钟")
         XCTAssertEqual(series.point(nearest: 200, region: .cn)?.price, 4, "还没到的时间取最新的点")
         XCTAssertNil(IntradaySeries(symbol: Symbol("sh600519")!, date: nil, points: []).point(nearest: 10, region: .cn))
+    }
+}
+
+final class VolumeTests: XCTestCase {
+    private let moutai = Symbol("sh600519")!
+
+    func testMergeKeepsTheFetchedVolume() throws {
+        let series = KlineSeries(symbol: moutai, period: .day, candles: [
+            Candle(date: "2026-09-25", open: 1230, close: 1237, high: 1240, low: 1228, volume: 30_000),
+            Candle(date: "2026-09-28", open: 1236, close: 1239, high: 1242, low: 1230, volume: 22_000),
+        ])
+        let timestamp = TencentQuoteParser.parseTimestamp("20260928150000", timeZone: MarketRegion.cn.timeZone)
+        let quote = Quote(symbol: moutai, name: "贵州茅台", price: 1243.88, previousClose: 1237, open: 1236, high: 1244.01,
+                          low: 1228.1, volume: 2_823_700, timestamp: timestamp)
+        let merged = series.merging(quote)
+        XCTAssertEqual(merged.candles.last?.close, 1243.88)
+        XCTAssertEqual(merged.candles.last?.volume, 22_000, "行情里的成交量单位不一样，沿用接口给的")
+
+        let nextDay = TencentQuoteParser.parseTimestamp("20260929100000", timeZone: MarketRegion.cn.timeZone)
+        var tomorrow = quote
+        tomorrow.timestamp = nextDay
+        let appended = series.merging(tomorrow)
+        XCTAssertEqual(appended.candles.count, 3)
+        XCTAssertNil(appended.candles.last?.volume, "新补的一根等下一次请求再画成交量")
+
+        let data = KlineChartData(series: appended)
+        XCTAssertEqual(data.maxVolume, 30_000)
+        XCTAssertNil(KlineChartData(series: KlineSeries(symbol: moutai, period: .day, candles: [
+            Candle(date: "2026-09-28", open: 1, close: 1, high: 1, low: 1),
+        ])).maxVolume)
     }
 }
 

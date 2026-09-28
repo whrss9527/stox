@@ -265,15 +265,20 @@ struct QuoteChartSection: View {
         guard let data = klineData, let index = hoveredCandle(in: data) else { return nil }
         let candle = data.candles[index]
         let date = data.period == .month ? String(candle.date.prefix(7)) : candle.date
-        var text = "\(date)  开 \(price(candle.open))  高 \(price(candle.high))  低 \(price(candle.low))  收 \(price(candle.close))"
+        var text = "\(date) 开\(price(candle.open)) 高\(price(candle.high)) 低\(price(candle.low)) 收\(price(candle.close))"
         if let change = data.changes[index] {
-            text += "  " + QuoteFormatter.percent(change)
+            text += " " + QuoteFormatter.percent(change)
+        }
+        // K 线接口里 A 股的成交量是手，港股、美股是股。
+        if let volume = candle.volume, volume > 0 {
+            text += " 量" + QuoteFormatter.largeNumber(volume) + (region == .cn ? "手" : "股")
         }
         return text
     }
 }
 
 /// K 线图：每根一个实体加上下影线，红涨绿跌跟着设置走。不显示红绿时阳线空心、阴线实心。
+/// 最下面四分之一淡淡地画着成交量柱。
 /// 画均线时上方留一行写 MA5、MA10、MA20 的值：鼠标指着时是那一根的，否则是最后一根的。
 struct KlineChart: View {
     static let legendHeight: CGFloat = 11
@@ -347,6 +352,18 @@ struct KlineChart: View {
             line.move(to: CGPoint(x: x, y: 0))
             line.addLine(to: CGPoint(x: x, y: size.height))
             context.stroke(line, with: .color(.secondary.opacity(0.7)), lineWidth: 0.6)
+        }
+
+        // 成交量柱画在最下面四分之一，淡一些，K 线压在上面。
+        if let maxVolume = data.maxVolume {
+            let band = size.height * 0.25
+            for (index, candle) in candles.enumerated() {
+                guard let volume = candle.volume, volume > 0 else { continue }
+                let height = max(CGFloat(volume / maxVolume) * band, 0.5)
+                let x = (CGFloat(layout.centerX(of: index)) * 2).rounded() / 2
+                let bar = CGRect(x: x - bodyWidth / 2, y: size.height - height, width: bodyWidth, height: height)
+                context.fill(Path(bar), with: .color(color(for: candle.direction).opacity(0.28)))
+            }
         }
 
         for (index, candle) in candles.enumerated() {
