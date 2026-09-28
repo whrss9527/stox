@@ -167,6 +167,9 @@ shape "tencent 5-day: hk00700" "https://web.ifzq.gtimg.cn/appstock/app/day/query
 shape "tencent 5-day: usAAPL (dayus)" "https://web.ifzq.gtimg.cn/appstock/app/dayus/query?code=usAAPL.OQ"
 shape "tencent 5-day: usAAPL (UsDay)" "https://web.ifzq.gtimg.cn/appstock/app/UsDay/query?code=usAAPL"
 
+# 分时能不能一次查多只（列表里的迷你走势用）。
+shape "tencent minute: two codes" "https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=sh600519,hk00700"
+
 # 新浪行情（腾讯不可用时的备用）：A 股、ETF、北交所、指数、港股、美股个股和美股指数的写法。
 fetch "sina quote (fallback)" 'https://hq.sinajs.cn/list=sh600519,sz000001,sh000001,sz399006,sh510300,bj920819,hk00700,hkHSI,gb_aapl,gb_brk.b,gb_brk$b,gb_ixic,gb_$ixic,gb_dji,gb_$dji,gb_inx,gb_$inx,sh999999' "GB18030" "https://finance.sina.com.cn/"
 fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030"
