@@ -4,6 +4,7 @@ import StoxCore
 // 命令行小工具：检查数据源、调试解析结果。
 //
 //   stox-cli quote sh600519 700 AAPL us.IXIC   解析并打印行情
+//   stox-cli sina sh600519 700 AAPL            用备用的新浪行情
 //   stox-cli raw sh600519 hk00700              打印接口原始返回
 //   stox-cli search 茅台                       搜索证券
 //   stox-cli kline sh600519 week               打印最近几根 K 线（day、week、month）
@@ -15,6 +16,7 @@ func printUsage() {
     print("""
     用法:
       stox-cli quote <代码>...    例如 stox-cli quote sh600519 700 AAPL us.IXIC
+      stox-cli sina <代码>...     用备用的新浪行情，格式同上
       stox-cli raw <代码>...      打印接口原始返回
       stox-cli search <关键词>    例如 stox-cli search gzmt
       stox-cli kline <代码> [day|week|month]   打印最近几根 K 线
@@ -47,9 +49,10 @@ let provider = TencentProvider()
 
 do {
     switch command {
-    case "quote":
+    case "quote", "sina":
         let symbols = parseSymbols(arguments.dropFirst())
-        let quotes = try await provider.fetchQuotes(for: symbols)
+        let source: QuoteProvider = command == "sina" ? SinaProvider() : provider
+        let quotes = try await source.fetchQuotes(for: symbols)
         var missing = 0
         for symbol in symbols {
             guard let q = quotes[symbol] else {

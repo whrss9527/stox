@@ -442,7 +442,7 @@ final class StatusItemController: NSObject {
         let kline = store.klines.values.map(\.candles.count).max() ?? 0
         print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
-        print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue)")
+        print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary")")
         print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }
@@ -466,6 +466,10 @@ final class PanelRouter: ObservableObject {
     @Published private(set) var searchResults: [SearchResult] = []
     /// searchResults 对应的查询词；输入后防抖期间两者不一致。
     private var resultsQuery = ""
+    /// 搜索结果的行情，只用来显示，不存进自选。
+    @Published private(set) var searchQuotes: [Symbol: Quote] = [:]
+    /// searchQuotes 对应的查询词。
+    private var searchQuotesQuery = ""
     @Published private(set) var isSearching = false
     @Published private(set) var searchError: String?
     /// 批量添加时查过行情、确认不存在的代码。
@@ -508,6 +512,8 @@ final class PanelRouter: ObservableObject {
         searchText = ""
         searchResults = []
         resultsQuery = ""
+        searchQuotes = [:]
+        searchQuotesQuery = ""
         searchError = nil
         isSearching = false
         batchMissing = []
@@ -582,6 +588,22 @@ final class PanelRouter: ObservableObject {
             searchError = error.localizedDescription
         }
         isSearching = false
+        await loadSearchQuotes(for: query, using: store)
+    }
+
+    /// 搜索结果出来后查一次它们的行情，每一条后面显示现价和涨跌幅；按代码直接添加的那条也能看出代码存不存在。
+    private func loadSearchQuotes(for query: String, using store: QuoteStore) async {
+        let symbols = searchResults.map(\.symbol)
+        guard !symbols.isEmpty else { return }
+        let quotes = try? await store.previewQuotes(for: symbols)
+        guard !Task.isCancelled, query == trimmedQuery else { return }
+        searchQuotes = quotes ?? [:]
+        searchQuotesQuery = quotes == nil ? "" : query
+    }
+
+    /// 这条搜索结果查过行情但是查不到：多半是不存在的代码。
+    func searchResultMissing(_ symbol: Symbol) -> Bool {
+        searchQuotesQuery == trimmedQuery && !searchQuotesQuery.isEmpty && searchQuotes[symbol] == nil
     }
 
     /// 回车要添加的证券：搜索结果已就绪时取第一条未添加的结果；

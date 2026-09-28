@@ -292,7 +292,9 @@ struct SearchResultsView: View {
                                 SearchResultRow(
                                     result: result,
                                     added: store.contains(result.symbol),
-                                    highlighted: highlighted == result.symbol
+                                    highlighted: highlighted == result.symbol,
+                                    quote: router.searchQuotes[result.symbol],
+                                    missing: router.searchResultMissing(result.symbol)
                                 ) {
                                     store.add(result.symbol, name: result.isDirect ? "" : result.name)
                                     router.clearSearch()
@@ -561,7 +563,13 @@ struct SearchResultRow: View {
     let added: Bool
     /// 回车会添加这一条（默认第一条，也可以用上下方向键选）。
     var highlighted = false
+    /// 这条结果的行情，查到了就在右边显示现价和涨跌幅。
+    var quote: Quote?
+    /// 查过行情但是查不到。
+    var missing = false
     let add: () -> Void
+
+    @EnvironmentObject private var settings: SettingsStore
 
     var body: some View {
         Button {
@@ -573,11 +581,21 @@ struct SearchResultRow: View {
                     Text(result.name)
                         .font(.system(size: 12.5, weight: .medium))
                         .lineLimit(1)
-                    Text(result.isDirect ? "按代码添加" : "\(result.symbol.displayCode) · \(result.typeLabel)")
+                    Text(subtitle)
                         .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(missing ? AnyShapeStyle(Color.orange) : AnyShapeStyle(.secondary))
                 }
                 Spacer()
+                if let quote, quote.price > 0 {
+                    VStack(alignment: .trailing, spacing: 1) {
+                        Text(QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))
+                            .font(.system(size: 12, weight: .medium).monospacedDigit())
+                        Text(QuoteFormatter.percent(quote.changePercent))
+                            .font(.system(size: 10).monospacedDigit())
+                    }
+                    .foregroundStyle(Theme.priceColor(for: quote.direction, convention: settings.colorConvention))
+                    .lineLimit(1)
+                }
                 if added {
                     Label("已添加", systemImage: "checkmark")
                         .font(.system(size: 11))
@@ -599,6 +617,11 @@ struct SearchResultRow: View {
         .buttonStyle(HoverRowStyle())
         .disabled(added)
     }
+
+    private var subtitle: String {
+        if missing { return result.isDirect ? "查不到这个代码的行情" : "\(result.symbol.displayCode) · 查不到行情" }
+        return result.isDirect ? "按代码添加" : "\(result.symbol.displayCode) · \(result.typeLabel)"
+    }
 }
 
 @MainActor
@@ -613,6 +636,7 @@ struct PanelFooter: View {
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .help(store.usingBackup ? "腾讯的行情接口暂时取不到，正在用新浪的行情；分时和 K 线要等腾讯恢复" : "")
             Spacer(minLength: 4)
             Menu {
                 Text("排序")
@@ -668,7 +692,8 @@ struct PanelFooter: View {
             ? "休市中每分钟刷新"
             : "每 \(Int(settings.refreshInterval)) 秒刷新"
         let order = settings.sortMode == .custom ? "拖动排序" : settings.sortMode.title
-        return "\(QuoteFormatter.time(updated)) 更新 · \(cadence) · \(order)"
+        let source = store.usingBackup ? "（新浪）" : ""
+        return "\(QuoteFormatter.time(updated)) 更新\(source) · \(cadence) · \(order)"
     }
 }
 

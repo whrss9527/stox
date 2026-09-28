@@ -30,6 +30,12 @@ final class QuoteStore: ObservableObject {
     var onLocalEdit: (() -> Void)?
 
     let provider: QuoteProvider
+    /// 腾讯的行情接口取不到时改用的备用数据源（新浪），只用来取实时行情。
+    private let backup: QuoteProvider?
+    /// 最近一次行情来自备用数据源。
+    @Published private(set) var usingBackup = false
+    /// 主数据源刚失败过：这个时间之前直接用备用的，免得每次刷新都先等主数据源超时。
+    private var primaryRetryAfter = Date.distantPast
     private let settings: SettingsStore
     private let defaults: UserDefaults
     private var alertEngine: AlertEngine
@@ -38,9 +44,15 @@ final class QuoteStore: ObservableObject {
     private var generation = 0
     private var cancellables = Set<AnyCancellable>()
 
-    init(settings: SettingsStore, provider: QuoteProvider = TencentProvider(), defaults: UserDefaults = .standard) {
+    init(
+        settings: SettingsStore,
+        provider: QuoteProvider = TencentProvider(),
+        backup: QuoteProvider? = SinaProvider(),
+        defaults: UserDefaults = .standard
+    ) {
         self.settings = settings
         self.provider = provider
+        self.backup = backup
         self.defaults = defaults
 
         if let data = defaults.data(forKey: Keys.watchlist), let saved = Watchlist.decode(data) {
@@ -116,14 +128,17 @@ final class QuoteStore: ObservableObject {
             if current == generation { isRefreshing = false }
         }
         do {
-            let result = try await provider.fetchQuotes(for: symbols)
+            let (result, source) = try await fetchQuotes(symbols)
             guard current == generation else { return }
             var merged = quotes.filter { symbols.contains($0.key) }
             merged.merge(result) { _, new in new }
             quotes = merged
             lastUpdated = Date()
             lastError = result.isEmpty ? "没有取到行情数据" : nil
-            cacheNames(from: result)
+            // 名称只从主数据源记：两家的叫法有细微差别，来回改会让 iCloud 同步个不停。
+            if source == .primary {
+                cacheNames(from: result)
+            }
             evaluateAlerts()
             await refreshRatesIfNeeded()
         } catch {
@@ -223,7 +238,7 @@ final class QuoteStore: ObservableObject {
     func addMany(_ symbols: [Symbol]) async throws -> [Symbol] {
         let wanted = symbols.filter { !contains($0) }
         guard !wanted.isEmpty else { return [] }
-        let result = try await provider.fetchQuotes(for: wanted)
+        let result = try await fetchQuotes(wanted).quotes
         var added = false
         for symbol in wanted where result[symbol] != nil && !contains(symbol) {
             items.append(WatchItem(symbol: symbol, name: result[symbol]?.name ?? ""))
@@ -294,6 +309,28 @@ final class QuoteStore: ObservableObject {
 
     func search(_ query: String) async throws -> [SearchResult] {
         try await provider.search(query)
+    }
+
+    /// 搜索结果的行情：只查不存，不影响自选。
+    func previewQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote] {
+        try await fetchQuotes(Array(symbols.prefix(30))).quotes
+    }
+
+    /// 取实时行情：先用腾讯，取不到时改用新浪。主数据源失败后两分钟内直接用备用的，之后再试主数据源。
+    private func fetchQuotes(_ symbols: [Symbol]) async throws -> (quotes: [Symbol: Quote], source: QuoteSource) {
+        let skipPrimary = Date() < primaryRetryAfter
+        let result = try await QuoteFailover.fetchQuotes(symbols, primary: provider, backup: backup, skipPrimary: skipPrimary)
+        let backupNow = result.source == .backup
+        if backupNow, !skipPrimary {
+            primaryRetryAfter = Date().addingTimeInterval(120)
+        } else if !backupNow {
+            primaryRetryAfter = .distantPast
+        }
+        if backupNow != usingBackup {
+            usingBackup = backupNow
+            Log.info(backupNow ? "腾讯行情取不到，改用新浪行情" : "腾讯行情恢复了")
+        }
+        return result
     }
 
     // MARK: - 内部
