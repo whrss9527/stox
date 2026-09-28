@@ -16,7 +16,7 @@ import Foundation
 /// | 35 | A 股为 `价格/成交量/成交额(元)`，美股为币种 |
 /// | 37 | 成交额（A 股单位为万元，港美股为元） |
 /// | 38 / 39 | 换手率% / 市盈率 |
-/// | 45 | 总市值（亿） |
+/// | 45 | 总市值（亿；指数为成分股总市值，不展示） |
 /// | 47 / 48 | 涨停价 / 跌停价（仅 A 股） |
 ///
 /// 无效代码不会出现在返回里。
@@ -67,20 +67,30 @@ public enum TencentQuoteParser {
 
         let region = symbol.market.region
         let isCN = region == .cn
+        let isIndex = symbol.isIndex
 
         var volume = number(6) ?? 0
-        if isCN { volume *= 100 }  // 手 → 股
-
         var amount: Double = 0
-        if isCN {
+        switch region {
+        case .cn:
+            volume *= 100  // 手 → 股
             let parts = fields[35].split(separator: "/")
             if parts.count == 3, let yuan = Double(parts[2]) {
                 amount = yuan
             } else {
                 amount = (number(37) ?? 0) * 10_000
             }
-        } else {
-            amount = number(37) ?? 0
+        case .hk:
+            if isIndex {
+                // 港股指数的第 6、37 位都是成交额（万港元），没有成交量。
+                volume = 0
+                amount = (number(37) ?? 0) * 10_000
+            } else {
+                amount = number(37) ?? 0
+            }
+        case .us:
+            // 美股指数的成交额字段数值不可靠，不展示。
+            amount = isIndex ? 0 : (number(37) ?? 0)
         }
 
         return Quote(
@@ -96,12 +106,12 @@ public enum TencentQuoteParser {
             volume: volume,
             amount: amount,
             turnoverRate: positive(38),
-            peRatio: symbol.isIndex ? nil : number(39).flatMap { $0 == 0 ? nil : $0 },
-            marketCap: positive(45).map { $0 * 100_000_000 },
+            peRatio: isIndex ? nil : number(39).flatMap { $0 == 0 ? nil : $0 },
+            marketCap: isIndex ? nil : positive(45).map { $0 * 100_000_000 },
             limitUp: isCN ? positive(47) : nil,
             limitDown: isCN ? positive(48) : nil,
             timestamp: parseTimestamp(fields[30], timeZone: region.timeZone),
-            priceDecimals: symbol.isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4])
+            priceDecimals: isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4])
         )
     }
 

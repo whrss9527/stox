@@ -39,6 +39,7 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(index.direction, .down)
         XCTAssertNil(index.peRatio)
         XCTAssertNil(index.limitUp)
+        XCTAssertNil(index.marketCap)
         XCTAssertEqual(index.amount, 678_213_668_263)
 
         let etf = try XCTUnwrap(quotes[Symbol("sh510300")!])
@@ -70,6 +71,11 @@ final class TencentQuoteParserTests: XCTestCase {
         let hsi = try XCTUnwrap(quotes[Symbol("hkHSI")!])
         XCTAssertEqual(hsi.name, "恒生指数")
         XCTAssertEqual(hsi.priceDecimals, 2)
+        XCTAssertEqual(hsi.volume, 0)
+        XCTAssertEqual(hsi.amount, 117_523_943_780, accuracy: 1)
+        XCTAssertEqual(QuoteFormatter.largeNumber(hsi.amount), "1175.24亿")
+        XCTAssertTrue(hsi.hasTraded)
+        XCTAssertNil(hsi.marketCap)
         XCTAssertEqual(QuoteFormatter.price(hsi.price, decimals: hsi.priceDecimals), "24643.59")
     }
 
@@ -89,6 +95,8 @@ final class TencentQuoteParserTests: XCTestCase {
         let ixic = try XCTUnwrap(quotes[Symbol("us.IXIC")!])
         XCTAssertEqual(ixic.name, "纳斯达克")
         XCTAssertEqual(ixic.price, 27068.72)
+        XCTAssertEqual(ixic.volume, 6_299_972_751)
+        XCTAssertEqual(ixic.amount, 0)
         XCTAssertNil(ixic.marketCap)
     }
 

@@ -46,7 +46,8 @@ public enum QuoteFormatter {
         return (value > 0 ? "+" : "") + fixed(value, decimals: decimals)
     }
 
-    static func fixed(_ value: Double, decimals: Int) -> String {
+    /// 固定小数位，不带正负号。
+    public static func fixed(_ value: Double, decimals: Int) -> String {
         String(format: "%.\(max(0, min(decimals, 6)))f", value)
     }
 }
