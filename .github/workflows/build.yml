@@ -137,4 +137,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/Stox.zip --title "Stox $GITHUB_REF_NAME" --generate-notes
+        # 安装说明放在前面，后面接 GitHub 自动生成的变更列表。
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/Stox.zip \
+            --title "Stox $GITHUB_REF_NAME" \
+            --notes-file .github/release-notes.md \
+            --generate-notes
