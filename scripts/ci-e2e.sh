@@ -166,7 +166,17 @@ update_test() {
  "assets":[{"name":"Stox.zip","size":$size,"browser_download_url":"http://127.0.0.1:8765/Stox.zip"},
            {"name":"SHA256SUMS.txt","size":80,"browser_download_url":"http://127.0.0.1:8765/SHA256SUMS.txt"}]}
 JSON
-  (cd "$feed" && python3 -m http.server 8765 --bind 127.0.0.1 > "$WORK/http.log" 2>&1 &)
+  # 不用 python3 -m http.server：它启动时会反查主机名，macOS 15 因此弹出“本地网络”授权框，挡住后面的截图。
+  FEED="$feed" python3 - > "$WORK/http.log" 2>&1 <<'PY' &
+import functools, http.server, os, socketserver
+
+class Server(socketserver.ThreadingTCPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+handler = functools.partial(http.server.SimpleHTTPRequestHandler, directory=os.environ["FEED"])
+Server(("127.0.0.1", 8765), handler).serve_forever()
+PY
   wait_for 15 curl -sf -o /dev/null http://127.0.0.1:8765/latest.json || fail "本地假发布没有启动"
   export STOX_UPDATE_URL=http://127.0.0.1:8765/latest.json
   defaults write "$DOMAIN" update.autoCheck -bool false
