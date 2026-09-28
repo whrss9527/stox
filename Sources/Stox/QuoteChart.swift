@@ -84,14 +84,16 @@ struct QuoteChartSection: View {
                 previousClose: quote.previousClose,
                 region: region,
                 color: Theme.priceColor(for: quote.direction, convention: settings.colorConvention),
-                hovered: hoveredPoint
+                hovered: hoveredPoint,
+                showAverage: settings.showMovingAverages
             )
         case .fiveDay:
             FiveDayChart(
                 series: fiveDaySeries,
                 region: region,
                 color: Theme.priceColor(for: fiveDayDirection, convention: settings.colorConvention),
-                hovered: hoveredFiveDay
+                hovered: hoveredFiveDay,
+                showAverage: settings.showMovingAverages
             )
         case .day, .week, .month:
             let data = klineData
@@ -176,8 +178,12 @@ struct QuoteChartSection: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”。
+    /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”；分时图上是最新的成交均价。
     private var summary: String? {
+        if settings.chartPeriod == .intraday {
+            guard settings.showMovingAverages, let average = intradaySeries?.latestAverage else { return nil }
+            return "均价 \(QuoteFormatter.price(average, decimals: quote.priceDecimals))"
+        }
         if settings.chartPeriod == .fiveDay {
             guard let series = fiveDaySeries, let last = fiveDayLast, let base = series.previousClose, base > 0 else { return nil }
             return "近 \(series.days.count) 日 \(QuoteFormatter.percent((last - base) / base * 100))"
@@ -208,6 +214,9 @@ struct QuoteChartSection: View {
             if let reference = series.dayPreviousCloses[day], reference > 0 {
                 text += "  " + QuoteFormatter.percent((point.price - reference) / reference * 100)
             }
+            if settings.showMovingAverages, let average = point.average {
+                text += "  均价 " + price(average)
+            }
             return text
         }
         if settings.chartPeriod.klinePeriod == nil {
@@ -215,6 +224,9 @@ struct QuoteChartSection: View {
             var text = String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60) + price(point.price)
             if quote.previousClose > 0 {
                 text += "  " + QuoteFormatter.percent((point.price - quote.previousClose) / quote.previousClose * 100)
+            }
+            if settings.showMovingAverages, let average = point.average {
+                text += "  均价 " + price(average)
             }
             return text
         }

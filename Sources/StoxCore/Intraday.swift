@@ -1,13 +1,16 @@
 import Foundation
 
-/// 分时走势里的一个点：交易所当地时间（自零点起的分钟数）和价格。
+/// 分时走势里的一个点：交易所当地时间（自零点起的分钟数）、价格和到这一分钟为止的成交均价。
 public struct IntradayPoint: Equatable, Sendable {
     public var minute: Int
     public var price: Double
+    /// 当天到这一分钟为止的成交均价；指数、算不出来时为 nil。
+    public var average: Double?
 
-    public init(minute: Int, price: Double) {
+    public init(minute: Int, price: Double, average: Double? = nil) {
         self.minute = minute
         self.price = price
+        self.average = average
     }
 }
 
@@ -26,6 +29,8 @@ public struct IntradaySeries: Equatable, Sendable {
 
     public var high: Double? { points.map(\.price).max() }
     public var low: Double? { points.map(\.price).min() }
+    /// 最新的成交均价。
+    public var latestAverage: Double? { points.last(where: { $0.average != nil })?.average }
 }
 
 /// 解析腾讯分时接口的返回。
@@ -34,7 +39,8 @@ public struct IntradaySeries: Equatable, Sendable {
 /// - 美股（含指数）：`https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code=usAAPL`
 ///
 /// 返回 `{"code":0,"data":{"sh600519":{"data":{"data":["0930 1236.00 349 43136400.00", …],"date":"20260928"}}}}`，
-/// 每条是“时刻 价格 累计成交量 [累计成交额]”，时刻是交易所当地时间。
+/// 每条是“时刻 价格 累计成交量 [累计成交额]”，时刻是交易所当地时间。A 股的成交量是手，港股是股，
+/// 美股只有累计成交量。
 public enum TencentMinuteParser {
     public static func parse(_ data: Data, symbol: Symbol) -> IntradaySeries? {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -43,9 +49,66 @@ public enum TencentMinuteParser {
               let series = entry["data"] as? [String: Any],
               let rows = series["data"] as? [String]
         else { return nil }
-        let points = rows.compactMap(point(from:))
+        let parsed = rows.compactMap(row(from:))
+        // 指数的成交量、成交额是成分股加起来的，没有均价。
+        let points = symbol.isIndex ? parsed.map(\.point) : addingAverages(parsed)
         let date = (series["date"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         return IntradaySeries(symbol: symbol, date: date, points: points)
+    }
+
+    /// 一条分时：点，以及到这一分钟为止的累计成交量和累计成交额（美股没有成交额）。
+    struct Row {
+        var point: IntradayPoint
+        var volume: Double?
+        var amount: Double?
+    }
+
+    static func row(from text: String) -> Row? {
+        guard let point = point(from: text) else { return nil }
+        let parts = text.split(separator: " ")
+        return Row(
+            point: point,
+            volume: parts.count > 2 ? Double(parts[2]) : nil,
+            amount: parts.count > 3 ? Double(parts[3]) : nil
+        )
+    }
+
+    /// 算每一分钟的成交均价：
+    /// - 有累计成交额时（A 股、港股）是成交额除以成交量。A 股的成交量是手、港股是股，
+    ///   看最后一条算出来的比值是价格的一百倍左右还是差不多，就知道要不要乘 100。
+    /// - 只有累计成交量时（美股）按每分钟新增的成交量给那一分钟的价格加权，是个近似。
+    /// 算出来明显不在当天价格范围里的（接口数据有问题）不要。
+    static func addingAverages(_ rows: [Row]) -> [IntradayPoint] {
+        let prices = rows.map(\.point.price)
+        guard let low = prices.min(), let high = prices.max() else { return [] }
+        func plausible(_ value: Double) -> Double? {
+            value.isFinite && value >= low * 0.9 && value <= high * 1.1 ? value : nil
+        }
+        if let reference = rows.last(where: { ($0.volume ?? 0) > 0 && ($0.amount ?? 0) > 0 }),
+           let volume = reference.volume, let amount = reference.amount {
+            let lot: Double = amount / volume / reference.point.price > 10 ? 100 : 1
+            return rows.map { row in
+                var point = row.point
+                if let volume = row.volume, volume > 0, let amount = row.amount, amount > 0 {
+                    point.average = plausible(amount / (volume * lot))
+                }
+                return point
+            }
+        }
+        var weighted = 0.0
+        var total = 0.0
+        var previous = 0.0
+        return rows.map { row in
+            var point = row.point
+            if let volume = row.volume {
+                let added = max(volume - previous, 0)
+                previous = max(previous, volume)
+                weighted += point.price * added
+                total += added
+                if total > 0 { point.average = plausible(weighted / total) }
+            }
+            return point
+        }
     }
 
     static func point(from row: String) -> IntradayPoint? {
@@ -159,7 +222,10 @@ public enum TencentMultiDayParser {
         for case let day as [String: Any] in list {
             guard let rows = day["data"] as? [String] else { continue }
             let date = (day["date"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            days.append(IntradaySeries(symbol: symbol, date: date, points: rows.compactMap(TencentMinuteParser.point(from:))))
+            // 每天的均价各算各的，和分时图一样指数没有。
+            let parsed = rows.compactMap(TencentMinuteParser.row(from:))
+            let points = symbol.isIndex ? parsed.map(\.point) : TencentMinuteParser.addingAverages(parsed)
+            days.append(IntradaySeries(symbol: symbol, date: date, points: points))
             closes.append((day["prec"] as? String).flatMap(Double.init).flatMap { $0 > 0 ? $0 : nil })
         }
         // 接口是最近的一天在前，画图要从早到晚。

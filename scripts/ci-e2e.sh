@@ -81,6 +81,8 @@ smoke() {
   grep -q 'image=false color=redUp' shots/panel.log || fail "默认应该在菜单栏显示行情、红涨绿跌"
   # 分时图的数据来自另一个接口，偶尔取不到不算失败，只提醒一下。
   grep -q "intraday=[1-9]" shots/detail.log || echo "::warning::展开详情时没有取到分时数据"
+  # 贵州茅台的分时每分钟都有成交额，应该算得出均价。
+  grep -q "avg=[1-9]" shots/detail.log || echo "::warning::分时图上没有均价"
   grep -q "settings_page=display" shots/settings-display.log || fail "设置窗口没有打开"
 
   # K 线：A 股日 K，美股月 K（美股个股要带交易所后缀才取得到完整的 K 线）。

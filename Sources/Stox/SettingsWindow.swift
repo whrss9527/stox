@@ -318,8 +318,8 @@ struct DisplayPage: View {
                 }
                 Section("行情面板") {
                     Toggle("价格变动时闪一下", isOn: $settings.flashOnChange)
-                    Toggle("K 线上画均线", isOn: $settings.showMovingAverages)
-                    FormNote("日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。")
+                    Toggle("画均线和均价线", isOn: $settings.showMovingAverages)
+                    FormNote("日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。分时图和五日图上画成交均价（橙色），指数没有。")
                     Toggle("美股盘前盘后价", isOn: $settings.showExtendedHours)
                     FormNote("美股个股不在常规交易时段时，代码旁边显示盘前或盘后的最新价相对收盘的涨跌，详情里有价格和成交时间。每只美股个股要多发一个请求。")
                 }
