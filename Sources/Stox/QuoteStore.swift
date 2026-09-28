@@ -11,6 +11,8 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var lastError: String?
     @Published private(set) var isRefreshing = false
+    /// 展开过的证券的分时走势。
+    @Published private(set) var intraday: [Symbol: IntradaySeries] = [:]
 
     /// 价格提醒触发时回调（由 AppDelegate 转成系统通知）。
     var onAlert: ((AlertTrigger) -> Void)?
@@ -125,6 +127,21 @@ final class QuoteStore: ObservableObject {
         return RefreshPolicy.interval(base: settings.refreshInterval, phases: phases, slowWhenIdle: settings.slowWhenIdle)
     }
 
+    /// 展开某只证券时调用：先取一次分时，之后交易时段内每分钟刷新，休市时十分钟一次，直到收起（任务被取消）。
+    func trackIntraday(_ symbol: Symbol) async {
+        while !Task.isCancelled {
+            do {
+                if let series = try await provider.fetchIntraday(for: symbol) {
+                    intraday[symbol] = series
+                }
+            } catch {
+                // 分时只是锦上添花，失败时保留上一次的，下一轮再试。
+            }
+            let live = phase(for: symbol.market.region).isLive
+            try? await Task.sleep(nanoseconds: (live ? 60 : 600) * 1_000_000_000)
+        }
+    }
+
     // MARK: - 市场状态
 
     /// 自选里出现过的市场，按 A 股、港股、美股排序。
@@ -178,6 +195,7 @@ final class QuoteStore: ObservableObject {
     func remove(_ symbol: Symbol) {
         items.removeAll { $0.symbol == symbol }
         quotes[symbol] = nil
+        intraday[symbol] = nil
         alertEngine.reset(symbol)
         save()
         saveAlertState()

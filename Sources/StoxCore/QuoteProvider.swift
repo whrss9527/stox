@@ -6,6 +6,12 @@ import FoundationNetworking
 public protocol QuoteProvider: Sendable {
     func fetchQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote]
     func search(_ query: String) async throws -> [SearchResult]
+    /// 当天的分时走势；数据源不支持时返回 nil。
+    func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries?
+}
+
+extension QuoteProvider {
+    public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? { nil }
 }
 
 public enum ProviderError: Error, LocalizedError, Equatable {
@@ -38,6 +44,15 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
 
     public static func quoteURL(for symbols: [Symbol]) -> URL? {
         URL(string: quoteEndpoint + symbols.map(\.rawValue).joined(separator: ","))
+    }
+
+    public static let minuteEndpoint = "https://web.ifzq.gtimg.cn/appstock/app/minute/query?code="
+    public static let usMinuteEndpoint = "https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code="
+
+    /// 分时接口：美股（含指数）用单独的地址。
+    public static func minuteURL(for symbol: Symbol) -> URL? {
+        let endpoint = symbol.market.region == .us ? usMinuteEndpoint : minuteEndpoint
+        return URL(string: endpoint + symbol.rawValue)
     }
 
     public static func searchURL(for query: String) -> URL? {
@@ -78,6 +93,11 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
         guard !trimmed.isEmpty else { return [] }
         guard let url = Self.searchURL(for: trimmed) else { throw URLError(.badURL) }
         return TencentSearchParser.parse(Self.decodeText(try await get(url)))
+    }
+
+    public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? {
+        guard let url = Self.minuteURL(for: symbol) else { throw URLError(.badURL) }
+        return TencentMinuteParser.parse(try await get(url), symbol: symbol)
     }
 
     private func fetchBatch(_ symbols: [Symbol]) async throws -> [Symbol: Quote] {

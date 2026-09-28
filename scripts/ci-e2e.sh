@@ -78,6 +78,8 @@ smoke() {
   run_case settings-display --show-settings display
   grep -q "panel_frame=" shots/panel.log || fail "面板没有打开"
   grep -q 'image=false color=redUp' shots/panel.log || fail "默认应该在菜单栏显示行情、红涨绿跌"
+  # 分时图的数据来自另一个接口，偶尔取不到不算失败，只提醒一下。
+  grep -q "intraday=[1-9]" shots/detail.log || echo "::warning::展开详情时没有取到分时数据"
   grep -q "settings_page=display" shots/settings-display.log || fail "设置窗口没有打开"
 
   # 右键单击切换的“只显示图标”：菜单栏只剩图标，左键照样能打开面板。
