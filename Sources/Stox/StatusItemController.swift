@@ -156,8 +156,10 @@ final class StatusItemController: NSObject {
 
     /// 顶边不动，按内容尺寸调整窗口。屏幕放不下时先把列表压矮，面板永远不盖住菜单栏。
     private func resizePanel(to size: CGSize) {
-        guard let panel, size.width > 0, size.height > 0 else { return }
+        guard size.width > 0, size.height > 0 else { return }
+        // 先记下来：第一次量到尺寸时面板窗口可能还没建好，打开面板时要用到。
         contentSize = size
+        guard let panel else { return }
         var height = ceil(size.height)
         if let available = availableHeight(), height > available {
             let minimum = QuoteRow.rowHeight * 2
@@ -282,7 +284,7 @@ final class StatusItemController: NSObject {
         }
         let panelFrame = panel?.isVisible == true ? panel?.frame : nil
         if let panelFrame {
-            print("STOX_DIAG panel_frame=\(topLeft(panelFrame))")
+            print("STOX_DIAG panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) list_max=\(Int(router.listMaxHeight))")
         }
         let frames = [statusFrame, panelFrame].compactMap { $0 }
         if let first = frames.first {

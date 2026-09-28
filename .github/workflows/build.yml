@@ -120,7 +120,7 @@ jobs:
         if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
         run: |
-          grep -h "status_title\|footprint" shots/panel.log shots/panel-memory.log shots/hidden.log shots/sync-panel.log 2>/dev/null | head -9 | while read -r line; do
+          grep -h "status_title\|footprint\|panel_frame" shots/panel.log shots/panel-memory.log shots/tips.log shots/holdings.log 2>/dev/null | head -9 | while read -r line; do
             echo "::notice title=diag::$line"
           done
       - name: Screenshot annotations (1)
