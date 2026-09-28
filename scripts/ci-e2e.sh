@@ -198,7 +198,21 @@ smoke() {
   run_case settings-dark --show-settings display
   defaults delete "$DOMAIN" appearance
   grep -q "panel_frame=" shots/panel-dark.log || fail "深色模式下面板没有打开"
+
+  # 自选删空了：空列表里有“添加常用指数”。
+  write_watchlist '[]'
+  run_case empty --show-panel
+  grep -q "items=0 " shots/empty.log || fail "自选应该是空的"
   defaults delete "$DOMAIN" watchlist.v1
+
+  # 美股盘前盘后价：常规交易时段里不取也不显示；其他时候默认自选里的苹果应该取得到，取不到只提醒一下。
+  late=$(grep -m1 "STOX_DIAG late us_phase=" shots/panel.log || true)
+  [[ -n "$late" ]] || fail "没有打印美股的时段和盘前盘后价"
+  if [[ "$late" == *"us_phase=trading "* ]]; then
+    [[ "$late" == *" extended=0 "* ]] || fail "美股常规交易时段里不应该有盘前盘后价：$late"
+  elif [[ "$late" == *" extended=0 "* ]]; then
+    echo "::warning::美股不在常规交易时段，但没有取到盘前盘后价：$late"
+  fi
 }
 
 sync_test() {

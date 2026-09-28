@@ -300,3 +300,10 @@ final class TableTests: XCTestCase {
         XCTAssertEqual(Portfolio.tableText(items: Array(items.prefix(1)), quotes: quotes), "", "没有持仓时是空的")
     }
 }
+
+final class CommonIndicesTests: XCTestCase {
+    func testCommonIndices() {
+        XCTAssertEqual(Watchlist.commonIndices.map(\.symbol.rawValue), ["sh000001", "sz399001", "sz399006", "hkHSI", "us.IXIC"])
+        XCTAssertEqual(Watchlist.commonIndices.first?.pinned, true, "上证照旧显示在菜单栏")
+    }
+}

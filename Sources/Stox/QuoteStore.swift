@@ -17,6 +17,10 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var klines: [KlineKey: KlineSeries] = [:]
     /// 看过的五日分时。
     @Published private(set) var fiveDay: [Symbol: MultiDaySeries] = [:]
+    /// 美股个股盘前盘后的最新成交。美股常规交易时段里是空的。
+    @Published private(set) var extendedHours: [Symbol: ExtendedHoursQuote] = [:]
+    /// 上一次取盘前盘后价的时间和当时取的是哪几只。
+    private var extendedHoursFetched: (date: Date, symbols: Set<Symbol>) = (.distantPast, [])
 
     /// 港币、美元兑人民币的汇率。持仓有两种以上货币时才去取，用来折合成人民币。
     @Published private(set) var rates: ExchangeRates?
@@ -146,6 +150,7 @@ final class QuoteStore: ObservableObject {
             evaluateAlerts()
             checkCloseSummaries()
             await refreshRatesIfNeeded()
+            await refreshExtendedHoursIfNeeded()
         } catch {
             guard current == generation else { return }
             lastError = error.localizedDescription
@@ -164,6 +169,52 @@ final class QuoteStore: ObservableObject {
         } catch {
             ratesFetched = Date().addingTimeInterval(-540)
         }
+    }
+
+    /// 美股不在常规交易时取自选里美股个股的盘前盘后价，每只一个请求：盘前盘后至少隔 15 秒取一次，
+    /// 休市时价格不会再变，半小时一次；自选里多了美股个股时马上取。常规交易时段里清空，也不去取。
+    private func refreshExtendedHoursIfNeeded() async {
+        let symbols = items.map(\.symbol).filter { $0.market.region == .us && !$0.isIndex }
+        let usPhase = self.phase(for: .us)
+        guard !symbols.isEmpty, usPhase != .trading, usPhase != .lunchBreak else {
+            if !extendedHours.isEmpty { extendedHours = [:] }
+            extendedHoursFetched = (.distantPast, [])
+            return
+        }
+        let wanted = Set(symbols)
+        let interval: TimeInterval = usPhase.isLive ? max(settings.refreshInterval, 15) : 1800
+        guard !wanted.isSubset(of: extendedHoursFetched.symbols)
+            || Date().timeIntervalSince(extendedHoursFetched.date) >= interval
+        else { return }
+        extendedHoursFetched = (Date(), wanted)
+        let provider = self.provider
+        let requests = symbols.map { ($0, quotes[$0]?.exchangeCode) }
+        // 每只的结果：取到了（可能是没有盘前盘后成交）或者请求失败。
+        let results = await withTaskGroup(of: (Symbol, ExtendedHoursQuote?, Bool).self) { group in
+            for (symbol, code) in requests {
+                group.addTask {
+                    do {
+                        let value = try await provider.fetchExtendedHours(for: symbol, exchangeCode: code)
+                        return (symbol, value, true)
+                    } catch {
+                        return (symbol, nil, false)
+                    }
+                }
+            }
+            var all: [(Symbol, ExtendedHoursQuote?, Bool)] = []
+            for await result in group { all.append(result) }
+            return all
+        }
+        // 取的时候进了常规交易，就不要这次的结果了。
+        let phaseNow = self.phase(for: .us)
+        guard phaseNow != .trading, phaseNow != .lunchBreak else { return }
+        let current = Set(items.map(\.symbol))
+        var updated = extendedHours.filter { current.contains($0.key) }
+        for (symbol, value, ok) in results where ok && current.contains(symbol) {
+            // 请求失败时保留上一次的，下一轮再试。
+            updated[symbol] = value
+        }
+        if updated != extendedHours { extendedHours = updated }
     }
 
     /// 当前实际的刷新间隔：所有关注的市场都休市时会放宽到每分钟一次。
@@ -255,6 +306,15 @@ final class QuoteStore: ObservableObject {
         restart()
     }
 
+    /// 一次加几只已知的（比如常用指数），已经在自选里的跳过。
+    func add(_ newItems: [WatchItem]) {
+        let fresh = newItems.filter { !contains($0.symbol) }
+        guard !fresh.isEmpty else { return }
+        items.append(contentsOf: fresh)
+        save()
+        restart()
+    }
+
     /// 批量添加：先查一次行情，只添加查得到的代码，名称也一并取回。返回查不到（不存在）的代码。
     func addMany(_ symbols: [Symbol]) async throws -> [Symbol] {
         let wanted = symbols.filter { !contains($0) }
@@ -279,6 +339,7 @@ final class QuoteStore: ObservableObject {
         intraday[symbol] = nil
         klines = klines.filter { $0.key.symbol != symbol }
         fiveDay[symbol] = nil
+        extendedHours[symbol] = nil
         alertEngine.reset(symbol)
         save()
         saveAlertState()
@@ -324,6 +385,7 @@ final class QuoteStore: ObservableObject {
         let symbols = Set(newItems.map(\.symbol))
         items = newItems
         quotes = quotes.filter { symbols.contains($0.key) }
+        extendedHours = extendedHours.filter { symbols.contains($0.key) }
         for item in newItems where oldAlerts[item.symbol] != item.alert {
             alertEngine.reset(item.symbol)
         }

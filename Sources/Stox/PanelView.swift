@@ -202,9 +202,14 @@ struct WatchlistView: View {
                     Text("还没有自选，在上面的搜索框里添加")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
+                    Button("添加常用指数") {
+                        store.add(Watchlist.commonIndices)
+                    }
+                    .controlSize(.small)
+                    .help(Watchlist.commonIndices.map(\.name).joined(separator: "、"))
                 }
                 .frame(maxWidth: .infinity)
-                .frame(height: 140)
+                .frame(height: 160)
             } else {
                 let filters = WatchlistFilter.available(for: store.items)
                 let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
@@ -449,32 +454,46 @@ struct BatchAddView: View {
 @MainActor
 struct TipsCards: View {
     @EnvironmentObject private var settings: SettingsStore
+    /// 这个版本更新了什么（从发布说明里取的“更新内容”），取不到时只显示版本号。
+    @State private var whatsNewNotes: String?
 
     var body: some View {
         if let version = settings.whatsNewVersion {
-            HStack(spacing: 10) {
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 16))
-                    .foregroundStyle(Color.accentColor)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("已更新到 \(version)")
-                        .font(.system(size: 12, weight: .semibold))
-                    Text("自选和设置都还在")
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 4)
-                Button("看看更新了什么") {
-                    if let url = URL(string: "https://github.com/\(UpdateCheck.repository)/releases/tag/v\(version)") {
-                        NSWorkspace.shared.open(url)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(Color.accentColor)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("已更新到 \(version)")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("自选和设置都还在")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.secondary)
                     }
-                    settings.whatsNewVersion = nil
+                    Spacer(minLength: 4)
+                    Button("看看更新了什么") {
+                        if let url = URL(string: "https://github.com/\(UpdateCheck.repository)/releases/tag/v\(version)") {
+                            NSWorkspace.shared.open(url)
+                        }
+                        settings.whatsNewVersion = nil
+                    }
+                    .controlSize(.small)
+                    closeButton { settings.whatsNewVersion = nil }
                 }
-                .controlSize(.small)
-                closeButton { settings.whatsNewVersion = nil }
+                if let whatsNewNotes {
+                    Text(ReleaseNotes.attributed(whatsNewNotes))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(10)
             .glassCard()
+            .task(id: version) {
+                whatsNewNotes = await Self.loadNotes(version)
+            }
         }
         if !settings.tipsDismissed {
             VStack(alignment: .leading, spacing: 6) {
@@ -495,6 +514,26 @@ struct TipsCards: View {
             .padding(10)
             .glassCard()
         }
+    }
+
+    /// 发布说明里“更新内容”的前几条。
+    private static func loadNotes(_ version: String) async -> String? {
+        let release: ReleaseInfo
+        do {
+            release = try await UpdateCheck.release(version: version, currentVersion: AppInfo.version)
+        } catch {
+            Log.info("取 \(version) 的更新内容失败：\(error.localizedDescription)")
+            print("STOX_DIAG whatsnew=failed \(error)")
+            fflush(stdout)
+            return nil
+        }
+        let lines = release.highlights
+            .split(separator: "\n")
+            .map(String.init)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+        print("STOX_DIAG whatsnew=\(lines.count) lines")
+        fflush(stdout)
+        return lines.isEmpty ? nil : lines.prefix(4).joined(separator: "\n")
     }
 
     private func tip(_ text: String) -> some View {
@@ -769,6 +808,7 @@ struct PanelFooter: View {
         if let copiedMessage {
             return copiedMessage
         }
+        if store.items.isEmpty { return "还没有自选" }
         guard let updated = store.lastUpdated else { return "正在获取行情…" }
         let cadence = store.effectiveInterval > settings.refreshInterval
             ? "休市中每分钟刷新"

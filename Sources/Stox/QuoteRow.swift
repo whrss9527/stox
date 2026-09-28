@@ -56,6 +56,11 @@ struct QuoteRow: View {
 
     private var direction: PriceDirection { quote?.direction ?? .flat }
 
+    /// 美股个股不在常规交易时显示的盘前盘后价。
+    private var extended: ExtendedQuote? {
+        quote.flatMap { ExtendedQuote(store.extendedHours[item.symbol], quote: $0) }
+    }
+
     /// 色块里的文字：涨跌幅、涨跌额或者总市值（指数没有市值）。
     private var pillText: String {
         guard let quote else { return "--" }
@@ -106,6 +111,14 @@ struct QuoteRow: View {
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 3)
                             .background(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.4)))
+                    }
+                    if let extended {
+                        // 美股盘前盘后：标签加涨跌幅，价格放在提示和详情里。
+                        Text("\(extended.label) \(QuoteFormatter.percent(extended.percent))")
+                            .font(.system(size: 9.5).monospacedDigit())
+                            .foregroundStyle(Theme.priceColor(for: PriceDirection(extended.change), convention: settings.colorConvention))
+                            .lineLimit(1)
+                            .help(extended.helpText)
                     }
                 }
             }
@@ -174,6 +187,9 @@ struct QuoteRow: View {
         }
         if let position {
             text += "，持仓盈亏 \(QuoteFormatter.signedMoney(position.totalProfit))"
+        }
+        if let extended {
+            text += "，\(extended.label) \(extended.priceText)，\(QuoteFormatter.percent(extended.percent))"
         }
         return text
     }
@@ -299,8 +315,10 @@ struct QuoteDetailView: View {
             }
             HStack(spacing: 10) {
                 Text(timeText)
-                    .font(.system(size: 10))
+                    .font(.system(size: 10).monospacedDigit())
                     .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 Spacer()
                 Button(item.symbol.isIndex ? "提醒" : "持仓与提醒") { router.route = .edit(item.symbol) }
                 Button("雪球") {
@@ -344,9 +362,49 @@ struct QuoteDetailView: View {
 
     private var timeText: String {
         let region = item.symbol.market.region
+        // 美股不在常规交易时，这一行换成盘前盘后价和它的成交时间；行情时间这时总是收盘那一刻，不用再写。
+        if let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
+            var text = "\(extended.label) \(extended.priceText) \(QuoteFormatter.percent(extended.percent))"
+            if let time = extended.timeText { text += " · 美东 \(time)" }
+            return text
+        }
         guard let timestamp = quote.timestamp else { return "" }
         var text = "\(region.displayName)时间 \(QuoteFormatter.time(timestamp, timeZone: region.timeZone))"
         if region == .hk { text += " · 延时约 15 分钟" }
+        return text
+    }
+}
+
+/// 列表和详情里显示的美股盘前盘后价：标签、价格和相对收盘的涨跌。没有数据、和行情对不上时为 nil。
+struct ExtendedQuote {
+    let label: String
+    let price: Double
+    let change: Double
+    let percent: Double
+    let decimals: Int
+    let time: Date?
+
+    init?(_ extended: ExtendedHoursQuote?, quote: Quote) {
+        guard let extended, let change = extended.change(from: quote) else { return nil }
+        label = extended.session.displayName
+        price = extended.price
+        self.change = change.change
+        percent = change.percent
+        decimals = quote.priceDecimals
+        time = extended.time
+    }
+
+    var priceText: String { QuoteFormatter.price(price, decimals: decimals) }
+
+    /// 成交时间，美东时间的时和分。
+    var timeText: String? {
+        time.map { String(QuoteFormatter.time($0, timeZone: MarketRegion.us.timeZone).prefix(5)) }
+    }
+
+    /// 鼠标停在标签上时的说明：价格、相对收盘的涨跌和成交时间。
+    var helpText: String {
+        var text = "\(label) \(priceText)，相对收盘 \(QuoteFormatter.percent(percent))"
+        if let timeText { text += "，美东时间 \(timeText)" }
         return text
     }
 }

@@ -133,5 +133,7 @@ final class ReleaseNotesTests: XCTestCase {
         XCTAssertEqual(ReleaseNotesText.highlights("修复了一些问题"), "修复了一些问题", "没有标题的说明原样显示")
         let release = ReleaseInfo(version: "0.13.0", tag: "v0.13.0", pageURL: URL(string: "https://github.com")!, notes: "## 更新内容\n- 筛选")
         XCTAssertEqual(release.highlights, "- 筛选")
+        XCTAssertEqual(UpdateCheck.releaseURL(version: "0.16.0")?.absoluteString,
+                       "https://api.github.com/repos/whrss9527/stox/releases/tags/v0.16.0")
     }
 }

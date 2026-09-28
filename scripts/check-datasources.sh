@@ -138,6 +138,8 @@ PY
 }
 pandata "tencent usfqkline pandata: usAAPL.OQ" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL.OQ,day,,,2,qfq"
 pandata "tencent US minute keys: usAAPL" "https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code=usAAPL"
+fetch "tencent usfqkline pandata raw: usAAPL.OQ,1" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL.OQ,day,,,1,qfq" "UTF-8"
+fetch "tencent usfqkline pandata raw: usTSLA.OQ,1" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usTSLA.OQ,day,,,1,qfq" "UTF-8"
 fetch "sina fx (fallback candidate)" "https://hq.sinajs.cn/list=fx_susdcny,fx_shkdcny,fx_susdhkd" "GB18030" "https://finance.sina.com.cn/"
 
 # 五日分时：打印返回的结构（各层的键、列表长度），找每天的分时在哪里。
