@@ -72,4 +72,61 @@ for c in usAAPL.OQ usBRK.B.N us.IXIC us.DJI us.INX usAAPL; do
   minute "tencent US minute: ${c}" "${U}${c}"
 done
 
+# 美股盘前盘后：逐个字段打印美股行情，找盘前盘后价格在哪几位；再看 K 线接口里的 pandata。
+fields() {
+  local title="$1" url="$2"
+  echo "=================================================================="
+  echo "## ${title}"
+  echo "## ${url}"
+  if curl -sS -m 15 -A "$UA" "$url" -o /tmp/stox-body.bin; then
+    python3 - /tmp/stox-body.bin <<'PY'
+import re, sys
+text = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
+for key, payload in re.findall(r'v_([^=]+)="([^"]*)"', text):
+    parts = payload.split("~")
+    print(f"{key}: {len(parts)} fields")
+    print("  " + "  ".join(f"[{i}]{v}" for i, v in enumerate(parts) if v not in ("", "0", "0.00", "0.000")))
+if "v_" not in text:
+    print(text[:500])
+PY
+  else
+    echo "!! request failed"
+  fi
+}
+fields "tencent quote fields: US" "https://qt.gtimg.cn/utf8/q=usAAPL,usTSLA,usNVDA"
+fields "tencent quote fields: FX guesses" "https://qt.gtimg.cn/utf8/q=whUSDCNY,whHKDCNY,whUSDHKD,fxUSDCNY,USDCNY"
+fetch "tencent smartbox: usdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=usdcny" "UTF-8"
+fetch "tencent smartbox: hkdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=hkdcny" "UTF-8"
+pandata() {
+  local title="$1" url="$2"
+  echo "=================================================================="
+  echo "## ${title}"
+  echo "## ${url}"
+  if curl -sS -m 15 -A "$UA" "$url" -o /tmp/stox-body.bin; then
+    python3 - /tmp/stox-body.bin <<'PY'
+import json, sys
+raw = open(sys.argv[1], "rb").read()
+try:
+    body = json.loads(raw)
+except Exception as error:
+    print("not json:", error, raw[:300]); sys.exit(0)
+for key, value in (body.get("data") or {}).items():
+    if not isinstance(value, dict):
+        continue
+    print(f"key={key} fields={sorted(value.keys())}")
+    for name in ("pandata", "prec", "mx_price", "version"):
+        if name in value:
+            print(f"  {name}: {json.dumps(value[name], ensure_ascii=False)[:600]}")
+    data = value.get("data")
+    if isinstance(data, dict):
+        print("  data fields:", sorted(data.keys()))
+PY
+  else
+    echo "!! request failed"
+  fi
+}
+pandata "tencent usfqkline pandata: usAAPL.OQ" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL.OQ,day,,,2,qfq"
+pandata "tencent US minute keys: usAAPL" "https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code=usAAPL"
+fetch "sina fx (fallback candidate)" "https://hq.sinajs.cn/list=fx_susdcny,fx_shkdcny,fx_susdhkd" "GB18030" "https://finance.sina.com.cn/"
+
 fetch "sina quote (fallback candidate)" "https://hq.sinajs.cn/list=sh600519,hk00700,gb_aapl" "GB18030" "https://finance.sina.com.cn/"
