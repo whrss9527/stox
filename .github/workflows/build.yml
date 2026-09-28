@@ -12,9 +12,10 @@ on:
         required: false
         default: ""
 
+# 同一分支上新的推送会取消还在跑的旧构建；手动发布单独一组，不会被合并时的推送构建取消。
 concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.event_name == 'workflow_dispatch' && format('release-{0}', inputs.release_tag) || format('build-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 jobs:
   core:
