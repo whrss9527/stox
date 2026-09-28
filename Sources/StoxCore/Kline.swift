@@ -55,9 +55,11 @@ public struct KlineSeries: Equatable, Sendable {
         guard day >= last.date else { return self }
 
         var result = self
+        // 新的一天要等开盘（有了开盘价）才补一根；美股盘前已经有成交量，但常规交易还没开始。
+        let opened = quote.open > 0
         switch period {
         case .day:
-            guard quote.hasTraded else { return self }
+            guard quote.hasTraded, day == last.date || opened else { return self }
             let today = Candle(
                 date: day,
                 open: quote.open > 0 ? quote.open : quote.price,
@@ -73,7 +75,9 @@ public struct KlineSeries: Equatable, Sendable {
         case .week, .month:
             guard quote.hasTraded else { return self }
             let unit: Calendar.Component = period == .week ? .weekOfYear : .month
-            if KlineCalendar.isSame(unit, day, last.date, region: region) {
+            let samePeriod = KlineCalendar.isSame(unit, day, last.date, region: region)
+            guard samePeriod || opened else { return self }
+            if samePeriod {
                 var updated = last
                 updated.date = day
                 updated.close = quote.price

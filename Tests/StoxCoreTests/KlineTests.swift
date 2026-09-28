@@ -124,6 +124,10 @@ final class KlineTests: XCTestCase {
         // 开盘前还没有成交：不补。
         let early = old.merging(quote(moutai, price: 1237, open: 0, high: 0, low: 0, volume: 0, time: "20260928091500"))
         XCTAssertEqual(early, old)
+        // 美股盘前：有成交量但还没有开盘价，不补今天这一根。
+        let apple = series(.day, [Candle(date: "2026-09-25", open: 336.04, close: 341.07, high: 341.67, low: 334.53)], symbol: Symbol("usAAPL")!)
+        let premarket = apple.merging(quote(Symbol("usAAPL")!, price: 341.07, open: 0, high: 0, low: 0, volume: 1200, time: "2026-09-28 08:30:00"))
+        XCTAssertEqual(premarket, apple)
         // 行情比 K 线还旧：不动。
         let stale = old.merging(quote(moutai, price: 1200, open: 1210, high: 1220, low: 1190, time: "20260924150000"))
         XCTAssertEqual(stale, old)
