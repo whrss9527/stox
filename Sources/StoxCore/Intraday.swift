@@ -88,3 +88,13 @@ public enum IntradayAxis {
         return elapsed
     }
 }
+
+extension IntradaySeries {
+    /// 横轴上离 offset（0 到 IntradayAxis.length）最近的点，鼠标悬停时用。
+    public func point(nearest offset: Double, region: MarketRegion) -> IntradayPoint? {
+        points.min { lhs, rhs in
+            abs(Double(IntradayAxis.offset(of: lhs.minute, region: region)) - offset)
+                < abs(Double(IntradayAxis.offset(of: rhs.minute, region: region)) - offset)
+        }
+    }
+}

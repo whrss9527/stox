@@ -87,8 +87,11 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// 打开面板。后三个参数用于调试和 CI 截图：展开某一行、预填搜索词、打印诊断信息。
-    func openPanel(route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil, printDiagnostics: Bool = false) {
+    /// 打开面板。后几个参数用于调试和 CI 截图：展开某一行、预填搜索词、模拟按键、打印诊断信息。
+    func openPanel(
+        route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil, keys: [PanelKey] = [],
+        printDiagnostics: Bool = false
+    ) {
         if panel == nil {
             makePanel()
         }
@@ -104,10 +107,19 @@ final class StatusItemController: NSObject {
         panel.orderFrontRegardless()
         panel.makeKey()
         statusItem.button?.highlight(true)
-        if printDiagnostics {
+        if printDiagnostics || !keys.isEmpty {
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
-                self?.printDiagnostics()
+                // 预填了搜索词时，等搜索结果回来再按键。
+                for _ in 0..<50 where search != nil {
+                    guard let router = self?.router, router.searchResults.isEmpty || router.isSearching else { break }
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+                if !keys.isEmpty {
+                    await self?.simulate(keys)
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                }
+                if printDiagnostics { self?.printDiagnostics() }
             }
         }
     }
@@ -150,7 +162,62 @@ final class StatusItemController: NSObject {
         panel.onResignKey = { [weak self] in self?.panelLostFocus() }
         panel.onClose = { [weak self] in self?.closePanel() }
         panel.onEscape = { [weak self] in self?.router.handleEscape() ?? false }
+        panel.onNavigate = { [weak self] key in self?.handleNavigation(key) ?? false }
         self.panel = panel
+    }
+
+    /// 键盘操作：搜索时上下选择搜索结果、回车添加；没在搜索时上下选择自选、回车展开或收起，
+    /// 展开着的时候左右切换分时和日 K、周 K、月 K。返回 false 的键照常交给搜索框。
+    private func handleNavigation(_ key: PanelKey) -> Bool {
+        guard router.route == .list else { return false }
+        if !router.trimmedQuery.isEmpty {
+            guard router.batch == nil else { return false }
+            // 已经添加过的跳过，选中的总是回车能添加的。
+            let symbols = router.searchResults.map(\.symbol).filter { !store.contains($0) }
+            switch key {
+            case .up, .down:
+                guard !symbols.isEmpty else { return false }
+                let start = router.defaultSearchHighlight(excluding: { store.contains($0) })
+                router.moveHighlight(by: key == .down ? 1 : -1, in: symbols, from: start)
+                return true
+            case .enter:
+                // 还没用方向键选过：交给搜索框，照旧添加第一条。
+                guard let symbol = router.highlighted, !store.contains(symbol),
+                      let result = router.searchResults.first(where: { $0.symbol == symbol })
+                else { return false }
+                store.add(symbol, name: result.isDirect ? "" : result.name)
+                router.clearSearch()
+                return true
+            case .left, .right:
+                return false
+            }
+        }
+        let symbols = settings.sortMode.apply(store.items, quotes: store.quotes).map(\.symbol)
+        switch key {
+        case .up, .down:
+            guard !symbols.isEmpty else { return false }
+            router.moveHighlight(by: key == .down ? 1 : -1, in: symbols, from: router.expanded)
+            return true
+        case .enter:
+            guard let symbol = router.highlighted, symbols.contains(symbol) else { return false }
+            withAnimation(.easeInOut(duration: 0.15)) {
+                router.toggleExpanded(symbol)
+            }
+            return true
+        case .left, .right:
+            guard router.expanded != nil else { return false }
+            settings.chartPeriod = settings.chartPeriod.moved(by: key == .right ? 1 : -1)
+            return true
+        }
+    }
+
+    /// CI 用：把一串按键依次发给面板，和真的按键走同一条路。
+    private func simulate(_ keys: [PanelKey]) async {
+        for key in keys {
+            guard let panel, let event = key.event(for: panel) else { continue }
+            panel.sendEvent(event)
+            try? await Task.sleep(nanoseconds: 300_000_000)
+        }
     }
 
     private func panelLostFocus() {
@@ -372,7 +439,9 @@ final class StatusItemController: NSObject {
         }
         let holdings = store.items.filter { $0.holding != nil }.count
         let intraday = store.intraday.values.map(\.points.count).max() ?? 0
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) error=\(store.lastError ?? "none")")
+        let kline = store.klines.values.map(\.candles.count).max() ?? 0
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) intraday=\(intraday) kline=\(kline) error=\(store.lastError ?? "none")")
+        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }
 }
@@ -390,6 +459,8 @@ final class PanelRouter: ObservableObject {
     /// 自选列表的最大高度。屏幕矮、放不下整个面板时由 StatusItemController 调低，每次打开面板时恢复。
     @Published var listMaxHeight = WatchlistView.defaultMaxHeight
     @Published var expanded: Symbol?
+    /// 键盘上下方向键选中的那一只：搜索时是搜索结果里的，否则是自选列表里的。
+    @Published var highlighted: Symbol?
     @Published private(set) var searchResults: [SearchResult] = []
     /// searchResults 对应的查询词；输入后防抖期间两者不一致。
     private var resultsQuery = ""
@@ -425,11 +496,13 @@ final class PanelRouter: ObservableObject {
     /// 每次关闭都回到干净的列表页，下次一键打开看到的就是行情。
     func panelDidClose() {
         expanded = nil
+        highlighted = nil
         route = .list
         clearSearch()
     }
 
     func clearSearch() {
+        highlighted = nil
         searchText = ""
         searchResults = []
         resultsQuery = ""
@@ -462,9 +535,26 @@ final class PanelRouter: ObservableObject {
         expanded = expanded == symbol ? nil : symbol
     }
 
+    /// 搜索结果里回车会添加的那一条：第一条还没添加的。键盘还没选时高亮它。
+    func defaultSearchHighlight(excluding contains: (Symbol) -> Bool) -> Symbol? {
+        guard resultsQuery == trimmedQuery else { return nil }
+        return searchResults.first { !contains($0.symbol) }?.symbol
+    }
+
+    /// 上下方向键：在 symbols 里移动选中的那一只，到头了停住。还没选时从 start 算起，start 也没有就从头或尾开始。
+    func moveHighlight(by step: Int, in symbols: [Symbol], from start: Symbol?) {
+        guard !symbols.isEmpty else { return }
+        if let current = (highlighted ?? start).flatMap({ symbols.firstIndex(of: $0) }) {
+            highlighted = symbols[min(max(current + step, 0), symbols.count - 1)]
+        } else {
+            highlighted = step > 0 ? symbols[0] : symbols[symbols.count - 1]
+        }
+    }
+
     /// 由 `.task(id: searchText)` 调用：输入变化时上一次搜索会被取消，相当于 250ms 防抖。
     func runSearch(using store: QuoteStore) async {
         let query = trimmedQuery
+        highlighted = nil
         batchMissing = []
         batchError = nil
         // 粘贴了多个代码：不用搜索接口，由批量添加处理。
