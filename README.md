@@ -32,7 +32,7 @@
 
 ### 方式一：下载构建好的 App
 
-1. 打开仓库的 [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) 页面，进入最近一次成功的构建，下载 `Stox-app`；打 tag 发布后也可以在 Releases 里下载 `Stox.zip`。
+1. 在仓库的 [Releases](https://github.com/whrss9527/stox/releases) 页面下载最新版本的 `Stox.zip`。想试用未发布的最新代码，可以在 [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) 页面最近一次成功的构建里下载 `Stox-app`。
 2. 解压后把 `Stox.app` 拖进“应用程序”文件夹。
 3. App 使用临时签名（没有 Apple 开发者证书），第一次打开会被系统拦截。任选一种方式放行：
    - 在终端执行 `xattr -dr com.apple.quarantine /Applications/Stox.app`，然后正常打开；
@@ -115,5 +115,16 @@ dist/Stox.app/Contents/MacOS/Stox --show-settings                 # 设置页
 ```
 
 CI 会在 macOS 上启动打包好的 App，确认启动不崩溃，并把面板截图作为构建产物上传。
+
+## 发布新版本
+
+两种方式都会由 CI 编译通用版 App，并把 `Stox.zip` 连同安装说明发布到 Releases：
+
+- 在 Actions 页面选择 build 工作流，点 Run workflow，填写版本号，例如 `v0.2.0`。CI 会在当前 `main` 上创建同名标签。
+- 或者在本地推送一个 `v` 开头的标签：
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
 
 设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。
