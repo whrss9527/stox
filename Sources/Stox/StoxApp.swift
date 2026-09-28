@@ -51,13 +51,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         workspace.addObserver(self, selector: #selector(systemWillSleep), name: NSWorkspace.willSleepNotification, object: nil)
         workspace.addObserver(self, selector: #selector(systemDidWake), name: NSWorkspace.didWakeNotification, object: nil)
 
-        // 调试与 CI 截图用：`Stox --show-panel` / `Stox --show-settings` 启动后直接打开面板。
+        // 调试与 CI 截图用：启动后直接打开面板并打印诊断信息。
+        //   Stox --show-panel [--expand sh600519] [--search 腾讯]
+        //   Stox --show-settings
         let arguments = ProcessInfo.processInfo.arguments
         if arguments.contains("--show-panel") || arguments.contains("--show-settings") {
+            func value(after flag: String) -> String? {
+                guard let index = arguments.firstIndex(of: flag), index + 1 < arguments.count else { return nil }
+                return arguments[index + 1]
+            }
             let route: PanelRoute = arguments.contains("--show-settings") ? .settings : .list
+            let expand = value(after: "--expand").flatMap { Symbol($0) }
+            let search = value(after: "--search")
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 4_000_000_000)
-                self?.statusController?.showPanel(route: route, printDiagnostics: true)
+                self?.statusController?.showPanel(route: route, expand: expand, search: search, printDiagnostics: true)
             }
         }
     }

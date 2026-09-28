@@ -190,9 +190,12 @@ final class StatusItemController: NSObject {
         showPanel(route: .list)
     }
 
-    /// 打开面板并切到指定页面。printDiagnostics 用于 CI：打印菜单栏文字和面板位置，方便检查和截图。
-    func showPanel(route: PanelRoute, printDiagnostics: Bool = false) {
+    /// 打开面板并切到指定页面。后三个参数用于调试和 CI 截图：展开某一行、预填搜索词、打印诊断信息。
+    func showPanel(route: PanelRoute, expand: Symbol? = nil, search: String? = nil, printDiagnostics: Bool = false) {
+        // 先切页面再打开，避免先闪一下列表页。
         router.route = route
+        if let expand { router.expanded = expand }
+        if let search { router.searchText = search }
         showPopover()
         guard printDiagnostics else { return }
         Task { @MainActor [weak self] in

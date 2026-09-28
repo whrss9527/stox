@@ -116,7 +116,10 @@ swift run stox-cli raw hk00700
 调试界面时，可以让 App 启动后直接打开面板，并在终端打印菜单栏文字和面板位置：
 
 ```bash
-dist/Stox.app/Contents/MacOS/Stox --show-panel      # 或 --show-settings
+dist/Stox.app/Contents/MacOS/Stox --show-panel                    # 自选列表
+dist/Stox.app/Contents/MacOS/Stox --show-panel --expand sh600519  # 展开某只证券的详情
+dist/Stox.app/Contents/MacOS/Stox --show-panel --search 腾讯       # 预填搜索词
+dist/Stox.app/Contents/MacOS/Stox --show-settings                 # 设置页
 ```
 
 CI 会在 macOS 上启动打包好的 App，确认启动不崩溃，并把面板截图作为构建产物上传。
