@@ -40,6 +40,15 @@ public enum QuoteFormatter {
         return (value > 0 ? "+" : "") + money(value)
     }
 
+    /// 菜单栏里的金额，越短越好：100 以内两位小数，1 万以内取整，更大的用万、亿：`12.90`、`688`、`1.20万`。
+    public static func compactMoney(_ value: Double) -> String {
+        let magnitude = abs(value)
+        if magnitude >= 1e8 { return fixed(value / 1e8, decimals: 2) + "亿" }
+        if magnitude >= 1e4 { return fixed(value / 1e4, decimals: 2) + "万" }
+        if magnitude >= 100 { return fixed(value, decimals: 0) }
+        return fixed(value, decimals: 2)
+    }
+
     /// 不带多余零的数字，用于股数和输入框里的价格：`100`、`2.5`、`1234.5678`，最多 4 位小数。
     public static func plain(_ value: Double) -> String {
         if value == value.rounded() { return String(format: "%.0f", value) }

@@ -3,10 +3,21 @@ import AppKit
 /// 无边框、不激活程序的浮动面板：像菜单一样出现在菜单栏图标下面，点到别处或按 Esc 时关闭。
 /// 不激活程序，所以打开面板不会抢走正在使用的 App 的焦点。
 final class PanelWindow: NSPanel {
-    /// 失去焦点（点到别处）或者按 Esc 时调用。
+    /// 失去焦点（点到别处）时调用。钉住时由调用方决定不关闭。
+    var onResignKey: (() -> Void)?
+    /// 按 Esc 并且面板内部没有处理时调用，钉住时也关闭。
     var onClose: (() -> Void)?
     /// 按 Esc 时先交给面板处理（清空搜索、返回列表）；返回 true 表示已处理，不关闭面板。
     var onEscape: (() -> Bool)?
+
+    /// 钉住：可以拖动，浮在普通窗口上面但不挡菜单；没钉住时像菜单一样在最上层。
+    var pinned = false {
+        didSet {
+            isMovable = pinned
+            isMovableByWindowBackground = pinned
+            level = pinned ? .floating : .popUpMenu
+        }
+    }
 
     init(contentView: NSView) {
         super.init(
@@ -32,7 +43,7 @@ final class PanelWindow: NSPanel {
 
     override func resignKey() {
         super.resignKey()
-        onClose?()
+        onResignKey?()
     }
 
     override func cancelOperation(_ sender: Any?) {
