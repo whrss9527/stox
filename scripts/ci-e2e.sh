@@ -144,11 +144,18 @@ smoke() {
     {"symbol":"hk00700","name":"腾讯控股","holding":{"shares":200,"cost":380}},
     {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'
   defaults write "$DOMAIN" ticker.dayProfit -bool true
+  defaults write "$DOMAIN" alerts.closeSummary -bool true
   run_case holdings --show-panel --expand sh600519
   defaults delete "$DOMAIN" ticker.dayProfit
+  defaults delete "$DOMAIN" alerts.closeSummary
+  # 编辑页：持仓、记一笔买卖、止盈止损。
+  run_case editor --show-panel --edit sh600519
+  grep -q "panel_frame=" shots/editor.log || fail "编辑页没有打开"
   grep -Eq "items=5 quotes=[0-9]+ holdings=4" shots/holdings.log || fail "持仓没有读出来"
   # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来。
   grep -Eq "alerts=[1-9]" shots/holdings.log || fail "持仓盈利达到阈值时没有提醒"
+  # 打开了收盘小结：收盘不到 16 小时的市场各发一条。CI 运行的时间不固定，发没发取决于这时哪个市场刚收盘，只提示不判失败。
+  grep -Eq "summaries=[1-9]" shots/holdings.log || echo "::warning::这次没有发收盘小结（可能没有刚收盘的市场）"
   grep -q 'status_title="上证 .* 今日 ' shots/holdings.log || fail "菜单栏没有显示今日盈亏"
   # 人民币、港币、美元都有持仓：取汇率折成人民币，列表上方多一行合计，菜单栏只显示一个数。
   if grep -q "rates=USDCNY:" shots/holdings.log; then

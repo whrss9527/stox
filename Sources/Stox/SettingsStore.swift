@@ -148,6 +148,10 @@ final class SettingsStore: ObservableObject {
     }
 
     // 只和这台 Mac 有关，不同步
+    /// 有持仓的市场收盘后发一条今日盈亏小结。不同步，免得几台 Mac 各发一遍。
+    @Published var closeSummary: Bool {
+        didSet { defaults.set(closeSummary, forKey: Keys.closeSummary) }
+    }
     /// 菜单栏只显示图标（右键单击菜单栏图标切换）。
     @Published var hideTicker: Bool {
         didSet { defaults.set(hideTicker, forKey: Keys.hideTicker) }
@@ -234,6 +238,7 @@ final class SettingsStore: ObservableObject {
         showPercent = defaults.object(forKey: Keys.showPercent) as? Bool ?? true
         rotateTicker = defaults.object(forKey: Keys.rotateTicker) as? Bool ?? false
         alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
+        closeSummary = defaults.object(forKey: Keys.closeSummary) as? Bool ?? false
         hideTicker = defaults.object(forKey: Keys.hideTicker) as? Bool ?? false
         hotKeyEnabled = defaults.object(forKey: Keys.hotKeyEnabled) as? Bool ?? true
         toggleHotkey = defaults.data(forKey: Keys.toggleHotkey)
@@ -305,6 +310,7 @@ final class SettingsStore: ObservableObject {
         static let hotKeyEnabled = "hotKeyEnabled"
         static let toggleHotkey = "hotkey.toggle"
         static let alertsEnabled = "alertsEnabled"
+        static let closeSummary = "alerts.closeSummary"
         static let autoCheckUpdates = "update.autoCheck"
         static let syncEnabled = "sync.enabled"
         static let appearance = "appearance"

@@ -28,6 +28,8 @@ final class QuoteStore: ObservableObject {
 
     /// 价格提醒触发时回调（由 AppDelegate 转成系统通知）。
     var onAlert: ((AlertTrigger) -> Void)?
+    /// 收盘小结要发的时候回调（由 AppDelegate 转成系统通知）。
+    var onCloseSummary: ((CloseSummaryNote) -> Void)?
     /// 自选列表保存之后调用（由 SyncManager 设置，用来同步到 iCloud）。
     var onLocalEdit: (() -> Void)?
 
@@ -142,6 +144,7 @@ final class QuoteStore: ObservableObject {
                 cacheNames(from: result)
             }
             evaluateAlerts()
+            checkCloseSummaries()
             await refreshRatesIfNeeded()
         } catch {
             guard current == generation else { return }
@@ -372,8 +375,26 @@ final class QuoteStore: ObservableObject {
         }
     }
 
-    /// 这次运行发出的提醒条数，CI 的诊断信息里用。
+    /// 这次运行发出的提醒条数和收盘小结条数，CI 的诊断信息里用。
     private(set) var firedAlertCount = 0
+    private(set) var closeSummaryCount = 0
+
+    /// 有持仓的市场收盘后发一条今日盈亏小结，每个市场每个交易日一次。
+    private func checkCloseSummaries() {
+        guard settings.closeSummary else { return }
+        for summary in Portfolio.summaries(items: items, quotes: quotes) {
+            let region = summary.region
+            let latest = quotes.values.filter { $0.symbol.market.region == region }.compactMap(\.timestamp).max()
+            let key = Keys.closeSummaryPrefix + region.rawValue
+            guard let note = CloseSummary.due(
+                region: region, phase: phase(for: region), summary: summary,
+                latestQuoteTime: latest, now: Date(), lastSentDay: defaults.string(forKey: key)
+            ) else { continue }
+            defaults.set(note.day, forKey: key)
+            closeSummaryCount += 1
+            onCloseSummary?(note)
+        }
+    }
 
     private func evaluateAlerts() {
         guard settings.alertsEnabled else { return }
@@ -400,6 +421,7 @@ final class QuoteStore: ObservableObject {
     private enum Keys {
         static let watchlist = "watchlist.v1"
         static let alertState = "alerts.fired.v1"
+        static let closeSummaryPrefix = "alerts.closeSummary.sent."
     }
 }
 

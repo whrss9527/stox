@@ -20,6 +20,10 @@ struct StockEditorPanel: View {
     @State private var shares = ""
     @State private var cost = ""
     @State private var note = ""
+    @State private var tradeShares = ""
+    @State private var tradePrice = ""
+    /// 刚记了一笔买卖：说明算出来的新持仓，保存后才生效。
+    @State private var tradeMessage: String?
     @State private var loaded = false
 
     var body: some View {
@@ -60,10 +64,17 @@ struct StockEditorPanel: View {
                             .font(.system(size: 12.5, weight: .semibold))
                         numberField("持有数量", text: $shares, unit: "股", placeholder: "没有持仓")
                         numberField("成本价", text: $cost, unit: currency, placeholder: "每股成本", allowZero: true)
+                        tradeRow
                         Text(holdingFooter)
                             .font(.system(size: 11))
                             .foregroundStyle(holdingState == .invalid ? Color.orange : Color.secondary)
                             .fixedSize(horizontal: false, vertical: true)
+                        if let tradeMessage {
+                            Text(tradeMessage)
+                                .font(.system(size: 11))
+                                .foregroundStyle(Color.accentColor)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     .padding(12)
                     .glassCard()
@@ -135,6 +146,90 @@ struct StockEditorPanel: View {
         }
         .padding(10)
         .glassCard(prominent: true)
+    }
+
+    /// 记一笔买卖：买入按加权平均重新算成本，卖出只减数量。价格不填时按现价。
+    private var tradeRow: some View {
+        HStack(spacing: 6) {
+            Text("记一笔")
+                .font(.system(size: 12.5))
+            Spacer(minLength: 4)
+            TextField("", text: $tradeShares, prompt: Text("数量"))
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 64)
+            Text("股")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField("", text: $tradePrice, prompt: Text(currentPriceText ?? "价格"))
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 72)
+            Button("买入", action: buy)
+                .disabled(tradeAmount == nil || tradeUnitPrice == nil || holdingState == .invalid)
+            Button("卖出", action: sell)
+                .disabled(tradeAmount == nil || !canSell)
+        }
+        .controlSize(.small)
+        .help("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量。记完检查一下，点保存才生效")
+    }
+
+    private var currentPriceText: String? {
+        store.quotes[symbol].map { QuoteFormatter.plain($0.price) }
+    }
+
+    private var tradeAmount: Double? {
+        if case .value(let value) = parse(tradeShares) { return value }
+        return nil
+    }
+
+    /// 成交价：填了用填的，没填用现价。
+    private var tradeUnitPrice: Double? {
+        switch parse(tradePrice, allowZero: true) {
+        case .value(let value): return value
+        case .empty: return store.quotes[symbol]?.price
+        case .invalid: return nil
+        }
+    }
+
+    private var canSell: Bool {
+        guard case .valid(let holding) = holdingState, let amount = tradeAmount else { return false }
+        return holding.selling(shares: amount) != nil
+    }
+
+    private func buy() {
+        guard let amount = tradeAmount, let price = tradeUnitPrice else { return }
+        let updated: Holding
+        switch holdingState {
+        case .valid(let holding):
+            guard let bought = holding.buying(shares: amount, at: price) else { return }
+            updated = bought
+        case .none:
+            updated = Holding(shares: amount, cost: price)
+        case .invalid:
+            return
+        }
+        shares = QuoteFormatter.plain(updated.shares)
+        cost = QuoteFormatter.plain(updated.cost)
+        tradeMessage = "买入 \(QuoteFormatter.plain(amount)) 股 @ \(QuoteFormatter.plain(price))：持有 \(shares) 股，成本 \(cost)。点保存生效"
+        tradeShares = ""
+        tradePrice = ""
+    }
+
+    private func sell() {
+        guard case .valid(let holding) = holdingState, let amount = tradeAmount,
+              let remaining = holding.selling(shares: amount)
+        else { return }
+        if remaining.isValid {
+            shares = QuoteFormatter.plain(remaining.shares)
+            tradeMessage = "卖出 \(QuoteFormatter.plain(amount)) 股：还剩 \(shares) 股，成本不变。点保存生效"
+        } else {
+            shares = ""
+            cost = ""
+            tradeMessage = "全部卖出，保存后清掉持仓"
+        }
+        tradeShares = ""
+        tradePrice = ""
     }
 
     private var item: WatchItem? { store.item(for: symbol) }

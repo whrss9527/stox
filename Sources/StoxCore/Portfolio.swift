@@ -16,6 +16,19 @@ public struct Holding: Codable, Hashable, Sendable {
     }
 
     public var costValue: Double { shares * cost }
+
+    /// 买入一笔：数量相加，成本价按加权平均重新算（摊薄或摊高）。
+    public func buying(shares extra: Double, at price: Double) -> Holding? {
+        guard isValid, extra > 0, price >= 0, extra.isFinite, price.isFinite else { return nil }
+        let total = shares + extra
+        return Holding(shares: total, cost: (costValue + extra * price) / total)
+    }
+
+    /// 卖出一笔：成本价不变，数量减少。卖得比持有的还多时返回 nil；全部卖出时数量为 0，由调用方清掉持仓。
+    public func selling(shares sold: Double) -> Holding? {
+        guard isValid, sold > 0, sold.isFinite, sold <= shares + 1e-9 else { return nil }
+        return Holding(shares: max(shares - sold, 0), cost: cost)
+    }
 }
 
 /// 按现价算出的持仓盈亏。
@@ -105,5 +118,47 @@ extension MarketRegion {
         case .hk: return "HK$"
         case .us: return "$"
         }
+    }
+}
+
+/// 收盘后发的今日盈亏小结。
+public struct CloseSummaryNote: Equatable, Sendable {
+    public var region: MarketRegion
+    /// 交易日，`2026-09-28`，用来记住今天发过了。
+    public var day: String
+    public var title: String
+    public var body: String
+}
+
+public enum CloseSummary {
+    /// 收盘后多久以内还补发：晚上才打开 Mac 也能收到，但第二天早上开盘前就不再发前一天的了。
+    public static let window: TimeInterval = 16 * 3600
+
+    /// 这个市场已经收盘（休市，或者美股进入盘后）、有持仓，最近一个交易日的收盘还不到 16 小时，
+    /// 并且这个交易日还没发过时，返回要发的小结。开盘前、午休不发；节假日最新行情是好几天前的，也不发。
+    public static func due(
+        region: MarketRegion,
+        phase: MarketPhase,
+        summary: PortfolioSummary?,
+        latestQuoteTime: Date?,
+        now: Date,
+        lastSentDay: String?
+    ) -> CloseSummaryNote? {
+        guard phase == .closed || phase == .afterHours, let summary, let latestQuoteTime,
+              now.timeIntervalSince(latestQuoteTime) < window
+        else { return nil }
+        let today = AlertEngine.dayKey(latestQuoteTime, region: region)
+        guard lastSentDay != today else { return nil }
+        let title = "\(region.displayName)收盘 今日盈亏 \(QuoteFormatter.signedMoney(summary.dayProfit))"
+        var body = ""
+        if let percent = summary.dayProfitPercent {
+            body += "今日 \(QuoteFormatter.percent(percent))，"
+        }
+        body += "持仓盈亏 \(QuoteFormatter.signedMoney(summary.totalProfit))"
+        if let percent = summary.totalProfitPercent {
+            body += "（\(QuoteFormatter.percent(percent))）"
+        }
+        body += "，市值 \(QuoteFormatter.money(summary.marketValue))\(region.currencyName)"
+        return CloseSummaryNote(region: region, day: today, title: title, body: body)
     }
 }
