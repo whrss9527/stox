@@ -167,3 +167,82 @@ final class ExportTests: XCTestCase {
         XCTAssertEqual(SymbolInput.parseList(Watchlist.exportText(brk))?.symbols, brk.map(\.symbol))
     }
 }
+
+final class TradeTests: XCTestCase {
+    func testBuyingAveragesTheCost() throws {
+        let holding = Holding(shares: 100, cost: 1200)
+        let more = try XCTUnwrap(holding.buying(shares: 100, at: 1300))
+        XCTAssertEqual(more.shares, 200)
+        XCTAssertEqual(more.cost, 1250, accuracy: 1e-9)
+        let free = try XCTUnwrap(holding.buying(shares: 100, at: 0))
+        XCTAssertEqual(free.cost, 600, accuracy: 1e-9, "送股摊薄成本")
+        XCTAssertNil(holding.buying(shares: 0, at: 1300))
+        XCTAssertNil(holding.buying(shares: 10, at: -1))
+    }
+
+    func testSellingKeepsTheCost() throws {
+        let holding = Holding(shares: 300, cost: 12.5)
+        let fewer = try XCTUnwrap(holding.selling(shares: 100))
+        XCTAssertEqual(fewer, Holding(shares: 200, cost: 12.5))
+        let none = try XCTUnwrap(holding.selling(shares: 300))
+        XCTAssertEqual(none.shares, 0)
+        XCTAssertFalse(none.isValid, "全部卖出后由调用方清掉持仓")
+        XCTAssertNil(holding.selling(shares: 301), "不能卖得比持有的多")
+        XCTAssertNil(holding.selling(shares: -1))
+    }
+}
+
+final class CloseSummaryTests: XCTestCase {
+    private func time(_ text: String, _ region: MarketRegion) -> Date {
+        TencentQuoteParser.parseTimestamp(text, timeZone: region.timeZone)!
+    }
+
+    private let summary = PortfolioSummary(region: .cn, marketValue: 147_000, costValue: 145_000, dayProfit: 688, count: 2)
+
+    func testSendsOnceAfterTheClose() throws {
+        let note = try XCTUnwrap(CloseSummary.due(
+            region: .cn, phase: .closed, summary: summary,
+            latestQuoteTime: time("20260928150003", .cn), now: time("20260928160000", .cn), lastSentDay: nil
+        ))
+        XCTAssertEqual(note.day, "2026-09-28")
+        XCTAssertEqual(note.title, "A股收盘 今日盈亏 +688.00")
+        XCTAssertEqual(note.body, "今日 +0.47%，持仓盈亏 +2000.00（+1.38%），市值 14.70万人民币")
+        XCTAssertNil(CloseSummary.due(
+            region: .cn, phase: .closed, summary: summary,
+            latestQuoteTime: time("20260928150003", .cn), now: time("20260928200000", .cn), lastSentDay: "2026-09-28"
+        ), "今天已经发过")
+        // 半夜才打开：还算前一个交易日的，补发一次。
+        let late = try XCTUnwrap(CloseSummary.due(
+            region: .cn, phase: .closed, summary: summary,
+            latestQuoteTime: time("20260928150003", .cn), now: time("20260929020000", .cn), lastSentDay: "2026-09-25"
+        ))
+        XCTAssertEqual(late.day, "2026-09-28")
+        XCTAssertNil(CloseSummary.due(
+            region: .cn, phase: .closed, summary: summary,
+            latestQuoteTime: time("20260928150003", .cn), now: time("20260929080000", .cn), lastSentDay: "2026-09-25"
+        ), "第二天早上不再发前一天的")
+    }
+
+    func testSkipsWhileTradingOnHolidaysAndWithoutHoldings() {
+        let quoteTime = time("20260928150003", .cn)
+        let now = time("20260928160000", .cn)
+        XCTAssertNil(CloseSummary.due(region: .cn, phase: .lunchBreak, summary: summary, latestQuoteTime: quoteTime, now: now, lastSentDay: nil))
+        XCTAssertNil(CloseSummary.due(region: .cn, phase: .trading, summary: summary, latestQuoteTime: quoteTime, now: now, lastSentDay: nil))
+        XCTAssertNil(CloseSummary.due(region: .cn, phase: .closed, summary: nil, latestQuoteTime: quoteTime, now: now, lastSentDay: nil))
+        // 国庆假期：最新行情还是节前的。
+        XCTAssertNil(CloseSummary.due(
+            region: .cn, phase: .closed, summary: summary,
+            latestQuoteTime: quoteTime, now: time("20261002160000", .cn), lastSentDay: nil
+        ))
+    }
+
+    func testUSSendsWhenAfterHoursStart() throws {
+        let us = PortfolioSummary(region: .us, marketValue: 3400, costValue: 3000, dayProfit: -10.5, count: 1)
+        let note = try XCTUnwrap(CloseSummary.due(
+            region: .us, phase: .afterHours, summary: us,
+            latestQuoteTime: time("2026-09-28 16:00:01", .us), now: time("2026-09-28 16:05:00", .us), lastSentDay: "2026-09-25"
+        ))
+        XCTAssertEqual(note.title, "美股收盘 今日盈亏 -10.50")
+        XCTAssertEqual(note.day, "2026-09-28", "按美东的日期")
+    }
+}

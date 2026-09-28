@@ -43,6 +43,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, self.settings.alertsEnabled else { return }
             Notifier.shared.post(trigger)
         }
+        store.onCloseSummary = { note in
+            Notifier.shared.postSummary(note)
+        }
         updater.notify = { title, body in
             Notifier.shared.postUpdate(title: title, body: body)
         }
@@ -124,7 +127,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 调试和 CI 用的启动参数：
     ///   Stox --show-panel [--expand sh600519] [--search 腾讯]   打开面板并打印诊断信息
-    ///        [--chart intraday|day|week|month] [--keys down,down,enter]   走势图的周期、依次模拟的按键
+    ///        [--chart intraday|fiveDay|day|week|month] [--keys down,down,enter]   走势图的周期、依次模拟的按键
+    ///        [--edit sh600519]                                  直接打开这只的持仓、提醒与简称页
     ///   Stox --show-settings [general|display|sync|about]      打开设置窗口并打印窗口位置
     ///   Stox --check-update                                    先检查一次更新再打开上面两者
     ///   Stox --install-update                                  检查并直接安装新版本
@@ -144,6 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let expand = value(after: "--expand").flatMap { Symbol($0) }
         let search = value(after: "--search")
         let chart = value(after: "--chart").flatMap(ChartPeriod.init(rawValue:))
+        let edit = value(after: "--edit").flatMap { Symbol($0) }
         let keys = (value(after: "--keys") ?? "").split(separator: ",").compactMap { PanelKey(rawValue: String($0)) }
         if let chart {
             settings.chartPeriod = chart
@@ -164,7 +169,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 try? await Task.sleep(nanoseconds: 2_000_000_000)
                 SettingsWindowController.shared.printDiagnostics()
             } else if showPanel {
-                self.statusController?.openPanel(expand: expand, search: search, keys: keys, printDiagnostics: true)
+                self.statusController?.openPanel(
+                    route: edit.map { .edit($0) } ?? .list, expand: expand, search: search, keys: keys, printDiagnostics: true
+                )
             }
         }
     }

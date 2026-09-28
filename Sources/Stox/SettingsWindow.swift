@@ -238,7 +238,12 @@ struct GeneralPage: View {
                 }
                 Section("价格提醒") {
                     Toggle("到价时发送系统通知", isOn: $settings.alertsEnabled)
-                    FormNote("在行情面板里右键某只证券，选“价格提醒与简称…”设置目标价或涨跌幅。每个条件每个交易日最多提醒一次。")
+                    FormNote("在行情面板里右键某只证券，选“价格提醒与简称…”设置目标价、涨跌幅，填了持仓的还能设止盈止损。每个条件每个交易日最多提醒一次。")
+                    Toggle("收盘后发一条今日盈亏小结", isOn: $settings.closeSummary)
+                        .onChange(of: settings.closeSummary) { enabled in
+                            if enabled { Notifier.shared.requestAuthorization() }
+                        }
+                    FormNote("有持仓的市场收盘后各发一次：今日盈亏、持仓盈亏和市值。美股在盘后开始时发。")
                     Button("打开系统的通知设置") {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!)
                     }

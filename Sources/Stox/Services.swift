@@ -43,6 +43,16 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         UNUserNotificationCenter.current().add(request) { _ in }
     }
 
+    /// 收盘小结，点击后打开面板。
+    func postSummary(_ note: CloseSummaryNote) {
+        guard isAvailable else { return }
+        let content = UNMutableNotificationContent()
+        content.title = note.title
+        content.body = note.body
+        let request = UNNotificationRequest(identifier: "summary.\(note.region.rawValue).\(note.day)", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request) { _ in }
+    }
+
     /// 发现新版本时的通知，点击后打开“关于与更新”。
     func postUpdate(title: String, body: String) {
         guard isAvailable else { return }
