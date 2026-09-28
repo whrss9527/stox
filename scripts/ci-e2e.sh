@@ -69,8 +69,9 @@ run_case() {
 }
 
 smoke() {
-  # CI 里不去 GitHub 检查更新，也就不会弹出通知挡住截图。
+  # CI 里不去 GitHub 检查更新，也就不会弹出通知挡住截图；使用提示单独截一张，其他截图里不显示。
   defaults write "$DOMAIN" update.autoCheck -bool false
+  defaults write "$DOMAIN" tips.dismissed -bool true
   run_case panel --show-panel
   run_case detail --show-panel --expand sh600519
   run_case search --show-panel --search 腾讯
@@ -88,6 +89,18 @@ smoke() {
   defaults delete "$DOMAIN" ticker.hidden
   grep -q 'status_title="" image=true' shots/hidden.log || fail "隐藏行情后菜单栏应该只有图标"
   grep -q "panel_frame=" shots/hidden.log || fail "只显示图标时面板没有打开"
+
+  # 第一次使用的提示，以及从旧版本更新上来后的“已更新到 x.y.z”。
+  defaults delete "$DOMAIN" tips.dismissed
+  defaults write "$DOMAIN" app.lastVersion -string 0.1.0
+  run_case tips --show-panel
+  defaults write "$DOMAIN" tips.dismissed -bool true
+  defaults delete "$DOMAIN" update.whatsNew 2>/dev/null || true
+
+  # 按涨幅排序。
+  defaults write "$DOMAIN" list.sort -string gainers
+  run_case sorted --show-panel
+  defaults delete "$DOMAIN" list.sort
 
   # 粘贴多个代码：列出认出的代码，等回车全部添加；认不出的单独列出来。
   run_case batch --show-panel --search "601318 09988 TSLA 茅台"
@@ -223,6 +236,7 @@ PY
   wait_for 15 curl -sf -o /dev/null http://127.0.0.1:8765/latest.json || fail "本地假发布没有启动"
   export STOX_UPDATE_URL=http://127.0.0.1:8765/latest.json
   defaults write "$DOMAIN" update.autoCheck -bool false
+  defaults write "$DOMAIN" tips.dismissed -bool true
 
   # 发现新版本：面板底部的更新条和“关于与更新”页。
   : > "$LOG"

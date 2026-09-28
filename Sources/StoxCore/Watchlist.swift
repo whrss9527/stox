@@ -174,3 +174,24 @@ public enum QuoteLinks {
         return URL(string: "https://xueqiu.com/S/" + path)
     }
 }
+
+/// 自选列表的显示顺序。自定义顺序可以拖动；按涨跌幅排序时没有行情的排在最后，涨跌幅相同的保持原来的顺序。
+public enum WatchlistSort: String, CaseIterable, Sendable {
+    case custom, gainers, losers
+
+    public func apply(_ items: [WatchItem], quotes: [Symbol: Quote]) -> [WatchItem] {
+        guard self != .custom else { return items }
+        return items.enumerated().sorted { a, b in
+            switch (quotes[a.element.symbol]?.changePercent, quotes[b.element.symbol]?.changePercent) {
+            case let (x?, y?) where x != y:
+                return self == .gainers ? x > y : x < y
+            case (nil, _?):
+                return false
+            case (_?, nil):
+                return true
+            default:
+                return a.offset < b.offset
+            }
+        }.map(\.element)
+    }
+}

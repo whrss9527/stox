@@ -20,6 +20,9 @@ struct QuoteRow: View {
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
     @State private var hovering = false
+    /// 价格刚变过：向上还是向下，用来让价格闪一下。
+    @State private var flash: PriceDirection?
+    @State private var lastPrice: Double?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -88,6 +91,12 @@ struct QuoteRow: View {
                     .font(.system(size: 14, weight: .medium).monospacedDigit())
                     .foregroundStyle(color)
                     .lineLimit(1)
+                    .padding(.horizontal, 3)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(Theme.priceColor(for: flash ?? .flat, convention: settings.colorConvention).opacity(flash == nil ? 0 : 0.2))
+                    )
+                    .padding(.horizontal, -3)
                 if let position {
                     // 有持仓时在现价下面显示持仓盈亏：公文包图标加比例，不占名称和代码的地方。
                     HStack(spacing: 2) {
@@ -114,6 +123,42 @@ struct QuoteRow: View {
         }
         .padding(.horizontal, 10)
         .frame(height: Self.rowHeight)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityText)
+        .onAppear { lastPrice = quote?.price }
+        .onChange(of: quote?.price) { price in
+            priceChanged(to: price)
+        }
+    }
+
+    /// 读屏软件念的内容：名称、代码、现价、涨跌，有持仓时加上持仓盈亏。
+    private var accessibilityText: String {
+        var text = "\(quote?.name ?? item.displayName)，\(item.symbol.displayCode)"
+        guard let quote else { return text + "，暂无行情" }
+        text += "，现价 \(QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))"
+        switch quote.direction {
+        case .up: text += "，上涨 \(QuoteFormatter.fixed(abs(quote.changePercent), decimals: 2))%"
+        case .down: text += "，下跌 \(QuoteFormatter.fixed(abs(quote.changePercent), decimals: 2))%"
+        case .flat: text += "，平盘"
+        }
+        if let position {
+            text += "，持仓盈亏 \(QuoteFormatter.signedMoney(position.totalProfit))"
+        }
+        return text
+    }
+
+    /// 价格变了就闪一下，0.8 秒后淡出。第一次拿到行情时不闪。
+    private func priceChanged(to price: Double?) {
+        defer { lastPrice = price }
+        guard settings.flashOnChange, let price, let lastPrice, price > 0, lastPrice > 0, price != lastPrice else { return }
+        let direction: PriceDirection = price > lastPrice ? .up : .down
+        withAnimation(.easeIn(duration: 0.1)) { flash = direction }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 800_000_000)
+            withAnimation(.easeOut(duration: 0.6)) {
+                if flash == direction { flash = nil }
+            }
+        }
     }
 
     private var position: PositionValue? {
