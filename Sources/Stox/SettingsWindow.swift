@@ -330,6 +330,13 @@ struct DisplayPage: View {
                         .disabled(settings.hideTicker)
                     Toggle("显示涨跌幅", isOn: $settings.showPercent)
                         .disabled(settings.hideTicker)
+                    Picker("排列方式", selection: $settings.tickerLayout) {
+                        ForEach(TickerLayout.allCases) { layout in
+                            Text(layout.title).tag(layout)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(settings.hideTicker)
                     Toggle("固定了多只时轮流显示", isOn: $settings.rotateTicker)
                         .disabled(settings.hideTicker)
                     Toggle("在菜单栏显示盈亏", isOn: $settings.showDayProfit)
@@ -341,7 +348,7 @@ struct DisplayPage: View {
                     }
                     .pickerStyle(.segmented)
                     .disabled(settings.hideTicker || !settings.showDayProfit)
-                    FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。轮流显示时每 5 秒换一只，适合刘海屏。盈亏只算填了持仓的证券，可以显示今日盈亏或者持仓盈亏，几种货币都有时按汇率折成人民币显示一个数，不参与轮流。")
+                    FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。上下两行时名称在左边，价格在上、涨跌幅在下，字小一些，同样的地方能放下更多只。轮流显示时每 5 秒换一只，适合刘海屏。盈亏只算填了持仓的证券，可以显示今日盈亏或者持仓盈亏，几种货币都有时按汇率折成人民币显示一个数，不参与轮流。")
                 }
                 Section("行情面板") {
                     Toggle("紧凑列表", isOn: $settings.compactRows)

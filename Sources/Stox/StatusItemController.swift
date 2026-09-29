@@ -25,6 +25,8 @@ final class StatusItemController: NSObject {
     private var lastAutoClose = Date.distantPast
     private var rotationTimer: Timer?
     private var rotationIndex = 0
+    /// 菜单栏上现在显示的行情文字（上下两行时是画成图的那些字连起来），诊断用。
+    private var tickerText = ""
     private var cancellables = Set<AnyCancellable>()
 
     init(store: QuoteStore, settings: SettingsStore, updater: Updater, sync: SyncManager) {
@@ -440,30 +442,43 @@ final class StatusItemController: NSObject {
             ? []
             : MenuBarTicker.entries(items: store.items, quotes: store.quotes, options: settings.tickerOptions)
         // 今日盈亏总是跟在最后，轮流显示时也不参与轮换。
-        let profit = hidden || !settings.showDayProfit
-            ? []
-            : MenuBarTicker.profitParts(
-                Portfolio.summaries(items: store.items, quotes: store.quotes), kind: settings.menuBarProfit,
-                rates: store.rates, hidingAmounts: settings.hideAmounts
-            )
+        let summaries = hidden || !settings.showDayProfit ? [] : Portfolio.summaries(items: store.items, quotes: store.quotes)
 
-        guard !entries.isEmpty || !profit.isEmpty else {
+        guard !entries.isEmpty || !summaries.isEmpty else {
             button.attributedTitle = NSAttributedString(string: "")
             button.image = Self.icon
+            button.imagePosition = .imageLeading
+            tickerText = ""
             return
         }
 
-        var shown: [[TickerPart]]
+        let shown: [[TickerPart]]
         if settings.rotateTicker, entries.count > 1 {
             shown = [entries[rotationIndex % entries.count]]
         } else {
             shown = entries
         }
-        if !profit.isEmpty {
-            shown.append(profit)
+        if settings.tickerLayout == .stacked {
+            // 上下两行：画成一张图，价格在上、涨跌幅在下；盈亏是金额在上、比例在下。
+            let blocks = shown.map(MenuBarTicker.stacked) + MenuBarTicker.stackedProfit(
+                summaries, kind: settings.menuBarProfit, rates: store.rates, hidingAmounts: settings.hideAmounts
+            )
+            button.attributedTitle = NSAttributedString(string: "")
+            button.image = StackedTickerImage.make(
+                blocks, convention: settings.colorConvention, height: NSStatusBar.system.thickness
+            )
+            button.imagePosition = .imageOnly
+            tickerText = blocks.map(\.text).joined(separator: "  ")
+        } else {
+            let profit = MenuBarTicker.profitParts(
+                summaries, kind: settings.menuBarProfit, rates: store.rates, hidingAmounts: settings.hideAmounts
+            )
+            let title = attributedTitle(for: profit.isEmpty ? shown : shown + [profit])
+            button.image = nil
+            button.imagePosition = .imageLeading
+            button.attributedTitle = title
+            tickerText = title.string
         }
-        button.image = nil
-        button.attributedTitle = attributedTitle(for: shown)
     }
 
     private func attributedTitle(for entries: [[TickerPart]]) -> NSAttributedString {
@@ -543,8 +558,9 @@ final class StatusItemController: NSObject {
         func topLeft(_ rect: NSRect) -> String {
             "\(Int(rect.minX)) \(Int(screenHeight - rect.maxY)) \(Int(rect.width)) \(Int(rect.height))"
         }
-        let title = statusItem.button?.attributedTitle.string ?? ""
-        print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil) color=\(settings.colorConvention.rawValue) pinned=\(settings.panelPinned) hide_amounts=\(settings.hideAmounts)")
+        print("STOX_DIAG status_title=\"\(tickerText)\" image=\(statusItem.button?.image != nil) color=\(settings.colorConvention.rawValue) pinned=\(settings.panelPinned) hide_amounts=\(settings.hideAmounts)")
+        let imageSize = statusItem.button?.image.map { "\(Int($0.size.width))x\(Int($0.size.height))" } ?? "none"
+        print("STOX_DIAG ticker_layout=\(settings.tickerLayout.rawValue) status_image=\(imageSize)")
         print("STOX_DIAG ticker_hidden=\(tickerHidden) ticker_live=\(tickerMarketsLive) when_closed=\(settings.hideTickerWhenClosed)")
         let statusFrame = statusItem.button?.window?.frame
         if let statusFrame {
