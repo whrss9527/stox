@@ -32,6 +32,8 @@ struct PanelView: View {
                 StockEditorPanel(symbol: symbol)
             case .group(let name, let member):
                 GroupEditorPanel(original: name, member: member)
+            case .alerts:
+                AlertLogPanel()
             }
         }
         .padding(12)
@@ -912,6 +914,8 @@ struct PanelFooter: View {
                 Divider()
                 Button("新建分组…") { router.route = .group(nil, member: nil) }
                     .disabled(store.items.isEmpty)
+                Button("最近的提醒…") { router.route = .alerts }
+                    .disabled(store.alertLog.entries.isEmpty)
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
             }

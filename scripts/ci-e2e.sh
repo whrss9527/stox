@@ -222,6 +222,10 @@ smoke() {
   grep -q "summary=hk " shots/holdings-hk.log || fail "只看港股时持仓合计应该只算港币"
   # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来。
   grep -Eq "alerts=[1-9]" shots/holdings.log || fail "持仓盈利达到阈值时没有提醒"
+  # 最近的提醒：刚才的止盈提醒记在里面。
+  run_case alert-log --show-panel --alerts
+  grep -q "route=alerts" shots/alert-log.log || fail "没有打开最近的提醒"
+  grep -Eq "alert_log=[1-9]" shots/alert-log.log || fail "最近的提醒里应该有刚才的止盈提醒"
   # 打开了收盘小结：收盘不到 16 小时的市场各发一条。CI 运行的时间不固定，发没发取决于这时哪个市场刚收盘，只提示不判失败。
   grep -Eq "summaries=[1-9]" shots/holdings.log || echo "::warning::这次没有发收盘小结（可能没有刚收盘的市场）"
   grep -q 'status_title="上证 .* 今日 ' shots/holdings.log || fail "菜单栏没有显示今日盈亏"
