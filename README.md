@@ -197,3 +197,13 @@ CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设
 也可以在 Actions 页面手动运行 release：不填标签就发 `CHANGELOG.md` 最上面的版本；勾选 overwrite 可以用原标签的代码重新打包、替换附件。
 
 设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。
+
+## 许可证
+
+Copyright © 2026 whrss9527
+
+Stox 是自由软件，以 [GNU 通用公共许可证第 3 版（GPL-3.0）](LICENSE) 发布：可以自由使用、研究、修改和分享；分发 Stox 或修改后的版本时，需要以同样的许可证提供源代码。
+
+「Stox」这个名字和 Stox 的图标不在 GPL 授权范围内（GPL-3.0 第 7 条 e 项）。介绍 Stox、分享未经修改的副本时可以使用；分发修改后的版本时，请换用自己的名字和图标。
+
+贡献需接受 [CONTRIBUTING.md](CONTRIBUTING.md) 里的贡献者协议。
