@@ -119,12 +119,13 @@ struct ProfitCalendarPanel: View {
                 .disabled(range.map { index >= $0.upperBound } ?? true)
                 .help("下一个月")
             }
-            grid(calendar)
+            grid(calendar, today: ProfitHistory.day(of: Date(), region: region))
             summary(calendar)
         }
     }
 
-    private func grid(_ calendar: ProfitCalendar) -> some View {
+    /// today 是这个市场今天的日期，那一格描一圈边。
+    private func grid(_ calendar: ProfitCalendar, today: String) -> some View {
         let columns = Array(repeating: GridItem(.flexible(), spacing: Self.spacing), count: 7)
         let scale = calendar.largestMagnitude
         return LazyVGrid(columns: columns, spacing: Self.spacing) {
@@ -138,12 +139,12 @@ struct ProfitCalendarPanel: View {
                 Color.clear.frame(height: Self.cellHeight)
             }
             ForEach(calendar.cells) { cell in
-                self.cell(cell, scale: scale)
+                self.cell(cell, scale: scale, isToday: cell.date == today)
             }
         }
     }
 
-    private func cell(_ cell: ProfitCalendar.Cell, scale: Double?) -> some View {
+    private func cell(_ cell: ProfitCalendar.Cell, scale: Double?, isToday: Bool) -> some View {
         let profit = cell.dayProfit
         let color = Theme.priceColor(for: PriceDirection(profit ?? 0), convention: settings.colorConvention)
         // 底色深浅按这个月赚（亏）得最多的那天比。
@@ -168,6 +169,10 @@ struct ProfitCalendarPanel: View {
         .background(
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(profit == nil ? Color.primary.opacity(0.03) : color.opacity(0.08 + 0.3 * strength))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 4, style: .continuous)
+                .strokeBorder(Color.accentColor.opacity(isToday ? 0.8 : 0), lineWidth: 1)
         )
         .help(profit.map { "\(cell.date) 今日盈亏 " + amount(QuoteFormatter.signedMoney($0)) } ?? "\(cell.date) 没有记录")
         .accessibilityElement(children: .ignore)

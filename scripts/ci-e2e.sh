@@ -276,10 +276,16 @@ smoke() {
   fi
   grep -Eq "items=5 quotes=[0-9]+ holdings=4 summary=cn,hk,us " shots/holdings.log || fail "持仓没有读出来"
   # 列表上方只看港股时，持仓合计也只算港股。
+  # 这次菜单栏显示持仓盈亏。
   defaults write "$DOMAIN" list.filter -string hk
+  defaults write "$DOMAIN" ticker.dayProfit -bool true
+  defaults write "$DOMAIN" ticker.profitKind -string total
   run_case holdings-hk --show-panel
   defaults delete "$DOMAIN" list.filter
+  defaults delete "$DOMAIN" ticker.dayProfit
+  defaults delete "$DOMAIN" ticker.profitKind
   grep -q "summary=hk " shots/holdings-hk.log || fail "只看港股时持仓合计应该只算港币"
+  grep -Eq 'status_title="[^"]* 持仓 [^"]+"' shots/holdings-hk.log || fail "菜单栏选了持仓盈亏，应该显示“持仓”"
   # 隐藏金额：面板里的市值、盈亏金额和持有数量是 ****（看截图），菜单栏的今日盈亏换成比例。
   defaults write "$DOMAIN" holdings.hideAmounts -bool true
   defaults write "$DOMAIN" ticker.dayProfit -bool true

@@ -291,6 +291,10 @@ final class SettingsStore: ObservableObject {
     @Published var showDayProfit: Bool {
         didSet { defaults.set(showDayProfit, forKey: Keys.showDayProfit) }
     }
+    /// 菜单栏上显示今日盈亏还是持仓盈亏（打开了 showDayProfit 时）。
+    @Published var menuBarProfit: MenuBarProfit {
+        didSet { defaults.set(menuBarProfit.rawValue, forKey: Keys.menuBarProfit) }
+    }
     /// 面板钉住：点别处时不关闭，可以拖到任何位置。
     @Published var panelPinned: Bool {
         didSet { defaults.set(panelPinned, forKey: Keys.panelPinned) }
@@ -367,6 +371,7 @@ final class SettingsStore: ObservableObject {
         showProfitHistory = defaults.object(forKey: Keys.showProfitHistory) as? Bool ?? false
         showExtendedHours = defaults.object(forKey: Keys.showExtendedHours) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
+        menuBarProfit = defaults.string(forKey: Keys.menuBarProfit).flatMap(MenuBarProfit.init(rawValue:)) ?? .day
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
         chartPeriod = defaults.string(forKey: Keys.chartPeriod).flatMap(ChartPeriod.init(rawValue:)) ?? .intraday
         tipsDismissed = defaults.object(forKey: Keys.tipsDismissed) as? Bool ?? false
@@ -455,6 +460,7 @@ final class SettingsStore: ObservableObject {
         static let showProfitHistory = "holdings.history"
         static let showExtendedHours = "list.extendedHours"
         static let showDayProfit = "ticker.dayProfit"
+        static let menuBarProfit = "ticker.profitKind"
         static let panelPinned = "panel.pinned"
         static let pinnedX = "panel.pinnedX"
         static let pinnedY = "panel.pinnedY"

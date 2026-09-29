@@ -219,23 +219,65 @@ public struct TickerOptions: Sendable, Equatable {
     public var isEmpty: Bool { !showName && !showPrice && !showPercent }
 }
 
+/// 菜单栏上显示哪一种盈亏。
+public enum MenuBarProfit: String, CaseIterable, Sendable, Identifiable {
+    /// 今日盈亏。
+    case day
+    /// 持仓盈亏（按现价算的浮动盈亏）。
+    case total
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .day: return "今日盈亏"
+        case .total: return "持仓盈亏"
+        }
+    }
+
+    /// 菜单栏上数字前面的字。
+    public var label: String {
+        switch self {
+        case .day: return "今日"
+        case .total: return "持仓"
+        }
+    }
+
+    func value(_ summary: PortfolioSummary) -> Double {
+        self == .day ? summary.dayProfit : summary.totalProfit
+    }
+
+    /// 今日盈亏相对昨日市值，持仓盈亏相对成本。
+    func percent(_ summary: PortfolioSummary) -> Double? {
+        self == .day ? summary.dayProfitPercent : summary.totalProfitPercent
+    }
+}
+
 public enum MenuBarTicker {
     /// 菜单栏上的今日盈亏，例如“今日 +¥688 -HK$120”，每种货币一段；给了汇率时折成人民币合成一段。
     /// 隐藏金额时换成相对昨日市值的比例，例如“今日 +0.62%”。没有持仓时返回空数组。
     public static func dayProfitParts(
         _ summaries: [PortfolioSummary], rates: ExchangeRates? = nil, hidingAmounts: Bool = false
     ) -> [TickerPart] {
+        profitParts(summaries, kind: .day, rates: rates, hidingAmounts: hidingAmounts)
+    }
+
+    /// 菜单栏上的盈亏：今日盈亏（“今日 +¥688”）或者持仓盈亏（“持仓 +¥1.29万”），每种货币一段，给了汇率时折成人民币合成一段。
+    /// 隐藏金额时换成比例（今日盈亏相对昨日市值，持仓盈亏相对成本）。没有持仓时返回空数组。
+    public static func profitParts(
+        _ summaries: [PortfolioSummary], kind: MenuBarProfit, rates: ExchangeRates? = nil, hidingAmounts: Bool = false
+    ) -> [TickerPart] {
         guard !summaries.isEmpty else { return [] }
-        var parts = [TickerPart(role: .name, text: "今日", direction: .flat)]
+        var parts = [TickerPart(role: .name, text: kind.label, direction: .flat)]
         // 有好几种货币并且拿到了汇率时，折成人民币只显示一个数，省地方。
         let shown = Portfolio.combined(summaries, rates: rates).map { [$0] } ?? summaries
         for summary in shown {
-            let value = summary.dayProfit
+            let value = kind.value(summary)
             // 颜色和正负号一致：不到一分钱的算平。
             let direction: PriceDirection = value >= 0.005 ? .up : (value <= -0.005 ? .down : .flat)
             let text: String
             if hidingAmounts {
-                text = summary.dayProfitPercent.map(QuoteFormatter.percent) ?? "--"
+                text = kind.percent(summary).map(QuoteFormatter.percent) ?? "--"
             } else {
                 let sign = direction == .up ? "+" : (direction == .down ? "-" : "")
                 text = sign + summary.region.currencySymbol + QuoteFormatter.compactMoney(abs(value))

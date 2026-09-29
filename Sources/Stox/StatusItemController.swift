@@ -442,8 +442,9 @@ final class StatusItemController: NSObject {
         // 今日盈亏总是跟在最后，轮流显示时也不参与轮换。
         let profit = hidden || !settings.showDayProfit
             ? []
-            : MenuBarTicker.dayProfitParts(
-                Portfolio.summaries(items: store.items, quotes: store.quotes), rates: store.rates, hidingAmounts: settings.hideAmounts
+            : MenuBarTicker.profitParts(
+                Portfolio.summaries(items: store.items, quotes: store.quotes), kind: settings.menuBarProfit,
+                rates: store.rates, hidingAmounts: settings.hideAmounts
             )
 
         guard !entries.isEmpty || !profit.isEmpty else {
