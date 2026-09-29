@@ -305,8 +305,17 @@ final class QuoteStore: ObservableObject {
     func add(_ symbol: Symbol, name: String = "") {
         guard !contains(symbol) else { return }
         items.append(WatchItem(symbol: symbol, name: name, group: groupForNewItems))
+        revealNewItems([symbol])
         save()
         restart()
+    }
+
+    /// 按市场或持仓筛选着、新加的看不到时回到“全部”，免得加完以为没加上。分组的会自动放进正在看的分组，不用管。
+    private func revealNewItems(_ symbols: [Symbol]) {
+        let visible = WatchlistFilter.effective(settings.listFilter, items: items).apply(items)
+        if symbols.contains(where: { symbol in !visible.contains { $0.symbol == symbol } }) {
+            settings.listFilter = .all
+        }
     }
 
     /// 正在看某个分组时，新加的放进这个分组，免得加完在列表里看不到。
@@ -370,6 +379,7 @@ final class QuoteStore: ObservableObject {
             added = true
         }
         if added {
+            revealNewItems(wanted.filter { result[$0] != nil })
             save()
             restart()
         }

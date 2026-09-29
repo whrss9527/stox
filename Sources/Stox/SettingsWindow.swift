@@ -14,7 +14,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .general: return "通用"
-        case .display: return "菜单栏与颜色"
+        case .display: return "显示"
         case .sync: return "iCloud 同步"
         case .about: return "关于与更新"
         }
@@ -293,7 +293,7 @@ struct GeneralPage: View {
     }
 }
 
-// MARK: - 菜单栏与颜色
+// MARK: - 显示
 
 @MainActor
 struct DisplayPage: View {
@@ -301,7 +301,7 @@ struct DisplayPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "菜单栏与颜色", subtitle: "菜单栏里显示什么，涨跌用什么颜色，面板用深色还是浅色")
+            PageHeader(title: "显示", subtitle: "菜单栏和行情面板里显示什么，涨跌用什么颜色，面板用深色还是浅色")
             Form {
                 Section("外观") {
                     Picker("行情面板和设置窗口", selection: $settings.appearance) {
@@ -331,6 +331,8 @@ struct DisplayPage: View {
                     FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。轮流显示时每 5 秒换一只，适合刘海屏。今日盈亏只算填了持仓的证券，几种货币都有时按汇率折成人民币显示一个数，不参与轮流。")
                 }
                 Section("行情面板") {
+                    Toggle("紧凑列表", isOn: $settings.compactRows)
+                    FormNote("每只一行：名称、代码、现价和色块排在一起，自选多时一屏能看到更多。持仓盈亏和盘前盘后价在展开后看。")
                     Toggle("价格变动时闪一下", isOn: $settings.flashOnChange)
                     Toggle("画均线和均价线", isOn: $settings.showMovingAverages)
                     FormNote("日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。分时图和五日图上画成交均价（橙色），指数没有。")
