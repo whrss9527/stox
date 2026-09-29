@@ -1,9 +1,9 @@
 # Stox
 
-一个轻量的 macOS 菜单栏股票行情工具。左键点一下菜单栏图标打开玻璃质感的行情面板，再点一下（或点面板外、按 Esc）就关掉；右键点一下在“显示行情”和“只显示图标”之间切换。原生 Swift 编写，压缩包约 3MB，内存占用约 28MB。
+一个轻量的 macOS 菜单栏股票行情工具。左键点一下菜单栏图标打开玻璃质感的行情面板，再点一下（或点面板外、按 Esc）就关掉；右键点一下在“显示行情”和“只显示图标”之间切换。原生 Swift 编写，压缩包约 3.5MB，内存占用约 30MB。
 
 <p>
-  <img src="docs/images/panel.jpg" width="300" alt="自选列表">
+  <img src="docs/images/panel.jpg" width="300" alt="自选列表和迷你分时">
   <img src="docs/images/detail.jpg" width="300" alt="展开详情：分时和均价线">
 </p>
 <p>
@@ -11,8 +11,12 @@
   <img src="docs/images/orderbook.jpg" width="300" alt="买卖五档">
 </p>
 <p>
+  <img src="docs/images/fundflow.jpg" width="300" alt="资金流向">
   <img src="docs/images/holdings.jpg" width="300" alt="持仓与盈亏">
+</p>
+<p>
   <img src="docs/images/editor.jpg" width="300" alt="持仓、买卖记录和分红">
+  <img src="docs/images/calendar.jpg" width="300" alt="盈亏日历">
 </p>
 <p>
   <img src="docs/images/rank.jpg" width="300" alt="A 股涨跌榜">
@@ -25,7 +29,7 @@
   <img src="docs/images/settings.jpg" width="604" alt="设置窗口">
 </p>
 
-截图依次是自选列表、展开详情（分时和均价线）、日 K 和均线、A 股的买卖五档、持仓与盈亏、编辑页的持仓和买卖记录、A 股涨跌榜、搜索添加、“不显示红绿”配色和设置窗口，由 CI 在 macOS 15 上启动打包好的 App 自动截取，数据是 2026-09-28、29 的实时行情。
+截图依次是自选列表（每一行带着当天的迷你分时）、展开详情（分时和均价线）、日 K 和均线、A 股的买卖五档、A 股的资金流向、持仓与盈亏、编辑页的持仓和买卖记录、盈亏日历、A 股涨跌榜、搜索添加、“不显示红绿”配色和设置窗口，由 CI 在 macOS 15 上启动打包好的 App 自动截取，数据是 2026-09-28、29 的实时行情。
 
 ## 功能
 
