@@ -630,7 +630,7 @@ struct HoldingsSummaryView: View {
                         row("合计", total, showsCurrency: true, help: combinedHelp)
                     }
                 }
-                // 今年卖出的已实现盈亏：编辑页里记了卖出才有。
+                // 今年卖出和分红的已实现盈亏：编辑页里记了卖出、分红才有。
                 let realized = Self.realized(store: store, settings: settings)
                 if !realized.isEmpty {
                     realizedRow(realized)
@@ -789,7 +789,7 @@ struct HoldingsSummaryView: View {
         .font(.system(size: 10.5).monospacedDigit())
         .lineLimit(1)
         .minimumScaleFactor(0.8)
-        .help("今年卖出的部分按当时的成本价算出的盈亏，来自编辑页里“记一笔”记下的卖出")
+        .help("今年卖出的部分按当时的成本价算出的盈亏，加上记下的现金分红，来自编辑页里“记一笔”记下的卖出和分红")
     }
 
     /// 列表上方筛选出来的那些持仓，按币种合计。

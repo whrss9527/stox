@@ -98,6 +98,33 @@ final class TradeLogTests: XCTestCase {
         XCTAssertEqual(Portfolio.yearStart(now: time(2026, 12, 31, 20, 0, .us)), "2027-01-01", "按北京的日期")
     }
 
+    func testDividends() throws {
+        // 每股派 25 元：总成本少了 2500，成本价摊薄到 1175。
+        let cashOnly = try XCTUnwrap(Holding(shares: 100, cost: 1200).applyingDividend(cash: 25, bonus: 0))
+        XCTAssertEqual(cashOnly, Holding(shares: 100, cost: 1175))
+        // 10 送 4 派 5：1000 股变 1400 股，总成本 12000 − 500。
+        let bonus = try XCTUnwrap(Holding(shares: 1000, cost: 12).applyingDividend(cash: 0.5, bonus: 0.4))
+        XCTAssertEqual(bonus.shares, 1400, accuracy: 1e-9)
+        XCTAssertEqual(bonus.cost, 11_500.0 / 1400, accuracy: 1e-9)
+        XCTAssertEqual(Holding(shares: 100, cost: 1).applyingDividend(cash: 5, bonus: 0)?.cost, 0, "成本价不会是负数")
+        XCTAssertNil(Holding(shares: 100, cost: 1).applyingDividend(cash: 0, bonus: 0))
+        XCTAssertNil(Holding(shares: 100, cost: 1).applyingDividend(cash: -1, bonus: 0))
+
+        let record = Trade.dividend(cash: 25, bonus: 0, holding: Holding(shares: 100, cost: 1200), day: "2026-06-20")
+        XCTAssertEqual(record, Trade(side: .dividend, shares: 100, price: 25, day: "2026-06-20", profit: 2500))
+        XCTAssertEqual(Trade.dividend(cash: 0.5, bonus: 0.4, holding: Holding(shares: 1000, cost: 12), day: "2026-06-20").bonus, 0.4)
+
+        // 分红算进已实现，不画在 K 线上，也不影响今日盈亏（除息那天昨收已经调过）。
+        let item = WatchItem(symbol: moutai, holding: cashOnly, trades: [record])
+        XCTAssertEqual(Portfolio.realizedProfit(items: [item], since: "2026-01-01").first?.profit, 2500)
+        let chart = KlineChartData(series: KlineSeries(symbol: moutai, period: .day, candles: [
+            Candle(date: "2026-06-20", open: 1, close: 1, high: 1, low: 1),
+        ]))
+        XCTAssertEqual(chart.tradeMarks([record], region: .cn), [])
+        let today = Trade.dividend(cash: 25, bonus: 0, holding: Holding(shares: 100, cost: 1200), day: "2026-09-29")
+        XCTAssertEqual(Portfolio.dayProfit(shares: 100, quote: quote(), trades: [today]), 1000)
+    }
+
     func testKlineTradeMarks() {
         func chart(_ period: KlinePeriod, _ dates: [String]) -> KlineChartData {
             KlineChartData(series: KlineSeries(symbol: moutai, period: period, candles: dates.map {

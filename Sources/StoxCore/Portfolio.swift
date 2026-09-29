@@ -29,6 +29,14 @@ public struct Holding: Codable, Hashable, Sendable {
         guard isValid, sold > 0, sold.isFinite, sold <= shares + 1e-9 else { return nil }
         return Holding(shares: max(shares - sold, 0), cost: cost)
     }
+
+    /// 分红送转：每股派 cash、送转 bonus 股。到手的现金从总成本里扣掉，送转以后数量变多，成本价跟着摊薄；
+    /// 分红比总成本还多时成本价是 0。两样都没有时返回 nil。
+    public func applyingDividend(cash: Double, bonus: Double) -> Holding? {
+        guard isValid, cash >= 0, bonus >= 0, cash.isFinite, bonus.isFinite, cash > 0 || bonus > 0 else { return nil }
+        let total = shares * (1 + bonus)
+        return Holding(shares: total, cost: max((costValue - shares * cash) / total, 0))
+    }
 }
 
 /// 按现价算出的持仓盈亏。

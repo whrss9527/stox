@@ -24,6 +24,9 @@ struct StockEditorPanel: View {
     @State private var group = ""
     @State private var tradeShares = ""
     @State private var tradePrice = ""
+    /// 分红送转：A 股填每 10 股派多少、送转多少，港股美股填每股派多少。
+    @State private var dividendCash = ""
+    @State private var dividendBonus = ""
     /// 刚记了一笔买卖：说明算出来的新持仓，保存后才生效。
     @State private var tradeMessage: String?
     /// 这只的买卖记录（最早的在前），记一笔、删一条都先改这里，保存时一起写回。
@@ -94,6 +97,7 @@ struct StockEditorPanel: View {
                         numberField("持有数量", text: $shares, unit: "股", placeholder: "没有持仓")
                         numberField("成本价", text: $cost, unit: currency, placeholder: "每股成本", allowZero: true)
                         tradeRow
+                        dividendRow
                         Text(holdingFooter)
                             .font(.system(size: 11))
                             .foregroundStyle(holdingState == .invalid ? Color.orange : Color.secondary)
@@ -206,11 +210,86 @@ struct StockEditorPanel: View {
         .help("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量、按成本价算出赚了多少。记完检查一下，点保存才生效")
     }
 
+    /// A 股的分红按“每 10 股”说（10 派 25 元、10 送 4 股），港股、美股按每股。
+    private var perTen: Bool { symbol.market.region == .cn }
+
+    /// 分红送转：现金分红从总成本里扣掉，送转的股加到数量里，成本价跟着摊薄。港股、美股只有现金分红。
+    private var dividendRow: some View {
+        HStack(spacing: 6) {
+            Text("分红送转")
+                .font(.system(size: 12.5))
+            Spacer(minLength: 4)
+            Text(perTen ? "10股派" : "每股派")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField("", text: $dividendCash, prompt: Text("0"))
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 48)
+            if perTen {
+                Text("送转")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                TextField("", text: $dividendBonus, prompt: Text("0"))
+                    .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 36)
+                Text("股")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Button("记一笔", action: recordDividend)
+                .disabled(dividendInput == nil)
+        }
+        .controlSize(.small)
+        .help(perTen
+            ? "按公告填，比如“10 派 25 元”填 25，“10 送 4 股”在送转里填 4。现金分红从成本里扣掉，送转的股加到持有数量里，成本价跟着摊薄。点保存才生效"
+            : "按公告填每股派多少。现金分红从成本里扣掉，成本价跟着摊薄。点保存才生效")
+    }
+
+    /// 填好的分红送转，换算成每股：(现金, 送转)。没填、填错或者没有持仓时为 nil。
+    private var dividendInput: (cash: Double, bonus: Double)? {
+        guard case .valid(let holding) = holdingState else { return nil }
+        let scale = perTen ? 10.0 : 1.0
+        var values: [Double] = []
+        for text in [dividendCash, perTen ? dividendBonus : ""] {
+            switch parse(text, allowZero: true) {
+            case .empty: values.append(0)
+            case .value(let value): values.append(value / scale)
+            case .invalid: return nil
+            }
+        }
+        guard holding.applyingDividend(cash: values[0], bonus: values[1]) != nil else { return nil }
+        return (values[0], values[1])
+    }
+
+    private func recordDividend() {
+        guard case .valid(let holding) = holdingState, let input = dividendInput,
+              let updated = holding.applyingDividend(cash: input.cash, bonus: input.bonus)
+        else { return }
+        let trade = Trade.dividend(cash: input.cash, bonus: input.bonus, holding: holding, day: tradeDay)
+        trades = trades.appending([trade])
+        shares = QuoteFormatter.plain(updated.shares)
+        cost = QuoteFormatter.plain(updated.cost)
+        tradeMessage = "\(dividendText(trade))，到手 \(QuoteFormatter.money(trade.profit ?? 0))：持有 \(shares) 股，成本摊薄到 \(cost)。点保存生效"
+        dividendCash = ""
+        dividendBonus = ""
+    }
+
+    /// “10 派 25、送 4”或“每股派 0.5”。
+    private func dividendText(_ trade: Trade) -> String {
+        guard perTen else { return "每股派 " + QuoteFormatter.plain(trade.price) }
+        var parts: [String] = []
+        if trade.price > 0 { parts.append("10 派 " + QuoteFormatter.plain(trade.price * 10)) }
+        if let bonus = trade.bonus, bonus > 0 { parts.append("送转 " + QuoteFormatter.plain(bonus * 10)) }
+        return parts.joined(separator: "、")
+    }
+
     /// 最近的买卖：最新的在前，最多列 5 笔；下面写今年卖出一共赚了多少。删掉一条只删记录，不改持仓。
     private var tradeList: some View {
         let recent = Array(trades.indices.reversed().prefix(5))
         let realized = trades.realizedProfit(since: Portfolio.yearStart(now: Date()))
-        let sold = trades.contains { $0.side == .sell && $0.day >= Portfolio.yearStart(now: Date()) }
+        let sold = trades.contains { $0.profit != nil && $0.day >= Portfolio.yearStart(now: Date()) }
         return VStack(alignment: .leading, spacing: 3) {
             Text("最近的买卖")
                 .font(.system(size: 11, weight: .medium))
@@ -226,7 +305,7 @@ struct StockEditorPanel: View {
                     .foregroundStyle(.tertiary)
             }
             if sold {
-                Text("今年卖出已实现 " + QuoteFormatter.signedMoney(realized))
+                Text("今年已实现（卖出和分红） " + QuoteFormatter.signedMoney(realized))
                     .font(.system(size: 11).monospacedDigit())
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(realized), convention: settings.colorConvention))
             }
@@ -238,7 +317,11 @@ struct StockEditorPanel: View {
         HStack(spacing: 6) {
             Text(dayText(trade.day))
                 .foregroundStyle(.secondary)
-            Text("\(trade.side.title) \(QuoteFormatter.plain(trade.shares)) 股 @ \(QuoteFormatter.plain(trade.price))")
+            if trade.side == .dividend {
+                Text("分红 " + dividendText(trade))
+            } else {
+                Text("\(trade.side.title) \(QuoteFormatter.plain(trade.shares)) 股 @ \(QuoteFormatter.plain(trade.price))")
+            }
             Spacer(minLength: 4)
             if let profit = trade.profit {
                 Text(QuoteFormatter.signedMoney(profit))

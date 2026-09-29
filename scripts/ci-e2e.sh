@@ -217,7 +217,8 @@ smoke() {
   year=$(TZ=Asia/Shanghai date +%Y)
   write_watchlist '[{"symbol":"sh000001","name":"上证指数","alias":"上证","pinned":true},
     {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},"note":"等回调到 1200 附近再加仓","alert":{"profitAbove":1},
-     "trades":[{"side":"buy","shares":200,"price":1200,"day":"'"$year"'-01-05"},{"side":"sell","shares":100,"price":1300,"day":"'"$year"'-01-06","profit":10000}]},
+     "trades":[{"side":"buy","shares":200,"price":1200,"day":"'"$year"'-01-05"},{"side":"sell","shares":100,"price":1300,"day":"'"$year"'-01-06","profit":10000},
+       {"side":"dividend","shares":100,"price":27.6,"day":"'"$year"'-06-20","profit":2760}]},
     {"symbol":"sz000001","name":"平安银行","holding":{"shares":2000,"cost":12.5}},
     {"symbol":"hk00700","name":"腾讯控股","holding":{"shares":200,"cost":380}},
     {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'

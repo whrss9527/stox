@@ -1,28 +1,41 @@
 import Foundation
 
-/// 在编辑页“记一笔”记下的一笔买卖。持仓已经按它改过了，这里留个记录：看最近买卖过什么、卖出赚了多少，
-/// 以及把今天的买卖算进今日盈亏。
+/// 在编辑页“记一笔”记下的一笔买卖或分红送转。持仓已经按它改过了，这里留个记录：看最近买卖过什么、
+/// 卖出和分红赚了多少，以及把今天的买卖算进今日盈亏。
 public struct Trade: Codable, Hashable, Sendable {
     public enum Side: String, Codable, Sendable {
         case buy, sell
+        /// 分红送转：现金分红摊薄成本，送转的股加到数量里。
+        case dividend
 
-        public var title: String { self == .buy ? "买入" : "卖出" }
+        public var title: String {
+            switch self {
+            case .buy: return "买入"
+            case .sell: return "卖出"
+            case .dividend: return "分红"
+            }
+        }
     }
 
     public var side: Side
+    /// 买卖的股数；分红送转时是登记时持有的股数。
     public var shares: Double
+    /// 成交价；分红送转时是每股派的现金。
     public var price: Double
     /// 哪个交易日的，交易所当地的 `2026-09-29`。
     public var day: String
-    /// 卖出时按当时的成本价算的已实现盈亏（本币）：(卖出价 − 成本价) × 股数。买入是 nil。
+    /// 已实现盈亏（本币）：卖出是按当时的成本价算的 (卖出价 − 成本价) × 股数，分红是到手的现金。买入是 nil。
     public var profit: Double?
+    /// 分红送转时每股送转几股（10 送 4 是 0.4）；没有送转、或者不是分红时为 nil。
+    public var bonus: Double?
 
-    public init(side: Side, shares: Double, price: Double, day: String, profit: Double? = nil) {
+    public init(side: Side, shares: Double, price: Double, day: String, profit: Double? = nil, bonus: Double? = nil) {
         self.side = side
         self.shares = shares
         self.price = price
         self.day = day
         self.profit = profit
+        self.bonus = bonus
     }
 
     /// 每只最多留这么多笔，旧的丢掉。
@@ -39,6 +52,11 @@ public struct Trade: Codable, Hashable, Sendable {
     /// 卖出一笔的记录，已实现盈亏按卖出前的成本价算。
     public static func sell(_ shares: Double, at price: Double, from holding: Holding, day: String) -> Trade {
         Trade(side: .sell, shares: shares, price: price, day: day, profit: (price - holding.cost) * shares)
+    }
+
+    /// 分红送转的记录：每股派 cash、送转 bonus 股，到手的现金算已实现盈亏。
+    public static func dividend(cash: Double, bonus: Double, holding: Holding, day: String) -> Trade {
+        Trade(side: .dividend, shares: holding.shares, price: cash, day: day, profit: holding.shares * cash, bonus: bonus > 0 ? bonus : nil)
     }
 }
 
@@ -57,7 +75,7 @@ extension Array where Element == Trade {
         Array((self + trades).suffix(Trade.limit))
     }
 
-    /// 这一天（含）以来卖出的已实现盈亏之和。
+    /// 这一天（含）以来卖出和分红的已实现盈亏之和。
     public func realizedProfit(since day: String) -> Double {
         filter { $0.day >= day }.reduce(0) { $0 + ($1.profit ?? 0) }
     }
@@ -79,6 +97,8 @@ extension Portfolio {
                 traded += (quote.price - trade.price) * trade.shares
             case .sell:
                 traded += (trade.price - quote.previousClose) * trade.shares
+            case .dividend:
+                break  // 除权除息那天昨收已经调过，送转的股也按涨跌额算就对了
             }
         }
         return (shares - bought) * quote.change + traded
@@ -92,11 +112,11 @@ extension Portfolio {
         return dayProfit(shares: 0, quote: quote, trades: item.trades)
     }
 
-    /// 某一天（含）以来卖出的已实现盈亏，按 A 股、港股、美股的货币分开；没有卖出过的货币不出现。
+    /// 某一天（含）以来卖出和分红的已实现盈亏，按 A 股、港股、美股的货币分开；没有卖出、分红过的货币不出现。
     /// since 按各个市场当地的日期比，比如今年是 `2026-01-01`。
     public static func realizedProfit(items: [WatchItem], since day: String) -> [(region: MarketRegion, profit: Double)] {
         var totals: [MarketRegion: Double] = [:]
-        for item in items where item.trades.contains(where: { $0.side == .sell && $0.day >= day }) {
+        for item in items where item.trades.contains(where: { $0.profit != nil && $0.day >= day }) {
             totals[item.symbol.market.region, default: 0] += item.trades.realizedProfit(since: day)
         }
         return MarketRegion.allCases.compactMap { region in totals[region].map { (region, $0) } }
@@ -131,6 +151,7 @@ extension KlineChartData {
             switch trade.side {
             case .buy: mark.bought = true
             case .sell: mark.sold = true
+            case .dividend: continue
             }
             marks[index] = mark
         }
