@@ -32,6 +32,8 @@ struct PanelView: View {
                 StockEditorPanel(symbol: symbol)
             case .group(let name, let member):
                 GroupEditorPanel(original: name, member: member)
+            case .alerts:
+                AlertLogPanel()
             }
         }
         .padding(12)
@@ -651,12 +653,13 @@ struct HoldingsSummaryView: View {
         disclosure("持仓分布", expanded: $settings.showAllocation, help: "看每只持仓占总市值多少")
         if settings.showAllocation {
             let entries = Self.allocation(store: store, settings: settings)
+            let view = AllocationView(entries)
             if entries.isEmpty {
                 Text("几种货币都有时，要等取到汇率才能放在一起比。")
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
-            ForEach(entries, id: \.symbol) { entry in
+            ForEach(view.shown, id: \.symbol) { entry in
                 HStack(spacing: 6) {
                     Text(entry.name)
                         .font(.system(size: 11))
@@ -678,6 +681,19 @@ struct HoldingsSummaryView: View {
                 .frame(height: 15)
                 .help("\(entry.name)：市值 \(QuoteFormatter.money(entry.marketValue))"
                     + (entry.profitPercent.map { "，持仓盈亏 \(QuoteFormatter.percent($0))" } ?? ""))
+            }
+            if view.restCount > 0 {
+                HStack(spacing: 6) {
+                    Text("其余 \(view.restCount) 只")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                    Spacer(minLength: 6)
+                    Text(QuoteFormatter.fixed(view.restShare, decimals: 1) + "%")
+                        .font(.system(size: 10.5).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 42, alignment: .trailing)
+                }
+                .frame(height: 15)
             }
         }
     }
@@ -912,6 +928,8 @@ struct PanelFooter: View {
                 Divider()
                 Button("新建分组…") { router.route = .group(nil, member: nil) }
                     .disabled(store.items.isEmpty)
+                Button("最近的提醒…") { router.route = .alerts }
+                    .disabled(store.alertLog.entries.isEmpty)
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
             }

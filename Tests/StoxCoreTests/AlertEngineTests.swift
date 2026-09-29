@@ -196,3 +196,33 @@ final class RapidMoveTests: XCTestCase {
         XCTAssertNil(detector.record(quote(80), at: start.addingTimeInterval(5010), threshold: 2), "清空以后只有一笔，没有比较的对象")
     }
 }
+
+final class AlertLogTests: XCTestCase {
+    private let symbol = Symbol("sh600519")!
+
+    func testNewestFirstAndCapped() throws {
+        var log = AlertLog()
+        let quote = Quote(symbol: symbol, name: "贵州茅台", price: 110, previousClose: 100, open: 101, volume: 100)
+        let start = Date(timeIntervalSince1970: 1_790_000_000)
+        log.append(AlertTrigger(symbol: symbol, name: "贵州茅台", condition: .limitUp, threshold: 0, quote: quote), at: start)
+        log.append(CloseSummaryNote(region: .cn, day: "2026-09-28", title: "A股收盘 今日盈亏 +688.00", body: "市值 14.70万人民币"),
+                   at: start.addingTimeInterval(60))
+        XCTAssertEqual(log.entries.map(\.title), ["A股收盘 今日盈亏 +688.00", "贵州茅台 涨停"], "最新的在前面")
+        XCTAssertNil(log.entries[0].symbol, "收盘小结不是某一只的")
+        XCTAssertEqual(log.entries[1].body, "现价 110.00，涨跌 +10.00（+10.00%）")
+
+        for index in 0..<(AlertLog.limit + 5) {
+            log.append(AlertLogEntry(symbol: symbol, title: "第 \(index) 条", body: "", time: start))
+        }
+        XCTAssertEqual(log.entries.count, AlertLog.limit)
+        XCTAssertEqual(log.entries.first?.title, "第 \(AlertLog.limit + 4) 条")
+
+        log.forget(symbol)
+        XCTAssertTrue(log.entries.isEmpty, "删掉的证券的提醒一起清掉")
+        log.append(AlertLogEntry(symbol: nil, title: "小结", body: "", time: start))
+        let data = try JSONEncoder().encode(log)
+        XCTAssertEqual(try JSONDecoder().decode(AlertLog.self, from: data), log)
+        log.removeAll()
+        XCTAssertTrue(log.entries.isEmpty)
+    }
+}

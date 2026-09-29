@@ -19,6 +19,8 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var fiveDay: [Symbol: MultiDaySeries] = [:]
     /// 每个交易日收盘后记下的持仓盈亏，只在这台 Mac 上。
     @Published private(set) var profitHistory: ProfitHistory
+    /// 最近发过的提醒，面板里可以翻看。
+    @Published private(set) var alertLog: AlertLog
     /// 美股个股盘前盘后的最新成交。美股常规交易时段里是空的。
     @Published private(set) var extendedHours: [Symbol: ExtendedHoursQuote] = [:]
     /// 上一次取盘前盘后价的时间和当时取的是哪几只。
@@ -71,6 +73,8 @@ final class QuoteStore: ObservableObject {
         }
         profitHistory = defaults.data(forKey: Keys.profitHistory)
             .flatMap { try? JSONDecoder().decode(ProfitHistory.self, from: $0) } ?? ProfitHistory()
+        alertLog = defaults.data(forKey: Keys.alertLog)
+            .flatMap { try? JSONDecoder().decode(AlertLog.self, from: $0) } ?? AlertLog()
         if let data = defaults.data(forKey: Keys.alertState),
            let engine = try? JSONDecoder().decode(AlertEngine.self, from: data) {
             alertEngine = engine
@@ -399,6 +403,8 @@ final class QuoteStore: ObservableObject {
         fiveDay[symbol] = nil
         extendedHours[symbol] = nil
         rapidMoves.forget(symbol)
+        alertLog.forget(symbol)
+        saveAlertLog()
         alertEngine.reset(symbol)
         save()
         saveAlertState()
@@ -516,6 +522,23 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 记进最近的提醒。
+    private func log(_ trigger: AlertTrigger) {
+        alertLog.append(trigger, at: Date())
+        saveAlertLog()
+    }
+
+    func clearAlertLog() {
+        alertLog.removeAll()
+        saveAlertLog()
+    }
+
+    private func saveAlertLog() {
+        if let data = try? JSONEncoder().encode(alertLog) {
+            defaults.set(data, forKey: Keys.alertLog)
+        }
+    }
+
     /// 这次运行发出的提醒条数和收盘小结条数，CI 的诊断信息里用。
     private(set) var firedAlertCount = 0
     private(set) var closeSummaryCount = 0
@@ -534,6 +557,8 @@ final class QuoteStore: ObservableObject {
             ) else { continue }
             defaults.set(note.day, forKey: key)
             closeSummaryCount += 1
+            alertLog.append(note, at: Date())
+            saveAlertLog()
             onCloseSummary?(note)
         }
     }
@@ -550,10 +575,12 @@ final class QuoteStore: ObservableObject {
             else { continue }
             firedAlertCount += 1
             let name = quote.name.isEmpty ? item.displayName : quote.name
-            onAlert?(AlertTrigger(
+            let trigger = AlertTrigger(
                 symbol: item.symbol, name: name, condition: move.direction == .up ? .rapidRise : .rapidFall,
                 threshold: move.percent, quote: quote
-            ))
+            )
+            log(trigger)
+            onAlert?(trigger)
         }
     }
 
@@ -563,7 +590,10 @@ final class QuoteStore: ObservableObject {
         guard !triggers.isEmpty else { return }
         firedAlertCount += triggers.count
         saveAlertState()
-        triggers.forEach { onAlert?($0) }
+        triggers.forEach { trigger in
+            log(trigger)
+            onAlert?(trigger)
+        }
     }
 
     private func save() {
@@ -584,6 +614,7 @@ final class QuoteStore: ObservableObject {
         static let alertState = "alerts.fired.v1"
         static let closeSummaryPrefix = "alerts.closeSummary.sent."
         static let profitHistory = "holdings.history.v1"
+        static let alertLog = "alerts.log.v1"
     }
 }
 
