@@ -258,6 +258,14 @@ final class SettingsStore: ObservableObject {
     @Published var showCostAndTrades: Bool {
         didSet { defaults.set(showCostAndTrades, forKey: Keys.showCostAndTrades) }
     }
+    /// 涨跌榜上次看的是哪个榜。
+    @Published var rankKind: RankKind {
+        didSet { defaults.set(rankKind.rawValue, forKey: Keys.rankKind) }
+    }
+    /// 涨跌榜上不列新股（N、C 开头的）。
+    @Published var rankHidesNewListings: Bool {
+        didSet { defaults.set(rankHidesNewListings, forKey: Keys.rankHidesNewListings) }
+    }
     /// 美股个股不在常规交易时段时显示盘前盘后价。
     @Published var showExtendedHours: Bool {
         didSet { defaults.set(showExtendedHours, forKey: Keys.showExtendedHours) }
@@ -329,6 +337,8 @@ final class SettingsStore: ObservableObject {
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showMovingAverages = defaults.object(forKey: Keys.showMovingAverages) as? Bool ?? true
         showCostAndTrades = defaults.object(forKey: Keys.showCostAndTrades) as? Bool ?? true
+        rankKind = defaults.string(forKey: Keys.rankKind).flatMap(RankKind.init(rawValue:)) ?? .gainers
+        rankHidesNewListings = defaults.object(forKey: Keys.rankHidesNewListings) as? Bool ?? true
         compactRows = defaults.object(forKey: Keys.compactRows) as? Bool ?? false
         showAllocation = defaults.object(forKey: Keys.showAllocation) as? Bool ?? false
         showProfitHistory = defaults.object(forKey: Keys.showProfitHistory) as? Bool ?? false
@@ -408,6 +418,8 @@ final class SettingsStore: ObservableObject {
         static let flashOnChange = "list.flash"
         static let showMovingAverages = "chart.movingAverages"
         static let showCostAndTrades = "chart.costAndTrades"
+        static let rankKind = "rank.kind"
+        static let rankHidesNewListings = "rank.hideNew"
         static let compactRows = "list.compact"
         static let showAllocation = "holdings.allocation"
         static let showProfitHistory = "holdings.history"

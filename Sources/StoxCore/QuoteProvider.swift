@@ -17,6 +17,10 @@ public protocol QuoteProvider: Sendable {
     func fetchFiveDay(for symbol: Symbol, exchangeCode: String?) async throws -> MultiDaySeries?
     /// 美股个股盘前或盘后的最新成交；常规交易时段、不是美股个股、数据源不支持时返回 nil。exchangeCode 同 fetchKline。
     func fetchExtendedHours(for symbol: Symbol, exchangeCode: String?) async throws -> ExtendedHoursQuote?
+    /// A 股涨跌榜的前 count 只；数据源不支持时返回 nil。
+    func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]?
+    /// A 股行业按涨跌幅排的前 count 个；数据源不支持时返回 nil。
+    func fetchIndustries(count: Int) async throws -> [IndustryEntry]?
 }
 
 extension QuoteProvider {
@@ -25,6 +29,8 @@ extension QuoteProvider {
     public func fetchExchangeRates() async throws -> ExchangeRates? { nil }
     public func fetchFiveDay(for symbol: Symbol, exchangeCode: String?) async throws -> MultiDaySeries? { nil }
     public func fetchExtendedHours(for symbol: Symbol, exchangeCode: String?) async throws -> ExtendedHoursQuote? { nil }
+    public func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]? { nil }
+    public func fetchIndustries(count: Int) async throws -> [IndustryEntry]? { nil }
 }
 
 public enum ProviderError: Error, LocalizedError, Equatable {
@@ -157,6 +163,16 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? {
         guard let url = Self.minuteURL(for: symbol) else { throw URLError(.badURL) }
         return TencentMinuteParser.parse(try await get(url), symbol: symbol)
+    }
+
+    public func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]? {
+        guard let url = TencentRank.url(kind, count: count) else { throw URLError(.badURL) }
+        return TencentRank.parse(try await get(url))
+    }
+
+    public func fetchIndustries(count: Int) async throws -> [IndustryEntry]? {
+        guard let url = TencentRank.industryURL(count: count) else { throw URLError(.badURL) }
+        return TencentRank.parseIndustries(try await get(url))
     }
 
     public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? {

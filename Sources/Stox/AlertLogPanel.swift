@@ -34,7 +34,7 @@ struct AlertLogPanel: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
                 }
-                .frame(height: min(CGFloat(store.alertLog.entries.count) * 52 + 8, Self.listMaxHeight))
+                .frame(height: min(CGFloat(store.alertLog.entries.count) * 52 + 8, Self.listMaxHeight, router.pageMaxHeight))
                 .glassCard()
             }
             HStack {

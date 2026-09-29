@@ -264,6 +264,14 @@ smoke() {
     grep -Eq "alerts=[1-9]" shots/holdings.log || fail "持仓盈利达到阈值时没有提醒"
     grep -Eq "alert_log=[1-9]" shots/alert-log.log || fail "最近的提醒里应该有刚才的止盈提醒"
   fi
+  # A 股涨跌榜：打开涨幅榜，取到了就列出来；接口偶尔取不到只提示。
+  run_case rank --show-panel --rank
+  grep -q "route=rank" shots/rank.log || fail "没有打开涨跌榜"
+  grep -Eq "rank=[1-9]" shots/rank.log || echo "::warning::涨跌榜没有取到数据"
+  defaults write "$DOMAIN" rank.kind -string industries
+  run_case rank-industries --show-panel --rank
+  defaults delete "$DOMAIN" rank.kind
+  grep -Eq "rank=[1-9]" shots/rank-industries.log || echo "::warning::行业榜没有取到数据"
   # 打开了收盘小结：收盘不到 16 小时的市场各发一条。CI 运行的时间不固定，发没发取决于这时哪个市场刚收盘，只提示不判失败。
   grep -Eq "summaries=[1-9]" shots/holdings.log || echo "::warning::这次没有发收盘小结（可能没有刚收盘的市场）"
   grep -q 'status_title="上证 .* 今日 ' shots/holdings.log || fail "菜单栏没有显示今日盈亏"

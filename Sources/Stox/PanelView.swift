@@ -34,6 +34,8 @@ struct PanelView: View {
                 GroupEditorPanel(original: name, member: member)
             case .alerts:
                 AlertLogPanel()
+            case .rank:
+                RankPanel()
             }
         }
         .padding(12)
@@ -961,6 +963,7 @@ struct PanelFooter: View {
                     .disabled(store.items.isEmpty)
                 Button("最近的提醒…") { router.route = .alerts }
                     .disabled(store.alertLog.entries.isEmpty)
+                Button("A 股涨跌榜…") { router.route = .rank }
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
             }

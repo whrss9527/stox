@@ -23,6 +23,13 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var alertLog: AlertLog
     /// 美股个股盘前盘后的最新成交。美股常规交易时段里是空的。
     @Published private(set) var extendedHours: [Symbol: ExtendedHoursQuote] = [:]
+    /// A 股涨跌榜，打开榜单页时才取（见 RankPanel）。
+    @Published private(set) var rank: [RankKind: [RankEntry]] = [:]
+    /// 行业榜。
+    @Published private(set) var industries: [IndustryEntry]?
+    @Published private(set) var rankUpdated: [RankKind: Date] = [:]
+    /// 最近一次取榜单失败的原因；取到了就清掉。
+    @Published private(set) var rankError: String?
     /// 上一次取盘前盘后价的时间和当时取的是哪几只。
     private var extendedHoursFetched: (date: Date, symbols: Set<Symbol>) = (.distantPast, [])
 
@@ -267,6 +274,26 @@ final class QuoteStore: ObservableObject {
             }
             let live = phase(for: symbol.market.region).isLive
             try? await Task.sleep(nanoseconds: (live ? 60 : 1800) * 1_000_000_000)
+        }
+    }
+
+    /// 取一次涨跌榜的前 count 只（行业榜是前 count 个行业）。
+    func loadRank(_ kind: RankKind, count: Int) async {
+        do {
+            if kind == .industries {
+                if let entries = try await provider.fetchIndustries(count: count) {
+                    industries = entries
+                    rankUpdated[kind] = Date()
+                    rankError = nil
+                }
+            } else if let entries = try await provider.fetchRank(kind, count: count) {
+                rank[kind] = entries
+                rankUpdated[kind] = Date()
+                rankError = nil
+            }
+        } catch {
+            guard !Task.isCancelled else { return }
+            rankError = error.localizedDescription
         }
     }
 
