@@ -137,3 +137,43 @@ final class ReleaseNotesTests: XCTestCase {
                        "https://api.github.com/repos/whrss9527/stox/releases/tags/v0.16.0")
     }
 }
+
+final class ReleaseRangeTests: XCTestCase {
+    /// releases 列表接口的返回（节选）：最新的在前，混着一个预发布和一个草稿。
+    private let listJSON = #"""
+    [{"tag_name":"v0.38.0","draft":false,"prerelease":false,"html_url":"https://github.com/whrss9527/stox/releases/tag/v0.38.0",
+      "body":"## 更新内容\n\n- 五日图下面画上成交量\n- README 换了截图\n\n## 安装\n\n1. 下载","assets":[]},
+     {"tag_name":"v0.38.0-beta","draft":false,"prerelease":true,"body":"## 更新内容\n\n- 试一试","assets":[]},
+     {"tag_name":"v0.37.0","draft":false,"prerelease":false,"body":"## 更新内容\n\n- 盈亏日历","assets":[]},
+     {"tag_name":"v0.36.1","draft":true,"prerelease":false,"body":"## 更新内容\n\n- 还没发","assets":[]},
+     {"tag_name":"v0.36.0","draft":false,"prerelease":false,"body":"## 安装\n\n1. 下载","assets":[]},
+     {"tag_name":"v0.35.0","draft":false,"prerelease":false,"body":"## 更新内容\n\n* 资金流向","assets":[]}]
+    """#
+
+    func testParsesTheListAndPicksTheRange() throws {
+        let all = UpdateCheck.parseList(Data(listJSON.utf8))
+        XCTAssertEqual(all.map(\.version), ["0.38.0", "0.37.0", "0.36.0", "0.35.0"], "草稿和预发布不算")
+        XCTAssertEqual(UpdateCheck.releases(all, after: "0.35.0", upTo: "0.38.0").map(\.version), ["0.38.0", "0.37.0", "0.36.0"])
+        XCTAssertEqual(UpdateCheck.releases(all, after: "0.36.0", upTo: "0.37.0").map(\.version), ["0.37.0"])
+        XCTAssertEqual(UpdateCheck.releases(all, after: "0.38.0", upTo: "0.38.0"), [])
+        XCTAssertEqual(UpdateCheck.parseList(Data("{\"message\":\"API rate limit exceeded\"}".utf8)), [])
+        XCTAssertEqual(UpdateCheck.listURL(count: 30)?.absoluteString, "https://api.github.com/repos/whrss9527/stox/releases?per_page=30")
+    }
+
+    func testCombinesTheNotes() {
+        let range = UpdateCheck.releases(UpdateCheck.parseList(Data(listJSON.utf8)), after: "0.34.0", upTo: "0.38.0")
+        XCTAssertEqual(ReleaseNotesText.combined(Array(range.prefix(2)), limit: 5),
+                       "**0.38.0**\n- 五日图下面画上成交量\n- README 换了截图\n\n**0.37.0**\n- 盈亏日历")
+        XCTAssertEqual(ReleaseNotesText.combined(range, limit: 2).components(separatedBy: "\n\n").last,
+                       "还有 2 个更早的版本，见发布页")
+        XCTAssertTrue(ReleaseNotesText.combined(range, limit: 3).contains("**0.36.0**\n这个版本没有写更新内容"))
+
+        XCTAssertEqual(ReleaseNotesText.firstLines(range, limit: 3), [
+            "- **0.38.0** 五日图下面画上成交量",
+            "- **0.37.0** 盈亏日历",
+            "- **0.36.0** 这个版本没有写更新内容",
+            "- 还有 1 个更早的版本",
+        ])
+        XCTAssertEqual(ReleaseNotesText.firstLines(Array(range.suffix(1)), limit: 3), ["- **0.35.0** 资金流向"], "* 开头的也认")
+    }
+}

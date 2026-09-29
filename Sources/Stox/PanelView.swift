@@ -554,7 +554,7 @@ struct TipsCards: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("已更新到 \(version)")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("自选和设置都还在")
+                        Text(settings.whatsNewSince.map { "从 \($0) 更新上来，自选和设置都还在" } ?? "自选和设置都还在")
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
                     }
@@ -580,7 +580,7 @@ struct TipsCards: View {
             .glassCard()
             .reportsCardHeight()
             .task(id: version) {
-                whatsNewNotes = await Self.loadNotes(version)
+                whatsNewNotes = await Self.loadNotes(version, since: settings.whatsNewSince)
             }
         }
         if !settings.tipsDismissed {
@@ -606,23 +606,37 @@ struct TipsCards: View {
     }
 
     /// 发布说明里“更新内容”的前几条。
-    private static func loadNotes(_ version: String) async -> String? {
-        let release: ReleaseInfo
+    /// 隔了几个版本才更新时，每个版本一行（它的第一条更新内容），最多 5 个版本；只差一个版本时是这个版本的前几条。
+    private static func loadNotes(_ version: String, since: String?) async -> String? {
+        let lines: [String]
         do {
-            release = try await UpdateCheck.release(version: version, currentVersion: AppInfo.version)
+            let all = try await UpdateCheck.releases(count: 30, currentVersion: AppInfo.version)
+            let range = UpdateCheck.releases(all, after: since ?? version, upTo: version)
+            if range.count > 1 {
+                lines = ReleaseNotesText.firstLines(range, limit: 5)
+            } else {
+                // 只差一个版本，或者不知道是从哪个版本更新的：这个版本自己的前几条。
+                let release: ReleaseInfo
+                if let found = all.first(where: { $0.version == version }) {
+                    release = found
+                } else {
+                    release = try await UpdateCheck.release(version: version, currentVersion: AppInfo.version)
+                }
+                lines = Array(release.highlights
+                    .split(separator: "\n")
+                    .map(String.init)
+                    .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                    .prefix(4))
+            }
         } catch {
             Log.info("取 \(version) 的更新内容失败：\(error.localizedDescription)")
             print("STOX_DIAG whatsnew=failed \(error)")
             fflush(stdout)
             return nil
         }
-        let lines = release.highlights
-            .split(separator: "\n")
-            .map(String.init)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        print("STOX_DIAG whatsnew=\(lines.count) lines")
+        print("STOX_DIAG whatsnew=\(lines.count) lines since=\(since ?? "none")")
         fflush(stdout)
-        return lines.isEmpty ? nil : lines.prefix(4).joined(separator: "\n")
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 
     private func tip(_ text: String) -> some View {

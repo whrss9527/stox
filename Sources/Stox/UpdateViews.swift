@@ -199,9 +199,11 @@ struct UpdateSection: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            if !release.highlights.isEmpty {
-                ReleaseNotes(text: release.highlights)
-                    .lineLimit(12)
+            // 隔了几个版本时列出中间每个版本的更新内容。
+            let notes = updater.notesSinceCurrent ?? release.highlights
+            if !notes.isEmpty {
+                ReleaseNotes(text: notes)
+                    .lineLimit(updater.notesSinceCurrent == nil ? 12 : 30)
                     .fixedSize(horizontal: false, vertical: true)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
