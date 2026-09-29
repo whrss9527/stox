@@ -155,6 +155,8 @@ swift run stox-cli quote sh600519 700 AAPL us.IXIC
 swift run stox-cli search 茅台
 swift run stox-cli raw hk00700
 swift run stox-cli kline usAAPL week      # 最近几根 K 线（day、week、month）
+swift run stox-cli book sh600519          # A 股的买卖五档和内外盘
+swift run stox-cli rank gainers 10        # A 股涨跌榜（gainers、losers、turnover、industries）
 swift run stox-cli sina sh600519 700 AAPL # 备用的新浪行情
 swift run stox-cli latest-release 0.1.0   # GitHub 上的最新发布，以及能不能一键更新
 ```
