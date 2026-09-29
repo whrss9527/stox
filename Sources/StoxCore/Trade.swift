@@ -98,3 +98,46 @@ extension Portfolio {
         String(ProfitHistory.day(of: now, region: .cn).prefix(4)) + "-01-01"
     }
 }
+
+/// K 线上的买卖点：第几根上记过买入、卖出。
+public struct KlineTradeMark: Equatable, Sendable {
+    public var index: Int
+    public var bought: Bool
+    public var sold: Bool
+
+    public init(index: Int, bought: Bool, sold: Bool) {
+        self.index = index
+        self.bought = bought
+        self.sold = sold
+    }
+}
+
+extension KlineChartData {
+    /// 记下的买卖落在图上的哪几根：日 K 按日期，周 K、月 K 按同一周、同一个月。落在图外面的不要。
+    public func tradeMarks(_ trades: [Trade], region: MarketRegion) -> [KlineTradeMark] {
+        var marks: [Int: KlineTradeMark] = [:]
+        for trade in trades {
+            guard let index = candleIndex(of: trade.day, region: region) else { continue }
+            var mark = marks[index] ?? KlineTradeMark(index: index, bought: false, sold: false)
+            switch trade.side {
+            case .buy: mark.bought = true
+            case .sell: mark.sold = true
+            }
+            marks[index] = mark
+        }
+        return marks.values.sorted { $0.index < $1.index }
+    }
+
+    /// 这一天落在哪一根上；K 线的日期是那一周、那个月的最后一个交易日。
+    func candleIndex(of day: String, region: MarketRegion) -> Int? {
+        guard let first = candles.first, let last = candles.last else { return nil }
+        switch period {
+        case .day:
+            guard day >= first.date, day <= last.date else { return nil }
+            return candles.firstIndex { $0.date == day }
+        case .week, .month:
+            let unit: Calendar.Component = period == .week ? .weekOfYear : .month
+            return candles.firstIndex { KlineCalendar.isSame(unit, $0.date, day, region: region) }
+        }
+    }
+}

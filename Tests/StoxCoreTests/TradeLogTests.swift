@@ -98,6 +98,36 @@ final class TradeLogTests: XCTestCase {
         XCTAssertEqual(Portfolio.yearStart(now: time(2026, 12, 31, 20, 0, .us)), "2027-01-01", "按北京的日期")
     }
 
+    func testKlineTradeMarks() {
+        func chart(_ period: KlinePeriod, _ dates: [String]) -> KlineChartData {
+            KlineChartData(series: KlineSeries(symbol: moutai, period: period, candles: dates.map {
+                Candle(date: $0, open: 10, close: 10, high: 10, low: 10)
+            }))
+        }
+        let trades = [
+            Trade(side: .buy, shares: 100, price: 10, day: "2026-08-03"),
+            Trade(side: .buy, shares: 100, price: 10, day: "2026-09-25"),
+            Trade(side: .sell, shares: 100, price: 10, day: "2026-09-29", profit: 0),
+            Trade(side: .buy, shares: 100, price: 10, day: "2026-09-29"),
+        ]
+        let daily = chart(.day, ["2026-09-24", "2026-09-25", "2026-09-28", "2026-09-29"])
+        XCTAssertEqual(daily.tradeMarks(trades, region: .cn), [
+            KlineTradeMark(index: 1, bought: true, sold: false),
+            KlineTradeMark(index: 3, bought: true, sold: true),
+        ], "图外面的 8 月那笔不画")
+
+        // 周 K 的日期是那一周的最后一个交易日：9 月 25 日（周五）那根包含 9 月 22 日到 26 日。
+        let weekly = chart(.week, ["2026-09-18", "2026-09-25", "2026-09-29"])
+        let midweek = [Trade(side: .buy, shares: 1, price: 10, day: "2026-09-22"), Trade(side: .sell, shares: 1, price: 10, day: "2026-09-28")]
+        XCTAssertEqual(weekly.tradeMarks(midweek, region: .cn), [
+            KlineTradeMark(index: 1, bought: true, sold: false),
+            KlineTradeMark(index: 2, bought: false, sold: true),
+        ])
+        let monthly = chart(.month, ["2026-07-31", "2026-08-31", "2026-09-29"])
+        XCTAssertEqual(monthly.tradeMarks(trades, region: .cn).map(\.index), [1, 2])
+        XCTAssertEqual(daily.tradeMarks([], region: .cn), [])
+    }
+
     func testCodingAndLimit() throws {
         let item = WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200),
                              trades: [Trade(side: .sell, shares: 100, price: 1300, day: "2026-09-29", profit: 10_000)])

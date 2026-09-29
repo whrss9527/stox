@@ -95,6 +95,20 @@ smoke() {
   # 多取了 20 根历史，取到了的话图上 60 根都有 MA20。
   grep -Eq "ma20=60 " shots/kline.log || echo "::warning::日 K 上的均线没有从最左边开始"
 
+  # 买卖点：上个月记过一买一卖，月 K 上那个月的一根标着 B 和 S。
+  local month
+  month=$(TZ=Asia/Shanghai date -v1d -v-1m +%Y-%m)
+  write_watchlist '[{"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},
+    "trades":[{"side":"buy","shares":100,"price":1200,"day":"'"$month"'-03"},{"side":"sell","shares":50,"price":1250,"day":"'"$month"'-20","profit":2500}]}]'
+  run_case kline-marks --show-panel --expand sh600519 --chart month
+  defaults delete "$DOMAIN" chart.period
+  defaults delete "$DOMAIN" watchlist.v1
+  if grep -Eq "kline=[1-9]" shots/kline-marks.log; then
+    grep -q "marks=1 " shots/kline-marks.log || fail "月 K 上应该标出上个月的买卖"
+  else
+    echo "::warning::月 K 没有取到数据，这次不检查买卖点"
+  fi
+
   # 五档：A 股个股有买卖五档，开盘前、停牌、涨跌停时不满，只提示。港股没有五档，选着五档时看分时，也不列五档。
   run_case orderbook --show-panel --expand sh600519 --chart orderBook
   run_case orderbook-hk --show-panel --expand hk00700 --chart orderBook
