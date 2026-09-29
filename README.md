@@ -12,6 +12,10 @@
 </p>
 <p>
   <img src="docs/images/holdings.jpg" width="300" alt="持仓与盈亏">
+  <img src="docs/images/editor.jpg" width="300" alt="持仓、买卖记录和分红">
+</p>
+<p>
+  <img src="docs/images/rank.jpg" width="300" alt="A 股涨跌榜">
   <img src="docs/images/search.jpg" width="300" alt="搜索添加">
 </p>
 <p>
@@ -21,7 +25,7 @@
   <img src="docs/images/settings.jpg" width="604" alt="设置窗口">
 </p>
 
-截图依次是自选列表、展开详情（分时和均价线）、日 K 和均线、A 股的买卖五档、持仓与盈亏、搜索添加、“不显示红绿”配色和设置窗口，由 CI 在 macOS 15 上启动打包好的 App 自动截取，数据是 2026-09-28、29 的实时行情。
+截图依次是自选列表、展开详情（分时和均价线）、日 K 和均线、A 股的买卖五档、持仓与盈亏、编辑页的持仓和买卖记录、A 股涨跌榜、搜索添加、“不显示红绿”配色和设置窗口，由 CI 在 macOS 15 上启动打包好的 App 自动截取，数据是 2026-09-28、29 的实时行情。
 
 ## 功能
 
