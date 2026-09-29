@@ -285,29 +285,30 @@ struct StockEditorPanel: View {
         return parts.joined(separator: "、")
     }
 
-    /// 最近的买卖：最新的在前，最多列 5 笔；下面写今年卖出一共赚了多少。删掉一条只删记录，不改持仓。
+    /// 最近的买卖：最新的在前，最多列 3 笔（编辑页不滚动，太长小屏幕放不下），标题行写着一共几笔和今年卖出、
+    /// 分红一共赚了多少。删掉一条只删记录，不改持仓。
     private var tradeList: some View {
-        let recent = Array(trades.indices.reversed().prefix(5))
-        let realized = trades.realizedProfit(since: Portfolio.yearStart(now: Date()))
-        let sold = trades.contains { $0.profit != nil && $0.day >= Portfolio.yearStart(now: Date()) }
+        let recent = Array(trades.indices.reversed().prefix(3))
+        let yearStart = Portfolio.yearStart(now: Date())
+        let realized = trades.realizedProfit(since: yearStart)
+        let hasRealized = trades.contains { $0.profit != nil && $0.day >= yearStart }
         return VStack(alignment: .leading, spacing: 3) {
-            Text("最近的买卖")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Text(trades.count > recent.count ? "最近的买卖（共 \(trades.count) 笔）" : "最近的买卖")
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                if hasRealized {
+                    Text("今年已实现 " + QuoteFormatter.signedMoney(realized))
+                        .foregroundStyle(Theme.priceColor(for: PriceDirection(realized), convention: settings.colorConvention))
+                        .help("今年卖出和分红一共赚了多少")
+                }
+            }
+            .font(.system(size: 11, weight: .medium).monospacedDigit())
+            .lineLimit(1)
             ForEach(recent, id: \.self) { index in
                 tradeLine(trades[index]) {
                     if trades.indices.contains(index) { trades.remove(at: index) }
                 }
-            }
-            if trades.count > recent.count {
-                Text("还有更早的 \(trades.count - recent.count) 笔")
-                    .font(.system(size: 10.5))
-                    .foregroundStyle(.tertiary)
-            }
-            if sold {
-                Text("今年已实现（卖出和分红） " + QuoteFormatter.signedMoney(realized))
-                    .font(.system(size: 11).monospacedDigit())
-                    .foregroundStyle(Theme.priceColor(for: PriceDirection(realized), convention: settings.colorConvention))
             }
         }
         .padding(.top, 2)
