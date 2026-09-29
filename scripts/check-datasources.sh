@@ -280,3 +280,9 @@ fetch "tencent quote: funds raw" "https://qt.gtimg.cn/q=jj161725,jj110022" "GB18
 fetch "fundgz estimate 161725" "https://fundgz.1234567.com.cn/js/161725.js" "UTF-8"
 fetch "fundgz estimate 110022" "https://fundgz.1234567.com.cn/js/110022.js" "UTF-8"
 fetch "tencent smartbox: fund" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=161725" "UTF-8"
+# 资金流向候选：腾讯 ff_（主力、散户的流入流出）和 s_pk（买卖盘里大单、小单的占比）。
+fields "tencent fund flow fields" "https://qt.gtimg.cn/utf8/q=ff_sh600519,ff_sz000001,ff_sh688981,ff_sh510300"
+fetch "tencent fund flow raw" "https://qt.gtimg.cn/q=ff_sh600519,ff_hk00700,ff_usAAPL,ff_sh000001" "GB18030"
+fetch "tencent pk" "https://qt.gtimg.cn/q=s_pksh600519,s_pksz000001" "GB18030"
+fetch "tencent fund flow today" "https://proxy.finance.qq.com/cgi/cgi-bin/fundflow/hsfundtab?code=sh600519&type=fundFlow&klineNeedDay=1" "UTF-8"
+fetch "tencent fund flow history" "https://proxy.finance.qq.com/cgi/cgi-bin/fundflow/hsfundtab?code=sh600519&type=historyFundFlow&klineNeedDay=5" "UTF-8"
