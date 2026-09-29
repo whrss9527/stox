@@ -413,6 +413,7 @@ struct QuoteDetailView: View {
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
+                    .help(item.symbol.isFund ? "场外基金的净值每个交易日晚上更新，白天看到的是上一个交易日的" : "")
                 Spacer()
                 Button(item.symbol.isIndex ? "提醒" : "持仓与提醒") { router.route = .edit(item.symbol) }
                 if let web = QuoteLinks.web(item.symbol) {
@@ -464,7 +465,7 @@ struct QuoteDetailView: View {
         // 场外基金写净值是哪天的，每个交易日晚上才出当天的。
         if item.symbol.isFund {
             guard let timestamp = quote.timestamp else { return "净值每个交易日晚上更新" }
-            return "净值日期 " + ProfitHistory.day(of: timestamp, region: .cn) + " · 每个交易日晚上更新"
+            return "净值日期 " + ProfitHistory.day(of: timestamp, region: .cn)
         }
         // 美股不在常规交易时，这一行换成盘前盘后价和它的成交时间；行情时间这时总是收盘那一刻，不用再写。
         if settings.showExtendedHours, let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {

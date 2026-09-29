@@ -21,6 +21,8 @@ public protocol QuoteProvider: Sendable {
     func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]?
     /// A 股行业按涨跌幅排的前 count 个；数据源不支持时返回 nil。
     func fetchIndustries(count: Int) async throws -> [IndustryEntry]?
+    /// A 股个股、ETF 当天的资金流向；没有资金流向的证券、数据源不支持时返回 nil。
+    func fetchFundFlow(for symbol: Symbol) async throws -> FundFlow?
 }
 
 extension QuoteProvider {
@@ -31,6 +33,7 @@ extension QuoteProvider {
     public func fetchExtendedHours(for symbol: Symbol, exchangeCode: String?) async throws -> ExtendedHoursQuote? { nil }
     public func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]? { nil }
     public func fetchIndustries(count: Int) async throws -> [IndustryEntry]? { nil }
+    public func fetchFundFlow(for symbol: Symbol) async throws -> FundFlow? { nil }
 }
 
 public enum ProviderError: Error, LocalizedError, Equatable {
@@ -173,6 +176,11 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     public func fetchIndustries(count: Int) async throws -> [IndustryEntry]? {
         guard let url = TencentRank.industryURL(count: count) else { throw URLError(.badURL) }
         return TencentRank.parseIndustries(try await get(url))
+    }
+
+    public func fetchFundFlow(for symbol: Symbol) async throws -> FundFlow? {
+        guard let url = TencentFundFlow.url(for: symbol) else { return nil }
+        return TencentFundFlow.parse(try await get(url))
     }
 
     public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? {

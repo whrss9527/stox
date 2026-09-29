@@ -40,6 +40,7 @@ jobs:
           swift run stox-cli book sh600519
           swift run stox-cli rank gainers 5
           swift run stox-cli rank industries 5
+          swift run stox-cli flow sh600519
           swift run stox-cli sina sh000001 sh600519 sh510300 hk00700 hkHSI usAAPL usBRK.B us.IXIC
           swift run stox-cli latest-release 0.0.1
 

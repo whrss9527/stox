@@ -10,6 +10,7 @@ import StoxCore
 //   stox-cli kline sh600519 week               打印最近几根 K 线（day、week、month）
 //   stox-cli book sh600519                     打印 A 股的买卖五档和内外盘
 //   stox-cli rank gainers 10                   打印 A 股涨跌榜（gainers、losers、turnover、industries）
+//   stox-cli flow sh600519                     打印 A 股个股、ETF 当天的资金流向
 //   stox-cli latest-release 0.1.0              查询 GitHub 上的最新发布，并和给定版本比较
 //
 // 有代码取不到行情、或搜索无结果时以非零状态退出，方便在 CI 里做冒烟测试。
@@ -24,6 +25,7 @@ func printUsage() {
       stox-cli kline <代码> [day|week|month]   打印最近几根 K 线
       stox-cli book <代码>        打印 A 股的买卖五档和内外盘
       stox-cli rank [gainers|losers|turnover|industries] [数量]   打印 A 股涨跌榜
+      stox-cli flow <代码>        打印 A 股个股、ETF 当天的资金流向
       stox-cli latest-release [当前版本]   查询最新发布
     """)
 }
@@ -157,6 +159,31 @@ do {
             ].joined(separator: " "))
         }
         exit(entries.isEmpty ? 1 : 0)
+
+    case "flow":
+        guard let symbol = parseSymbols(arguments.dropFirst().prefix(1)).first else {
+            printUsage()
+            exit(2)
+        }
+        guard let flow = try await provider.fetchFundFlow(for: symbol) else {
+            print("\(symbol.rawValue) 没有资金流向（只有 A 股个股和 ETF 有）")
+            exit(1)
+        }
+        let money = QuoteFormatter.signedLargeNumber
+        let rank = flow.rank.map { "  排名 \($0.position)/\($0.total)" } ?? ""
+        print("\(symbol.rawValue) 主力净流入 \(money(flow.mainNetInflow))\(rank)")
+        print("  主力流入 \(QuoteFormatter.largeNumber(flow.mainInflow))  流出 \(QuoteFormatter.largeNumber(flow.mainOutflow))")
+        print("  超大单 \(money(flow.superNet))  大单 \(money(flow.bigNet))  中单 \(money(flow.mediumNet))  小单 \(money(flow.smallNet))")
+        if let first = flow.trend.first, let last = flow.trend.last {
+            func time(_ minute: Int) -> String { String(format: "%02d:%02d", minute / 60, minute % 60) }
+            print("  分时 \(flow.trend.count) 分钟，\(time(first.minute)) 到 \(time(last.minute))")
+        }
+        for day in flow.days {
+            print("  \(day.date)  \(money(day.mainNetInflow))")
+        }
+        if let note = flow.note {
+            print("  \(note)")
+        }
 
     case "latest-release":
         let current = arguments.dropFirst().first ?? "0.0.0"
