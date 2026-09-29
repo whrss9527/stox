@@ -105,6 +105,8 @@ jobs:
           ls -la shots
       - uses: actions/upload-artifact@v5
         if: always()
+        # 截图只是辅助诊断，GitHub 的产物服务偶尔超时，不能因为它让整次构建失败。
+        continue-on-error: true
         with:
           name: screenshots
           path: shots/
