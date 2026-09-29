@@ -954,6 +954,8 @@ struct PanelFooter: View {
                     .disabled(store.items.isEmpty)
                 Button("复制持仓表格") { copyHoldings() }
                     .disabled(!store.items.contains { $0.holding != nil })
+                Button("复制买卖记录") { copyTrades() }
+                    .disabled(!store.items.contains { !$0.trades.isEmpty })
                 Divider()
                 Button("新建分组…") { router.route = .group(nil, member: nil) }
                     .disabled(store.items.isEmpty)
@@ -1000,6 +1002,13 @@ struct PanelFooter: View {
         guard !text.isEmpty else { return }
         let rows = text.components(separatedBy: "\n").count - 1
         copy(text, message: "已复制 \(rows) 行持仓，可以直接粘贴到表格里")
+    }
+
+    private func copyTrades() {
+        let text = Portfolio.tradesText(items: store.items)
+        guard !text.isEmpty else { return }
+        let rows = text.components(separatedBy: "\n").count - 1
+        copy(text, message: "已复制 \(rows) 笔买卖，可以直接粘贴到表格里")
     }
 
     private func copy(_ text: String, message: String) {

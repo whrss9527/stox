@@ -128,6 +128,36 @@ extension Portfolio {
     }
 }
 
+extension Portfolio {
+    /// 全部买卖记录，制表符分隔，按日期从早到晚，粘贴到 Numbers、Excel 就是一张表。金额保留两位小数，方便再计算。
+    public static func tradesText(items: [WatchItem]) -> String {
+        var rows: [(day: String, order: Int, line: String)] = []
+        for item in items {
+            for trade in item.trades {
+                var kind = trade.side.title
+                if let bonus = trade.bonus, bonus > 0 {
+                    kind += "（每股送转 \(QuoteFormatter.plain(bonus))）"
+                }
+                let line = [
+                    trade.day,
+                    item.displayName,
+                    item.symbol.displayCode,
+                    item.symbol.market.region.currency,
+                    kind,
+                    QuoteFormatter.plain(trade.shares),
+                    QuoteFormatter.plain(trade.price),
+                    QuoteFormatter.fixed(trade.shares * trade.price, decimals: 2),
+                    trade.profit.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "",
+                ].joined(separator: "\t")
+                rows.append((trade.day, rows.count, line))
+            }
+        }
+        guard !rows.isEmpty else { return "" }
+        let sorted = rows.sorted { ($0.day, $0.order) < ($1.day, $1.order) }
+        return (["日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t已实现盈亏"] + sorted.map(\.line)).joined(separator: "\n")
+    }
+}
+
 /// K 线上的买卖点：第几根上记过买入、卖出。
 public struct KlineTradeMark: Equatable, Sendable {
     public var index: Int

@@ -155,6 +155,26 @@ final class TradeLogTests: XCTestCase {
         XCTAssertEqual(daily.tradeMarks([], region: .cn), [])
     }
 
+    func testTradesText() {
+        let items = [
+            WatchItem(symbol: moutai, name: "贵州茅台", trades: [
+                Trade(side: .buy, shares: 100, price: 1200, day: "2026-01-05"),
+                Trade(side: .sell, shares: 50, price: 1300, day: "2026-03-02", profit: 5000),
+            ]),
+            WatchItem(symbol: Symbol("sz000001")!, name: "平安银行", trades: [
+                Trade(side: .dividend, shares: 1000, price: 0.5, day: "2026-02-10", profit: 500, bonus: 0.4),
+            ]),
+            WatchItem(symbol: Symbol("usAAPL")!, name: "苹果"),
+        ]
+        XCTAssertEqual(Portfolio.tradesText(items: items), [
+            "日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t已实现盈亏",
+            "2026-01-05\t贵州茅台\t600519\tCNY\t买入\t100\t1200\t120000.00\t",
+            "2026-02-10\t平安银行\t000001\tCNY\t分红（每股送转 0.4）\t1000\t0.5\t500.00\t500.00",
+            "2026-03-02\t贵州茅台\t600519\tCNY\t卖出\t50\t1300\t65000.00\t5000.00",
+        ].joined(separator: "\n"), "按日期排，几只的记录混在一起")
+        XCTAssertEqual(Portfolio.tradesText(items: [items[2]]), "", "没有记录时是空的")
+    }
+
     func testCodingAndLimit() throws {
         let item = WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200),
                              trades: [Trade(side: .sell, shares: 100, price: 1300, day: "2026-09-29", profit: 10_000)])
