@@ -1,7 +1,7 @@
 import Foundation
 
-/// 一只证券（股票、指数、基金）。统一用腾讯接口的代码格式表示，例如
-/// `sh600519`、`sz399001`、`bj920819`、`hk00700`、`hkHSI`、`usAAPL`、`us.IXIC`。
+/// 一只证券（股票、指数、基金），或者一个期货外汇品种。统一用腾讯接口的代码格式表示，例如
+/// `sh600519`、`sz399001`、`bj920819`、`hk00700`、`hkHSI`、`usAAPL`、`us.IXIC`、`hf_XAU`、`whUSDCNY`。
 public struct Symbol: Hashable, Sendable {
     public let market: Market
     public let code: String
@@ -12,7 +12,7 @@ public struct Symbol: Hashable, Sendable {
         self.code = normalized
     }
 
-    /// 从 `sh600519` 这样的完整代码构造。
+    /// 从 `sh600519`、`hf_XAU` 这样的完整代码构造。
     public init?(_ rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 2, let market = Market(rawValue: trimmed.prefix(2).lowercased()) else {
@@ -21,7 +21,8 @@ public struct Symbol: Hashable, Sendable {
         self.init(market: market, code: String(trimmed.dropFirst(2)))
     }
 
-    public var rawValue: String { market.rawValue + code }
+    /// 腾讯接口里的代码。国际期货在市场前缀后面多一个下划线（`hf_XAU`）。
+    public var rawValue: String { market == .hf ? "hf_" + code : market.rawValue + code }
 
     /// 指数没有成交量单位、价格固定两位小数，界面上也会单独标注。
     public var isIndex: Bool {
@@ -31,12 +32,21 @@ public struct Symbol: Hashable, Sendable {
         case .bj: return code.hasPrefix("899")
         case .hk: return !code.allSatisfy(\.isASCIIDigit)
         case .us: return code.hasPrefix(".")
-        case .jj: return false
+        case .jj, .hf, .wh: return false
         }
     }
 
     /// 场外基金：只有每天的净值，没有盘中行情、分时和 K 线。
     public var isFund: Bool { market == .jj }
+
+    /// 期货外汇：国际期货、贵金属现货和外汇。
+    public var isGlobal: Bool { market.region == .global }
+
+    /// 能不能填持仓、记买卖：指数和期货外汇不能。
+    public var canHold: Bool { !isIndex && !isGlobal }
+
+    /// 有没有分时、五日和 K 线：场外基金和期货外汇没有（数据源不提供）。
+    public var hasCharts: Bool { !isFund && !isGlobal }
 
     /// 科创板（上交所 688、689 开头）：腾讯接口里它的成交量、K 线的量是股，别的 A 股是手。
     public var isStarMarket: Bool {
@@ -70,6 +80,18 @@ public struct Symbol: Hashable, Sendable {
                   upper.contains(where: \.isASCIILetter)
             else { return nil }
             return upper
+        case .hf:
+            // hf_XAU：代码前面的下划线可有可无。
+            let upper = String(code.drop(while: { $0 == "_" })).uppercased()
+            guard (1...10).contains(upper.count), upper.allSatisfy({ $0.isASCIILetter || $0.isASCIIDigit }),
+                  upper.contains(where: \.isASCIILetter)
+            else { return nil }
+            return upper
+        case .wh:
+            // 外汇是两种货币的代码连在一起（USDCNY），美元指数是 USDX。
+            let upper = code.uppercased()
+            guard upper.count == 6 || upper == "USDX", upper.allSatisfy(\.isASCIILetter) else { return nil }
+            return upper
         }
     }
 }
@@ -101,14 +123,15 @@ extension Symbol: Codable {
 /// 把用户随手输入的代码解析成 Symbol。
 ///
 /// 支持：`sh600519`、`600519.SH`、`600519`（按号段推断沪深北）、`700`/`00700`（港股）、
-/// `AAPL`/`brk.b`（美股）、`us.IXIC`、`hkHSI`，场外基金 `jj161725`、`161725.OF`。
+/// `AAPL`/`brk.b`（美股）、`us.IXIC`、`hkHSI`，场外基金 `jj161725`、`161725.OF`，期货外汇 `hf_XAU`、`whUSDCNY`。
 public enum SymbolInput {
     public static func parse(_ input: String) -> Symbol? {
         let text = input.filter { !$0.isWhitespace }
         guard !text.isEmpty else { return nil }
 
-        // 1. 前缀格式：sh600519 / hk00700 / usAAPL / us.IXIC。
-        //    美股、港股字母代码要求小写前缀，避免把 USO、HKD 之类的美股代码误判。
+        // 1. 前缀格式：sh600519 / hk00700 / usAAPL / us.IXIC / hf_XAU / whUSDCNY。
+        //    美股、港股字母代码和外汇要求小写前缀，避免把 USO、HKD、WHR 之类的美股代码误判；
+        //    国际期货要带下划线（hf_C 是玉米，hfc 还是美股）。
         if text.count > 2 {
             let prefix = String(text.prefix(2))
             let rest = String(text.dropFirst(2))
@@ -119,6 +142,8 @@ public enum SymbolInput {
                 case .sh, .sz, .bj, .jj: accept = true
                 case .hk: accept = restIsDigits || prefix == "hk"
                 case .us: accept = prefix == "us" || rest.hasPrefix(".")
+                case .hf: accept = rest.hasPrefix("_")
+                case .wh: accept = prefix == "wh"
                 }
                 if accept, let symbol = Symbol(market: market, code: rest) { return symbol }
             }
@@ -156,8 +181,8 @@ public enum SymbolInput {
     /// 纯字母（如 `gzmt`、`aapl`）既可能是美股代码也可能是拼音，需要交给搜索判断。
     public static func isExplicitCode(_ input: String) -> Bool {
         let text = input.filter { !$0.isWhitespace }
-        guard !text.isEmpty, parse(text) != nil else { return false }
-        if text.contains(where: \.isASCIIDigit) { return true }
+        guard !text.isEmpty, let symbol = parse(text) else { return false }
+        if symbol.isGlobal || text.contains(where: \.isASCIIDigit) { return true }
         if text.count > 2, text.hasPrefix("us") || text.hasPrefix("hk") { return true }
         if let dot = text.lastIndex(of: ".") {
             let suffix = text[text.index(after: dot)...].uppercased()

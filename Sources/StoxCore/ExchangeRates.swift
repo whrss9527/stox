@@ -15,7 +15,8 @@ public struct ExchangeRates: Equatable, Sendable {
         switch region {
         case .cn: return 1
         case .hk: return hkdCNY
-        case .us: return usdCNY
+        // 期货外汇不能填持仓，用不到；报价大多是美元。
+        case .us, .global: return usdCNY
         }
     }
 }

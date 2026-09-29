@@ -17,11 +17,15 @@ struct QuoteRow: View {
     static let sparklineWidth: CGFloat = 40
     static let sparklineMinimumWidth: CGFloat = 24
 
-    /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。场外基金没有走势图，只有一行净值。
+    /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。场外基金没有走势图，只有一行净值；
+    /// 期货外汇也没有走势图，是两行行情数据。
     static func detailHeight(for item: WatchItem) -> CGFloat {
         let note: CGFloat = item.note == nil ? 0 : 20
         if item.symbol.isFund {
             return (item.holding == nil ? 63 : 96) + note
+        }
+        if item.symbol.isGlobal {
+            return 96 + note
         }
         return (item.holding == nil ? 129 : 162) + QuoteChartSection.height + 6 + note
     }
@@ -102,9 +106,9 @@ struct QuoteRow: View {
 
     private var color: Color { Theme.priceColor(for: direction, convention: settings.colorConvention) }
 
-    /// 这一行画的迷你分时：设置里打开了、没展开（展开了有大的分时图）、不是场外基金，末端跟着现价走。
+    /// 这一行画的迷你分时：设置里打开了、没展开（展开了有大的分时图）、有分时（场外基金、期货外汇没有），末端跟着现价走。
     private var rowSparkline: Sparkline? {
-        guard settings.showSparklines, !expanded, !item.symbol.isFund, let sparkline = store.sparklines[item.symbol] else { return nil }
+        guard settings.showSparklines, !expanded, item.symbol.hasCharts, let sparkline = store.sparklines[item.symbol] else { return nil }
         return sparkline.updating(with: quote, region: item.symbol.market.region)
     }
 
@@ -312,7 +316,7 @@ struct QuoteRow: View {
         Button(item.pinned ? "不在菜单栏显示" : "显示在菜单栏") {
             store.togglePinned(item.symbol)
         }
-        Button(item.symbol.isIndex ? "价格提醒与简称…" : "持仓、提醒与简称…") {
+        Button(item.symbol.canHold ? "持仓、提醒与简称…" : "价格提醒与简称…") {
             router.route = .edit(item.symbol)
         }
         Menu("分组") {
@@ -380,6 +384,24 @@ struct QuoteDetailView: View {
                     cell("日涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
                     cell("日涨幅", QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
                 }
+            } else if item.symbol.isGlobal {
+                // 期货外汇没有走势图和成交量：开高低收、买价卖价；外汇有 52 周最高最低，期货写振幅。
+                HStack(spacing: 0) {
+                    cell("今开", positivePrice(quote.open))
+                    cell("最高", positivePrice(quote.high))
+                    cell("最低", positivePrice(quote.low))
+                    cell(item.symbol.market == .hf ? "昨结" : "昨收", price(quote.previousClose))
+                }
+                HStack(spacing: 0) {
+                    cell("涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
+                    cell("买价", quote.bid.map(price) ?? "--")
+                    cell("卖价", quote.ask.map(price) ?? "--")
+                    if let high = quote.high52Week, let low = quote.low52Week {
+                        cell("52周高低", price(high) + "/" + price(low))
+                    } else {
+                        cell("振幅", quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                    }
+                }
             } else {
                 QuoteChartSection(item: item, quote: quote)
                 HStack(spacing: 0) {
@@ -434,7 +456,7 @@ struct QuoteDetailView: View {
                     .minimumScaleFactor(0.85)
                     .help(item.symbol.isFund ? "场外基金的净值每个交易日晚上更新，白天看到的是上一个交易日的" : "")
                 Spacer()
-                Button(item.symbol.isIndex ? "提醒" : "持仓与提醒") { router.route = .edit(item.symbol) }
+                Button(item.symbol.canHold ? "持仓与提醒" : "提醒") { router.route = .edit(item.symbol) }
                 if let web = QuoteLinks.web(item.symbol) {
                     Button(web.title) { NSWorkspace.shared.open(web.url) }
                 }
@@ -448,6 +470,11 @@ struct QuoteDetailView: View {
 
     private func price(_ value: Double) -> String {
         QuoteFormatter.price(value, decimals: quote.priceDecimals)
+    }
+
+    /// 还没开盘时今开、最高、最低是 0，写成 --。
+    private func positivePrice(_ value: Double) -> String {
+        value > 0 ? price(value) : "--"
     }
 
     /// 亏损公司的市盈率是负数，和券商软件一样显示“亏损”。
@@ -493,6 +520,10 @@ struct QuoteDetailView: View {
             return text
         }
         guard let timestamp = quote.timestamp else { return "" }
+        // 期货外汇的行情时间本来就是北京时间。
+        if item.symbol.isGlobal {
+            return "北京时间 " + QuoteFormatter.time(timestamp, timeZone: region.timeZone)
+        }
         var text = "\(region.displayName)时间 \(QuoteFormatter.time(timestamp, timeZone: region.timeZone))"
         if region == .hk { text += " · 延时约 15 分钟" }
         return text

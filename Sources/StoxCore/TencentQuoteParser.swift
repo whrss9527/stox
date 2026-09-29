@@ -24,7 +24,7 @@ import Foundation
 /// | 61 | A 股的类别：`GP-A`、`GP-A-CYB`（创业板）、`GP-A-KCB`（科创板）、`ETF`、`ZS`（指数） |
 /// | 67 / 68 | A 股：52 周最高 / 最低（美股的 67 是当天的成交均价，即成交额除以成交量，没有用） |
 ///
-/// 无效代码不会出现在返回里。
+/// 无效代码不会出现在返回里。期货外汇的字段完全不同，见 GlobalQuoteParser。
 public enum TencentQuoteParser {
     public static func parse(_ text: String) -> [Symbol: Quote] {
         var quotes: [Symbol: Quote] = [:]
@@ -53,6 +53,7 @@ public enum TencentQuoteParser {
     }
 
     static func parseRecord(symbol: Symbol, payload: String) -> Quote? {
+        if symbol.isGlobal { return GlobalQuoteParser.parse(symbol: symbol, payload: payload) }
         let fields = payload.split(separator: "~", omittingEmptySubsequences: false).map {
             $0.trimmingCharacters(in: .whitespaces)
         }
@@ -99,6 +100,8 @@ public enum TencentQuoteParser {
         case .us:
             // 美股指数的成交额字段数值不可靠，不展示。
             amount = isIndex ? 0 : (number(37) ?? 0)
+        case .global:
+            return nil  // 上面已经交给 GlobalQuoteParser
         }
 
         return Quote(

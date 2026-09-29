@@ -163,6 +163,8 @@ public enum IntradayAxis {
         case .cn: return [(9 * 60 + 30)...(11 * 60 + 30), (13 * 60)...(15 * 60)]
         case .hk: return [(9 * 60 + 30)...(12 * 60), (13 * 60)...(16 * 60)]
         case .us: return [(9 * 60 + 30)...(16 * 60)]
+        // 期货外汇没有分时图，全天算一段。
+        case .global: return [0...(24 * 60)]
         }
     }
 
