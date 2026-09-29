@@ -32,6 +32,9 @@ public struct Quote: Sendable, Equatable {
     /// 换手率（%）。
     public var turnoverRate: Double?
     public var peRatio: Double?
+    /// 市净率、量比（只有 A 股个股和 ETF 有，ETF 没有市净率）。
+    public var pbRatio: Double?
+    public var volumeRatio: Double?
     /// 总市值（本币元）。
     public var marketCap: Double?
     /// 涨停价 / 跌停价（仅 A 股）。
@@ -68,6 +71,8 @@ public struct Quote: Sendable, Equatable {
         amount: Double = 0,
         turnoverRate: Double? = nil,
         peRatio: Double? = nil,
+        pbRatio: Double? = nil,
+        volumeRatio: Double? = nil,
         marketCap: Double? = nil,
         limitUp: Double? = nil,
         limitDown: Double? = nil,
@@ -95,6 +100,8 @@ public struct Quote: Sendable, Equatable {
         self.amount = amount
         self.turnoverRate = turnoverRate
         self.peRatio = peRatio
+        self.pbRatio = pbRatio
+        self.volumeRatio = volumeRatio
         self.marketCap = marketCap
         self.limitUp = limitUp
         self.limitDown = limitDown

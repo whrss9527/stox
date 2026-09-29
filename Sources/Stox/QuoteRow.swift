@@ -17,8 +17,8 @@ struct QuoteRow: View {
     static let sparklineWidth: CGFloat = 40
     static let sparklineMinimumWidth: CGFloat = 24
 
-    /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。场外基金没有走势图，只有一行净值；
-    /// 期货外汇是两行行情数据，国际期货上面还有分时图。
+    /// 展开后详情的高度：走势图、三行行情数据，A 股个股和 ETF 多一行涨停跌停，有持仓时再加一行。
+    /// 场外基金没有走势图，只有一行净值；期货外汇是两行行情数据，国际期货上面还有分时图。
     static func detailHeight(for item: WatchItem) -> CGFloat {
         let note: CGFloat = item.note == nil ? 0 : 20
         if item.symbol.isFund {
@@ -27,7 +27,8 @@ struct QuoteRow: View {
         if item.symbol.isGlobal {
             return 96 + (item.symbol.hasIntraday ? QuoteChartSection.height + 6 : 0) + note
         }
-        return (item.holding == nil ? 129 : 162) + QuoteChartSection.height + 6 + note
+        let limits: CGFloat = QuoteDetailView.showsLimits(item.symbol) ? 33 : 0
+        return (item.holding == nil ? 129 : 162) + limits + QuoteChartSection.height + 6 + note
     }
 
     let item: WatchItem
@@ -429,6 +430,15 @@ struct QuoteDetailView: View {
                     cell("52周最高", quote.high52Week.map(price) ?? "--")
                     cell("52周最低", quote.low52Week.map(price) ?? "--")
                 }
+                if Self.showsLimits(item.symbol) {
+                    // 涨停价用涨的颜色、跌停价用跌的颜色；ETF 没有市净率，新浪的备用行情里这一行都没有。
+                    HStack(spacing: 0) {
+                        cell("涨停", quote.limitUp.map(price) ?? "--", color: profitColor(1))
+                        cell("跌停", quote.limitDown.map(price) ?? "--", color: profitColor(-1))
+                        cell("市净率", quote.pbRatio.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "--")
+                        cell("量比", quote.volumeRatio.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "--")
+                    }
+                }
             }
             if let holding = item.holding {
                 HStack(spacing: 0) {
@@ -473,6 +483,11 @@ struct QuoteDetailView: View {
 
     private func price(_ value: Double) -> String {
         QuoteFormatter.price(value, decimals: quote.priceDecimals)
+    }
+
+    /// A 股个股和 ETF 多一行涨停价、跌停价、市净率和量比（指数、场外基金没有）。
+    static func showsLimits(_ symbol: Symbol) -> Bool {
+        symbol.market.region == .cn && !symbol.isIndex && !symbol.isFund
     }
 
     /// 还没开盘时今开、最高、最低是 0，写成 --。

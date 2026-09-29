@@ -25,6 +25,8 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(q.marketCap), 1_549_576_000_000, accuracy: 1)
         XCTAssertEqual(q.limitUp, 1360.70)
         XCTAssertEqual(q.limitDown, 1113.30)
+        XCTAssertEqual(q.pbRatio, 6.17)
+        XCTAssertEqual(q.volumeRatio, 1.04)
         XCTAssertEqual(q.high52Week, 1539.98)
         XCTAssertEqual(q.low52Week, 1151.01)
         XCTAssertEqual(q.priceDecimals, 2)
@@ -50,6 +52,10 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(etf.priceDecimals, 3)
         XCTAssertEqual(QuoteFormatter.price(etf.price, decimals: etf.priceDecimals), "4.417")
         XCTAssertNil(etf.peRatio)
+        XCTAssertNil(etf.pbRatio, "ETF 的市净率是 0")
+        XCTAssertEqual(etf.volumeRatio, 1.56)
+        XCTAssertNil(index.pbRatio)
+        XCTAssertNil(index.volumeRatio)
         XCTAssertEqual(etf.high52Week, 5.095)
         XCTAssertEqual(etf.low52Week, 4.397)
     }
@@ -76,6 +82,7 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertEqual(q.high52Week, 677.7)
         XCTAssertEqual(q.low52Week, 411)
         XCTAssertNil(q.limitUp)
+        XCTAssertNil(q.pbRatio, "港股不取市净率")
         XCTAssertEqual(q.timestamp, date(2026, 9, 28, 13, 55, 11, .hk))
 
         let hsi = try XCTUnwrap(quotes[Symbol("hkHSI")!])
