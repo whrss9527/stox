@@ -31,6 +31,9 @@ final class Updater: ObservableObject {
 
     @Published private(set) var phase: Phase = .idle
     @Published private(set) var lastChecked: Date?
+    /// 有新版本、又隔了不止一个版本时，从现在的版本到新版本之间每个版本的更新内容（从新到旧）；否则是 nil，用新版本自己的。
+    @Published private(set) var notesSinceCurrent: String?
+    private var notesTask: Task<Void, Never>?
     /// 最近一次手动检查失败的原因。
     @Published private(set) var checkError: String?
     /// 最近一次安装失败的原因，界面据此给出对应的按钮。
@@ -107,6 +110,19 @@ final class Updater: ObservableObject {
         }
     }
 
+    /// 取中间各个版本的更新内容。取不到时只显示新版本自己的，不影响更新。
+    private func loadNotes(since current: String, upTo latest: String) async {
+        do {
+            let all = try await UpdateCheck.releases(count: 30, currentVersion: current)
+            let range = UpdateCheck.releases(all, after: current, upTo: latest)
+            guard !Task.isCancelled else { return }
+            notesSinceCurrent = range.count > 1 ? ReleaseNotesText.combined(range, limit: 6) : nil
+        } catch {
+            Log.info("取各个版本的更新内容失败：\(error.localizedDescription)")
+            notesSinceCurrent = nil
+        }
+    }
+
     /// 检查一次。manual 表示用户点的：失败要显示，跳过的版本也显示。返回发现的新版本。
     @discardableResult
     func check(manual: Bool) async -> ReleaseInfo? {
@@ -131,6 +147,11 @@ final class Updater: ObservableObject {
             }
             Log.info("检查更新：有新版本 \(latest.version)（当前 \(current)）")
             phase = .available(latest)
+            // 各个版本的更新内容在后面慢慢取，不耽误检查和一键更新。
+            notesTask?.cancel()
+            notesTask = Task { [weak self] in
+                await self?.loadNotes(since: current, upTo: latest.version)
+            }
             if !manual, defaults.string(forKey: Self.notifiedKey) != latest.version {
                 defaults.set(latest.version, forKey: Self.notifiedKey)
                 notify?("Stox 有新版本 \(latest.version)", "打开行情面板点“更新”，自动下载安装并重新启动")

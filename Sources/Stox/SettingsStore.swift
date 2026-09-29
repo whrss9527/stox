@@ -323,6 +323,10 @@ final class SettingsStore: ObservableObject {
     @Published var whatsNewVersion: String? {
         didSet { defaults.set(whatsNewVersion, forKey: Keys.whatsNewVersion) }
     }
+    /// 是从哪个版本更新到 whatsNewVersion 的：隔了几个版本时，“已更新”里列出中间每个版本的更新内容。
+    @Published var whatsNewSince: String? {
+        didSet { defaults.set(whatsNewSince, forKey: Keys.whatsNewSince) }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -367,11 +371,16 @@ final class SettingsStore: ObservableObject {
         chartPeriod = defaults.string(forKey: Keys.chartPeriod).flatMap(ChartPeriod.init(rawValue:)) ?? .intraday
         tipsDismissed = defaults.object(forKey: Keys.tipsDismissed) as? Bool ?? false
         whatsNewVersion = defaults.string(forKey: Keys.whatsNewVersion)
+        whatsNewSince = defaults.string(forKey: Keys.whatsNewSince)
     }
 
     /// 启动时记下这次运行的版本；比上次运行的新，就在面板里提示一次“已更新”。
     func recordLaunch(version: String) {
         if let last = defaults.string(forKey: Keys.lastRunVersion), UpdateCheck.isNewer(version, than: last) {
+            // 上一次的提示还没关就又更新了：从更早的那个版本算起。
+            if whatsNewVersion == nil || whatsNewSince == nil {
+                whatsNewSince = last
+            }
             whatsNewVersion = version
         }
         defaults.set(version, forKey: Keys.lastRunVersion)
@@ -452,6 +461,7 @@ final class SettingsStore: ObservableObject {
         static let chartPeriod = "chart.period"
         static let tipsDismissed = "tips.dismissed"
         static let whatsNewVersion = "update.whatsNew"
+        static let whatsNewSince = "update.whatsNewSince"
         static let lastRunVersion = "app.lastVersion"
     }
 }

@@ -182,6 +182,8 @@ smoke() {
   defaults write "$DOMAIN" app.lastVersion -string 0.1.0
   run_case tips --show-panel
   check_fits tips
+  # 从 0.1.0 更新上来隔了很多个版本：“已更新”里每个版本一行，最多 5 个版本再加一行“还有几个”。取 GitHub 的接口偶尔被限流，只提示。
+  grep -Eq "whatsnew=[2-9] lines since=0.1.0" shots/tips.log || echo "::warning::“已更新”里没有列出中间各个版本的更新内容"
   defaults write "$DOMAIN" tips.dismissed -bool true
   defaults delete "$DOMAIN" update.whatsNew 2>/dev/null || true
 

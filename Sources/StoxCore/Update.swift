@@ -145,6 +145,37 @@ public enum UpdateCheck {
         return release
     }
 
+    /// 最近的一批发布（新的在前）。隔了几个版本才更新时，用来列出中间每个版本的更新内容。
+    public static func listURL(count: Int) -> URL? {
+        URL(string: "https://api.github.com/repos/\(repository)/releases?per_page=\(min(max(count, 1), 100))")
+    }
+
+    public static func releases(count: Int = 30, currentVersion: String, session: URLSession = .shared) async throws -> [ReleaseInfo] {
+        guard let url = listURL(count: count) else { throw UpdateError.badResponse }
+        let data: Data
+        do {
+            data = try await HTTP.get(url, session: session, timeout: 15, headers: [
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "Stox/\(currentVersion) (macOS)",
+            ])
+        } catch ProviderError.badStatus(let code) {
+            throw UpdateError.server(code)
+        }
+        return parseList(data)
+    }
+
+    /// 解析 releases 列表接口返回的 JSON 数组；草稿、预发布和认不出的跳过。
+    public static func parseList(_ data: Data) -> [ReleaseInfo] {
+        guard let items = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] else { return [] }
+        return items.compactMap(parse(object:))
+    }
+
+    /// 比 since 新、又不比 latest 新的那些发布，从新到旧：从 since 更新到 latest 时中间的每个版本（含 latest）。
+    public static func releases(_ all: [ReleaseInfo], after since: String, upTo latest: String) -> [ReleaseInfo] {
+        all.filter { isNewer($0.version, than: since) && !isNewer($0.version, than: latest) }
+            .sorted { isNewer($0.version, than: $1.version) }
+    }
+
     /// 下载发布附带的校验文件 SHA256SUMS.txt 并解析。
     public static func checksums(at url: URL, currentVersion: String, session: URLSession = .shared) async throws -> [String: String] {
         let data: Data
@@ -160,9 +191,12 @@ public enum UpdateCheck {
 
     /// 解析 GitHub releases 接口返回的 JSON。
     public static func parse(_ data: Data) -> ReleaseInfo? {
-        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let tag = json["tag_name"] as? String, !tag.isEmpty
-        else { return nil }
+        (try? JSONSerialization.jsonObject(with: data) as? [String: Any]).flatMap(parse(object:))
+    }
+
+    /// 解析一个发布的 JSON 对象（单个发布的接口和列表接口里的每一项都是这样）。
+    static func parse(object json: [String: Any]) -> ReleaseInfo? {
+        guard let tag = json["tag_name"] as? String, !tag.isEmpty else { return nil }
         if json["draft"] as? Bool == true || json["prerelease"] as? Bool == true { return nil }
         let assets = (json["assets"] as? [[String: Any]]) ?? []
         func asset(named name: String) -> [String: Any]? {
@@ -304,5 +338,54 @@ public enum ReleaseNotesText {
             if !skipping { kept.append(line) }
         }
         return kept.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// 几个版本的更新内容合在一起（从新到旧）：每个版本一段，开头是加粗的版本号，下面是它的“更新内容”。
+    /// 最多 limit 个版本，更早的只写还有几个。
+    public static func combined(_ releases: [ReleaseInfo], limit: Int) -> String {
+        let shown = releases.prefix(max(limit, 1))
+        var parts = shown.map { release -> String in
+            let text = release.highlights
+            return "**\(release.version)**\n" + (text.isEmpty ? "这个版本没有写更新内容" : text)
+        }
+        if releases.count > shown.count {
+            parts.append("还有 \(releases.count - shown.count) 个更早的版本，见发布页")
+        }
+        return parts.joined(separator: "\n\n")
+    }
+
+    /// 一条更新内容的开头一句：到第一个冒号为止（写在冒号前的一般是功能的名字，比如“盈亏日历：……”），
+    /// 没有冒号就到第一个逗号、句号或分号；这样也超过 maxLength 个字时截断，加上省略号。
+    public static func headline(_ text: String, maxLength: Int = 36) -> String {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        for stops in [["：", ":"], ["，", "。", "；"]] as [[Character]] {
+            if let index = text.firstIndex(where: { stops.contains($0) }), index > text.startIndex,
+               text.distance(from: text.startIndex, to: index) <= maxLength {
+                return String(text[..<index])
+            }
+        }
+        return text.count > maxLength ? String(text.prefix(maxLength)) + "…" : text
+    }
+
+    /// 每个版本只取更新内容第一条的开头一句，“已更新到 x.y.z”里一行一个版本：`0.37.0 盈亏日历`。
+    /// 最多 limit 个版本（从新到旧），更早的合成一行“还有 N 个版本”。
+    public static func firstLines(_ releases: [ReleaseInfo], limit: Int) -> [String] {
+        let shown = releases.prefix(max(limit, 1))
+        var lines = shown.map { release -> String in
+            let first = release.highlights
+                .split(separator: "\n")
+                .map { $0.trimmingCharacters(in: .whitespaces) }
+                .first { !$0.isEmpty }
+                .map { line -> String in
+                    var text = line
+                    if text.hasPrefix("- ") || text.hasPrefix("* ") { text.removeFirst(2) }
+                    return text
+                } ?? ""
+            return "- **\(release.version)** " + (first.isEmpty ? "这个版本没有写更新内容" : headline(first))
+        }
+        if releases.count > shown.count {
+            lines.append("- 还有 \(releases.count - shown.count) 个更早的版本")
+        }
+        return lines
     }
 }
