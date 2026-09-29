@@ -159,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let group = value(after: "--group")
         let alerts = arguments.contains("--alerts")
         let rank = arguments.contains("--rank")
+        let calendar = arguments.contains("--calendar")
         if let path = value(after: "--export-backup") {
             do {
                 try sync.backupData().write(to: URL(fileURLWithPath: path), options: .atomic)
@@ -197,7 +198,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             } else if showPanel {
                 self.statusController?.openPanel(
                     route: edit.map { PanelRoute.edit($0) } ?? group.map { PanelRoute.group($0, member: nil) }
-                        ?? (alerts ? .alerts : (rank ? .rank : .list)),
+                        ?? (alerts ? .alerts : (rank ? .rank : (calendar ? .calendar : .list))),
                     expand: expand, search: search, keys: keys, printDiagnostics: true
                 )
             }

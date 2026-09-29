@@ -54,6 +54,8 @@ struct PanelView: View {
                 AlertLogPanel()
             case .rank:
                 RankPanel()
+            case .calendar:
+                ProfitCalendarPanel()
             }
         }
         .padding(12)
@@ -649,6 +651,7 @@ struct TipsCards: View {
 struct HoldingsSummaryView: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var router: PanelRouter
 
     var body: some View {
         // 跟着列表上方的筛选走：只看某个分组、某个市场时只算这些。
@@ -770,9 +773,18 @@ struct HoldingsSummaryView: View {
             ForEach(store.profitHistory.regions, id: \.self) { region in
                 historyRow(region)
             }
-            Text("每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。")
-                .font(.system(size: 9.5))
-                .foregroundStyle(.tertiary)
+            HStack(spacing: 6) {
+                Text("每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 0)
+                Button("日历") { router.route = .calendar }
+                    .buttonStyle(.link)
+                    .font(.system(size: 10))
+                    .help("按月看每天赚了多少")
+            }
         }
     }
 
@@ -1043,6 +1055,8 @@ struct PanelFooter: View {
                     .disabled(store.items.isEmpty)
                 Button("最近的提醒…") { router.route = .alerts }
                     .disabled(store.alertLog.entries.isEmpty)
+                Button("盈亏日历…") { router.route = .calendar }
+                    .disabled(store.profitHistory.records.isEmpty)
                 Button("A 股涨跌榜…") { router.route = .rank }
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
