@@ -183,6 +183,10 @@ final class SettingsStore: ObservableObject {
     @Published var limitAlerts: Bool {
         didSet { defaults.set(limitAlerts, forKey: Keys.limitAlerts) }
     }
+    /// 自选里的证券创 52 周新高、新低时提醒。只在本机，不同步。
+    @Published var yearHighLowAlerts: Bool {
+        didSet { defaults.set(yearHighLowAlerts, forKey: Keys.yearHighLowAlerts) }
+    }
     /// 异动提醒：几分钟内涨跌超过这个幅度（%）时提醒；0 是关闭。只在本机。
     @Published var rapidMoveThreshold: Double {
         didSet { defaults.set(rapidMoveThreshold, forKey: Keys.rapidMoveThreshold) }
@@ -308,6 +312,7 @@ final class SettingsStore: ObservableObject {
         alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
         closeSummary = defaults.object(forKey: Keys.closeSummary) as? Bool ?? false
         limitAlerts = defaults.object(forKey: Keys.limitAlerts) as? Bool ?? false
+        yearHighLowAlerts = defaults.object(forKey: Keys.yearHighLowAlerts) as? Bool ?? false
         let rapid = defaults.object(forKey: Keys.rapidMoveThreshold) as? Double ?? 0
         rapidMoveThreshold = Self.rapidMoveOptions.contains(rapid) ? rapid : 0
         hideTicker = defaults.object(forKey: Keys.hideTicker) as? Bool ?? false
@@ -392,6 +397,7 @@ final class SettingsStore: ObservableObject {
         static let alertsEnabled = "alertsEnabled"
         static let closeSummary = "alerts.closeSummary"
         static let limitAlerts = "alerts.limit"
+        static let yearHighLowAlerts = "alerts.yearHighLow"
         static let rapidMoveThreshold = "alerts.rapid"
         static let autoCheckUpdates = "update.autoCheck"
         static let syncEnabled = "sync.enabled"

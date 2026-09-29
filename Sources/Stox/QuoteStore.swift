@@ -590,7 +590,9 @@ final class QuoteStore: ObservableObject {
 
     private func evaluateAlerts() {
         guard settings.alertsEnabled else { return }
-        let triggers = alertEngine.evaluate(items: items, quotes: quotes, now: Date(), limitAlerts: settings.limitAlerts)
+        let triggers = alertEngine.evaluate(
+            items: items, quotes: quotes, now: Date(), limitAlerts: settings.limitAlerts, yearAlerts: settings.yearHighLowAlerts
+        )
         guard !triggers.isEmpty else { return }
         firedAlertCount += triggers.count
         saveAlertState()

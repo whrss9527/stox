@@ -39,8 +39,8 @@ public struct PriceAlert: Codable, Hashable, Sendable {
         case .fallBelow: return fallBelow
         case .profitAbove: return profitAbove
         case .lossBelow: return lossBelow
-        // 涨停跌停、异动不是每只单独设的，由设置里的总开关管（见 AlertEngine.evaluate、RapidMoveDetector）。
-        case .limitUp, .limitDown, .rapidRise, .rapidFall: return nil
+        // 涨停跌停、52 周新高新低、异动不是每只单独设的，由设置里的总开关管（见 AlertEngine.evaluate、RapidMoveDetector）。
+        case .limitUp, .limitDown, .yearHigh, .yearLow, .rapidRise, .rapidFall: return nil
         }
     }
 }
@@ -51,6 +51,8 @@ public enum AlertCondition: String, Codable, CaseIterable, Sendable {
     case limitUp, limitDown
     /// 几分钟内快速拉升、下跌（异动），由 RapidMoveDetector 判断。
     case rapidRise, rapidFall
+    /// 当天的最高价达到 52 周最高、最低价达到 52 周最低。
+    case yearHigh, yearLow
 
     func isMet(by quote: Quote, holding: Holding?, threshold: Double) -> Bool {
         switch self {
@@ -63,6 +65,13 @@ public enum AlertCondition: String, Codable, CaseIterable, Sendable {
             return self == .profitAbove ? percent >= abs(threshold) : percent <= -abs(threshold)
         case .limitUp: return quote.isLimitUp
         case .limitDown: return quote.isLimitDown
+        // 接口的 52 周最高最低可能已经算上了今天，所以用“达到”：今天的最高价不低于它就是创了新高。
+        case .yearHigh:
+            guard let high = quote.high52Week, high > 0, quote.high > 0 else { return false }
+            return quote.high >= high - 1e-9
+        case .yearLow:
+            guard let low = quote.low52Week, low > 0, quote.low > 0 else { return false }
+            return quote.low <= low + 1e-9
         case .rapidRise, .rapidFall: return false
         }
     }
@@ -104,6 +113,10 @@ public struct AlertTrigger: Sendable, Equatable {
             return "\(name) 涨停"
         case .limitDown:
             return "\(name) 跌停"
+        case .yearHigh:
+            return "\(name) 创 52 周新高"
+        case .yearLow:
+            return "\(name) 创 52 周新低"
         case .rapidRise:
             return "\(name) \(Int(RapidMoveDetector.window / 60)) 分钟内拉升 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
         case .rapidFall:
@@ -122,7 +135,16 @@ public struct AlertTrigger: Sendable, Equatable {
             }
             return text
         }
-        return price
+        var text = price
+        switch condition {
+        case .yearHigh:
+            text += "今天最高 \(QuoteFormatter.price(quote.high, decimals: quote.priceDecimals))，"
+        case .yearLow:
+            text += "今天最低 \(QuoteFormatter.price(quote.low, decimals: quote.priceDecimals))，"
+        default:
+            break
+        }
+        return text
             + "涨跌 \(QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))"
             + "（\(QuoteFormatter.percent(quote.changePercent))）"
     }
@@ -137,10 +159,14 @@ public struct AlertEngine: Codable, Sendable, Equatable {
         self.firedDays = firedDays
     }
 
-    /// - Parameter limitAlerts: 设置里打开了“涨停、跌停时提醒”：自选里的 A 股个股封板时也提醒。
-    public mutating func evaluate(items: [WatchItem], quotes: [Symbol: Quote], now: Date, limitAlerts: Bool = false) -> [AlertTrigger] {
+    /// - Parameters:
+    ///   - limitAlerts: 设置里打开了“涨停、跌停时提醒”：自选里的 A 股个股封板时也提醒。
+    ///   - yearAlerts: 设置里打开了“创 52 周新高、新低时提醒”：自选里的证券（含指数）都看。
+    public mutating func evaluate(
+        items: [WatchItem], quotes: [Symbol: Quote], now: Date, limitAlerts: Bool = false, yearAlerts: Bool = false
+    ) -> [AlertTrigger] {
         var triggers: [AlertTrigger] = []
-        for item in items where !item.alert.isEmpty || limitAlerts {
+        for item in items where !item.alert.isEmpty || limitAlerts || yearAlerts {
             guard let quote = quotes[item.symbol], quote.price > 0, quote.hasTraded else { continue }
             let day = Self.dayKey(quote.timestamp ?? now, region: item.symbol.market.region)
             for condition in AlertCondition.allCases {
@@ -148,6 +174,8 @@ public struct AlertEngine: Codable, Sendable, Equatable {
                 switch condition {
                 case .limitUp, .limitDown:
                     threshold = limitAlerts && !item.symbol.isIndex ? 0 : nil
+                case .yearHigh, .yearLow:
+                    threshold = yearAlerts ? 0 : nil
                 default:
                     threshold = item.alert.threshold(for: condition)
                 }

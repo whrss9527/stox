@@ -250,6 +250,11 @@ struct GeneralPage: View {
                             if enabled { Notifier.shared.requestAuthorization() }
                         }
                     FormNote("自选里的 A 股个股（不含指数）封涨停或跌停时发一条通知，开板再封板当天不再重复。")
+                    Toggle("创 52 周新高、新低时提醒", isOn: $settings.yearHighLowAlerts)
+                        .onChange(of: settings.yearHighLowAlerts) { enabled in
+                            if enabled { Notifier.shared.requestAuthorization() }
+                        }
+                    FormNote("自选里的证券（含指数）当天的最高价达到 52 周最高、或者最低价达到 52 周最低时发一条通知，每只每天最多一次。")
                     Picker("异动提醒", selection: $settings.rapidMoveThreshold) {
                         ForEach(SettingsStore.rapidMoveOptions, id: \.self) { value in
                             Text(value == 0 ? "关闭" : "5 分钟内涨跌 \(Int(value))%").tag(value)
