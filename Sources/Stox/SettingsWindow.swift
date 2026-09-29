@@ -339,6 +339,9 @@ struct DisplayPage: View {
                 Section("行情面板") {
                     Toggle("紧凑列表", isOn: $settings.compactRows)
                     FormNote("每只一行：名称、代码、现价和色块排在一起，自选多时一屏能看到更多。持仓盈亏和盘前盘后价在展开后看。")
+                    Toggle("列表里画当天的迷你分时", isOn: $settings.showSparklines)
+                        .disabled(settings.compactRows)
+                    FormNote("每一行现价左边画一条当天的走势，虚线是昨收。面板打开着的时候才去取，交易时段内两分钟取一轮，每只一个请求；紧凑列表、场外基金不画。")
                     Toggle("价格变动时闪一下", isOn: $settings.flashOnChange)
                     Toggle("画均线和均价线", isOn: $settings.showMovingAverages)
                     FormNote("日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。分时图和五日图上画成交均价（橙色），指数没有。")

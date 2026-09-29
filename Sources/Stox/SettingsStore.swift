@@ -263,6 +263,10 @@ final class SettingsStore: ObservableObject {
     @Published var compactRows: Bool {
         didSet { defaults.set(compactRows, forKey: Keys.compactRows) }
     }
+    /// 列表里每一行画一条当天的迷你分时（紧凑列表不画）。
+    @Published var showSparklines: Bool {
+        didSet { defaults.set(showSparklines, forKey: Keys.showSparklines) }
+    }
     /// K 线上画 5、10、20 根的收盘价均线，分时图上画成交均价。
     @Published var showMovingAverages: Bool {
         didSet { defaults.set(showMovingAverages, forKey: Keys.showMovingAverages) }
@@ -353,6 +357,7 @@ final class SettingsStore: ObservableObject {
         rankKind = defaults.string(forKey: Keys.rankKind).flatMap(RankKind.init(rawValue:)) ?? .gainers
         rankHidesNewListings = defaults.object(forKey: Keys.rankHidesNewListings) as? Bool ?? true
         compactRows = defaults.object(forKey: Keys.compactRows) as? Bool ?? false
+        showSparklines = defaults.object(forKey: Keys.showSparklines) as? Bool ?? true
         showAllocation = defaults.object(forKey: Keys.showAllocation) as? Bool ?? false
         hideAmounts = defaults.object(forKey: Keys.hideAmounts) as? Bool ?? false
         showProfitHistory = defaults.object(forKey: Keys.showProfitHistory) as? Bool ?? false
@@ -435,6 +440,7 @@ final class SettingsStore: ObservableObject {
         static let rankKind = "rank.kind"
         static let rankHidesNewListings = "rank.hideNew"
         static let compactRows = "list.compact"
+        static let showSparklines = "list.sparklines"
         static let showAllocation = "holdings.allocation"
         static let hideAmounts = "holdings.hideAmounts"
         static let showProfitHistory = "holdings.history"

@@ -237,6 +237,12 @@ struct WatchlistView: View {
     /// 屏幕够高时列表最多这么高；屏幕放不下整个面板时由 PanelRouter.listMaxHeight 再压低。
     static let defaultMaxHeight: CGFloat = 430
 
+    /// 取迷你分时的任务按这个重新开始：面板开关、设置改了、列表里的证券变了（只是顺序变了不算）。
+    private struct SparklineTrack: Hashable {
+        var active: Bool
+        var symbols: Set<Symbol>
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if store.items.isEmpty {
@@ -296,6 +302,12 @@ struct WatchlistView: View {
                         // 方向键移动时马上滚到看得见的地方，不等动画。
                         if let symbol { proxy.scrollTo(symbol) }
                     }
+                }
+                .task(id: SparklineTrack(
+                    active: router.isOpen && settings.showSparklines && !settings.compactRows, symbols: Set(visible.map(\.symbol))
+                )) {
+                    guard router.isOpen, settings.showSparklines, !settings.compactRows else { return }
+                    await store.trackSparklines(visible.map(\.symbol))
                 }
             }
         }

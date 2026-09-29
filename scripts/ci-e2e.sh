@@ -90,6 +90,8 @@ smoke() {
   run_case settings-general --show-settings general
   run_case settings-display --show-settings display
   grep -q "panel_frame=" shots/panel.log || fail "面板没有打开"
+  # 列表里的迷你分时：面板打开后一只一只地取，几秒后应该有了；取不到只提示。
+  grep -Eq "late flow=[^ ]+ sparklines=[1-9]" shots/panel.log || echo "::warning::列表里的迷你分时没有取到"
   grep -q 'image=false color=redUp' shots/panel.log || fail "默认应该在菜单栏显示行情、红涨绿跌"
   # 分时图的数据来自另一个接口，偶尔取不到不算失败，只提醒一下。
   grep -q "intraday=[1-9]" shots/detail.log || echo "::warning::展开详情时没有取到分时数据"
@@ -213,6 +215,7 @@ smoke() {
   run_case compact --show-panel
   defaults delete "$DOMAIN" list.compact
   grep -q "compact=true" shots/compact.log || fail "没有切到紧凑列表"
+  grep -q "late flow=[^ ]* sparklines=0" shots/compact.log || fail "紧凑列表不画迷你分时，不应该去取"
 
   # 分组：腾讯和苹果在“科技”里，列表上方选了这个分组。
   write_watchlist '[{"symbol":"sh600519","name":"贵州茅台"},{"symbol":"hk00700","name":"腾讯控股","group":"科技"},{"symbol":"usAAPL","name":"苹果","group":"科技"}]'

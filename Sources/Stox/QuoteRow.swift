@@ -13,6 +13,10 @@ struct QuoteRow: View {
         compact ? compactRowHeight : standardRowHeight
     }
 
+    /// 迷你分时的宽度：地方够时这么宽，名称、代码那一列长的时候（比如美股带着盘后涨跌）让它，最窄到 minimum。
+    static let sparklineWidth: CGFloat = 40
+    static let sparklineMinimumWidth: CGFloat = 24
+
     /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。场外基金没有走势图，只有一行净值。
     static func detailHeight(for item: WatchItem) -> CGFloat {
         let note: CGFloat = item.note == nil ? 0 : 20
@@ -98,6 +102,12 @@ struct QuoteRow: View {
 
     private var color: Color { Theme.priceColor(for: direction, convention: settings.colorConvention) }
 
+    /// 这一行画的迷你分时：设置里打开了、没展开（展开了有大的分时图）、不是场外基金，末端跟着现价走。
+    private var rowSparkline: Sparkline? {
+        guard settings.showSparklines, !expanded, !item.symbol.isFund, let sparkline = store.sparklines[item.symbol] else { return nil }
+        return sparkline.updating(with: quote, region: item.symbol.market.region)
+    }
+
     private var summary: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
@@ -147,7 +157,14 @@ struct QuoteRow: View {
                     }
                 }
             }
+            // 名称、代码这一列排在现价后面，迷你分时让着它们。
+            .layoutPriority(1)
             Spacer(minLength: 6)
+            if let sparkline = rowSparkline {
+                SparklineView(sparkline: sparkline, reference: quote?.previousClose ?? 0, color: color)
+                    .frame(minWidth: Self.sparklineMinimumWidth, idealWidth: Self.sparklineWidth, maxWidth: Self.sparklineWidth)
+                    .frame(height: 20)
+            }
             VStack(alignment: .trailing, spacing: 1) {
                 priceLabel(size: 14)
                 if let position {
@@ -163,6 +180,8 @@ struct QuoteRow: View {
                     .help("持仓盈亏")
                 }
             }
+            // 现价最先排，永远不省略。
+            .layoutPriority(2)
             pill(width: 70, height: 24, fontSize: 12)
         }
     }

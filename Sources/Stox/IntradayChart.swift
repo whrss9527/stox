@@ -411,3 +411,44 @@ struct ChartAxis: View {
         .accessibilityHidden(true)
     }
 }
+
+/// 列表里一行的迷你分时：一条细线，虚线是昨收。横轴和分时图一样从开盘到收盘，还没到的时间留空。
+struct SparklineView: View {
+    let sparkline: Sparkline
+    /// 昨收，画成虚线；没有时为 0。
+    let reference: Double
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            guard let range = sparkline.range(reference: reference) else { return }
+            let count = sparkline.values.count
+            func x(_ index: Int) -> CGFloat {
+                count > 1 ? CGFloat(index) / CGFloat(count - 1) * size.width : 0
+            }
+            func y(_ value: Double) -> CGFloat {
+                size.height * CGFloat((range.upperBound - value) / (range.upperBound - range.lowerBound))
+            }
+            if reference > 0 {
+                var baseline = Path()
+                baseline.move(to: CGPoint(x: 0, y: y(reference)))
+                baseline.addLine(to: CGPoint(x: size.width, y: y(reference)))
+                context.stroke(baseline, with: .color(Color.secondary.opacity(0.45)), style: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
+            }
+            var line = Path()
+            var started = false
+            for (index, value) in sparkline.values.enumerated() {
+                guard let value else { continue }
+                let point = CGPoint(x: x(index), y: y(value))
+                if started {
+                    line.addLine(to: point)
+                } else {
+                    line.move(to: point)
+                    started = true
+                }
+            }
+            context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
+        }
+        .accessibilityHidden(true)
+    }
+}
