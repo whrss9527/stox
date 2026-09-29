@@ -237,6 +237,34 @@ final class CloseSummaryTests: XCTestCase {
         ), "第二天早上不再发前一天的")
     }
 
+    func testNamesTheBiggestMovers() throws {
+        let moutai = Symbol("sh600519")!, bank = Symbol("sz000001")!, index = Symbol("sh000001")!
+        let items = [
+            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200)),
+            WatchItem(symbol: bank, name: "平安银行", holding: Holding(shares: 2000, cost: 12.5)),
+            WatchItem(symbol: index, name: "上证指数"),
+            WatchItem(symbol: Symbol("hk00700")!, name: "腾讯控股", holding: Holding(shares: 200, cost: 380)),
+        ]
+        let quotes: [Symbol: Quote] = [
+            moutai: Quote(symbol: moutai, name: "贵州茅台", price: 1243.88, previousClose: 1237, open: 1236, volume: 100),
+            bank: Quote(symbol: bank, name: "平安银行", price: 11.29, previousClose: 11.3, open: 11.28, volume: 100),
+            index: Quote(symbol: index, name: "上证指数", price: 3823.62, previousClose: 3888.37, open: 3878.41, volume: 100),
+        ]
+        let movers = CloseSummary.movers(items: items, quotes: quotes, region: .cn)
+        XCTAssertEqual(movers.map(\.name), ["贵州茅台", "平安银行"], "只算这个市场有持仓的")
+
+        let note = try XCTUnwrap(CloseSummary.due(
+            region: .cn, phase: .closed, summary: summary,
+            latestQuoteTime: time("20260928150003", .cn), now: time("20260928160000", .cn), lastSentDay: nil, movers: movers
+        ))
+        XCTAssertEqual(note.body, "今日 +0.47%，持仓盈亏 +2000.00（+1.38%），市值 14.70万人民币。涨得最多的是贵州茅台 +0.56%，跌得最多的是平安银行 -0.09%")
+
+        XCTAssertNil(CloseSummary.moversText(Array(movers.prefix(1))), "只有一只时不写")
+        XCTAssertEqual(CloseSummary.moversText([
+            CloseSummary.Mover(name: "甲", changePercent: 1), CloseSummary.Mover(name: "乙", changePercent: 2),
+        ]), "涨得最多的是乙 +2.00%", "都涨了就不写跌得最多的")
+    }
+
     func testSkipsWhileTradingOnHolidaysAndWithoutHoldings() {
         let quoteTime = time("20260928150003", .cn)
         let now = time("20260928160000", .cn)
@@ -374,7 +402,7 @@ final class TableTests: XCTestCase {
         let tencent = Symbol("hk00700")!
         let items = [
             WatchItem(symbol: Symbol("sh000001")!, name: "上证指数"),
-            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200)),
+            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200), group: "白酒"),
             WatchItem(symbol: tencent, name: "腾讯控股", holding: Holding(shares: 200, cost: 380)),
             WatchItem(symbol: Symbol("usAAPL")!, name: "苹果", holding: Holding(shares: 10, cost: 300)),
         ]
@@ -384,9 +412,9 @@ final class TableTests: XCTestCase {
         ]
         let rows = Portfolio.tableText(items: items, quotes: quotes).components(separatedBy: "\n")
         XCTAssertEqual(rows.count, 3, "指数没有持仓，苹果没有行情，都不列")
-        XCTAssertEqual(rows[0], "名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏")
-        XCTAssertEqual(rows[1], "贵州茅台\t600519\tCNY\t100\t1200\t1243.88\t124388.00\t4388.00\t3.66%\t688.00")
-        XCTAssertEqual(rows[2], "腾讯控股\t00700\tHKD\t200\t380\t439.800\t87960.00\t11960.00\t15.74%\t640.00")
+        XCTAssertEqual(rows[0], "名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组")
+        XCTAssertEqual(rows[1], "贵州茅台\t600519\tCNY\t100\t1200\t1243.88\t124388.00\t4388.00\t3.66%\t688.00\t白酒")
+        XCTAssertEqual(rows[2], "腾讯控股\t00700\tHKD\t200\t380\t439.800\t87960.00\t11960.00\t15.74%\t640.00\t", "没分组的最后一列是空的")
         XCTAssertEqual(Portfolio.tableText(items: Array(items.prefix(1)), quotes: quotes), "", "没有持仓时是空的")
     }
 }
