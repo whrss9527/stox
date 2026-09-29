@@ -40,6 +40,9 @@ public enum QuoteFormatter {
         return (value > 0 ? "+" : "") + money(value)
     }
 
+    /// 打开“隐藏金额”时，市值、盈亏金额和持有数量都换成它；比例照常显示。
+    public static let hiddenAmount = "****"
+
     /// 菜单栏里的金额，越短越好：100 以内两位小数，1 万以内取整，更大的用万、亿：`12.90`、`688`、`1.20万`。
     public static func compactMoney(_ value: Double) -> String {
         let magnitude = abs(value)

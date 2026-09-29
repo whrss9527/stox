@@ -85,6 +85,8 @@ public struct AlertTrigger: Sendable, Equatable {
     public let quote: Quote
     /// 触发时的持仓，止盈止损提醒的正文里用。
     public var holding: Holding?
+    /// 打开了“隐藏金额”：止盈止损提醒的正文里不写盈亏金额，只写比例。
+    public var hidesAmounts = false
 
     public init(symbol: Symbol, name: String, condition: AlertCondition, threshold: Double, quote: Quote, holding: Holding? = nil) {
         self.symbol = symbol
@@ -129,7 +131,10 @@ public struct AlertTrigger: Sendable, Equatable {
         if condition == .profitAbove || condition == .lossBelow, let holding,
            let position = Portfolio.position(holding, quote: quote) {
             var text = price + "成本 \(QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))，"
-                + "持仓盈亏 \(QuoteFormatter.signedMoney(position.totalProfit))"
+            if hidesAmounts {
+                return text + "持仓盈亏 \(position.totalProfitPercent.map(QuoteFormatter.percent) ?? QuoteFormatter.hiddenAmount)"
+            }
+            text += "持仓盈亏 \(QuoteFormatter.signedMoney(position.totalProfit))"
             if let percent = position.totalProfitPercent {
                 text += "（\(QuoteFormatter.percent(percent))）"
             }

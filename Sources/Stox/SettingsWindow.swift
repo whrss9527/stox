@@ -346,6 +346,8 @@ struct DisplayPage: View {
                     FormNote("填了持仓的，分时图和 K 线上成本价落在图里时画一条虚线；K 线上用 B、S 标出“记一笔”记过买入、卖出的那几根。")
                     Toggle("美股盘前盘后价", isOn: $settings.showExtendedHours)
                     FormNote("美股个股不在常规交易时段时，代码旁边显示盘前或盘后的最新价相对收盘的涨跌，详情里有价格和成交时间。每只美股个股要多发一个请求。")
+                    Toggle("隐藏金额", isOn: $settings.hideAmounts)
+                    FormNote("给别人看屏幕时用：市值、盈亏金额和持有数量换成 ****，盈亏比例照常显示；菜单栏的今日盈亏换成比例，收盘小结和止盈止损的通知里也不写金额。持仓合计里“市值”旁边的小眼睛可以随时切换。编辑页和复制出来的表格照常是实际数字。")
                 }
                 Section("涨跌颜色") {
                     Picker("涨跌颜色", selection: $settings.colorConvention) {

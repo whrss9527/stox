@@ -243,7 +243,7 @@ struct QuoteRow: View {
         case .flat: text += "，平盘"
         }
         if let position {
-            text += "，持仓盈亏 \(QuoteFormatter.signedMoney(position.totalProfit))"
+            text += "，持仓盈亏 \(holdingText(position))"
         }
         if let extended {
             text += "，\(extended.label) \(extended.priceText)，\(QuoteFormatter.percent(extended.percent))"
@@ -270,12 +270,12 @@ struct QuoteRow: View {
         return Portfolio.position(holding, quote: quote, trades: item.trades)
     }
 
-    /// 列表里的持仓盈亏：有成本时显示比例，成本为 0 时显示金额。
+    /// 列表里的持仓盈亏：有成本时显示比例，成本为 0 时显示金额（隐藏金额时是 ****）。
     private func holdingText(_ position: PositionValue) -> String {
         if let percent = position.totalProfitPercent {
             return QuoteFormatter.percent(percent)
         }
-        return QuoteFormatter.signedMoney(position.totalProfit)
+        return settings.hideAmounts ? QuoteFormatter.hiddenAmount : QuoteFormatter.signedMoney(position.totalProfit)
     }
 
     /// 停牌、涨停、跌停等状态标签。
@@ -388,11 +388,11 @@ struct QuoteDetailView: View {
             }
             if let holding = item.holding {
                 HStack(spacing: 0) {
-                    cell("持有", QuoteFormatter.plain(holding.shares) + (item.symbol.isFund ? "份" : "股"))
+                    cell("持有", amount(QuoteFormatter.plain(holding.shares) + (item.symbol.isFund ? "份" : "股")))
                     cell("成本", QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))
                     if let position = Portfolio.position(holding, quote: quote, trades: item.trades) {
-                        cell("持仓盈亏", QuoteFormatter.signedMoney(position.totalProfit), color: profitColor(position.totalProfit))
-                        cell("今日盈亏", QuoteFormatter.signedMoney(position.dayProfit), color: profitColor(position.dayProfit))
+                        cell("持仓盈亏", amount(QuoteFormatter.signedMoney(position.totalProfit)), color: profitColor(position.totalProfit))
+                        cell("今日盈亏", amount(QuoteFormatter.signedMoney(position.dayProfit)), color: profitColor(position.dayProfit))
                     } else {
                         cell("持仓盈亏", "--")
                         cell("今日盈亏", "--")
@@ -438,6 +438,11 @@ struct QuoteDetailView: View {
 
     private func profitColor(_ value: Double) -> Color {
         Theme.priceColor(for: PriceDirection(value), convention: settings.colorConvention)
+    }
+
+    /// 持有数量和盈亏金额：隐藏金额时是 ****。
+    private func amount(_ text: @autoclosure () -> String) -> String {
+        settings.hideAmounts ? QuoteFormatter.hiddenAmount : text()
     }
 
     private func cell(_ title: String, _ value: String, color: Color = .primary) -> some View {
