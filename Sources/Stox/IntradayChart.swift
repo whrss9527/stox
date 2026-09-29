@@ -17,6 +17,8 @@ struct IntradayChart: View {
     var decimals = 2
     /// 持仓成本价：落在图的范围里时画一条虚线，不画时为 nil。
     var cost: Double?
+    /// 成交量柱的颜色跟着涨跌颜色的设置走。
+    var convention: ColorConvention = .redUp
 
     var body: some View {
         GeometryReader { proxy in
@@ -25,6 +27,10 @@ struct IntradayChart: View {
             ) {
                 let paths = scale.paths
                 ZStack {
+                    // 成交量柱在最下面四分之一，淡淡的，价格线压在上面。
+                    paths.volumeUp.fill(volumeColor(.up))
+                    paths.volumeDown.fill(volumeColor(.down))
+                    paths.volumeFlat.fill(volumeColor(.flat))
                     paths.area
                         .fill(LinearGradient(colors: [color.opacity(0.22), color.opacity(0.02)], startPoint: .top, endPoint: .bottom))
                     paths.baseline
@@ -82,6 +88,15 @@ struct IntradayChart: View {
         var baseline: Path
         /// 均价线；没有均价的点断开。
         var average: Path
+        /// 成交量柱，按这一分钟比上一分钟涨了、跌了还是平的分开，好上不同的颜色。
+        var volumeUp = Path()
+        var volumeDown = Path()
+        var volumeFlat = Path()
+    }
+
+    private func volumeColor(_ direction: PriceDirection) -> Color {
+        if convention == .neutral { return Color.primary.opacity(0.18) }
+        return Theme.priceColor(for: direction, convention: convention).opacity(0.3)
     }
 
     /// 价格和时刻到图上坐标的换算。纵轴包含昨收，涨跌很小时至少留出昨收 0.4% 的范围，免得一点波动就撑满。
@@ -95,6 +110,8 @@ struct IntradayChart: View {
         /// 图上画出来的最高、最低的值（价格、均价、昨收），标在左上角和左下角。
         let high: Double
         let low: Double
+        /// 成交量柱画满四分之一高度时对应的量；没有成交量时为 nil。
+        var volumeScale: Double?
 
         func location(of point: IntradayPoint) -> CGPoint {
             let length = CGFloat(IntradayAxis.length(for: region))
@@ -135,7 +152,26 @@ struct IntradayChart: View {
                     drawing = true
                 }
             }
-            return ChartPaths(line: line, area: area, baseline: baseline, average: average)
+            var paths = ChartPaths(line: line, area: area, baseline: baseline, average: average)
+            // 成交量柱：一分钟一根，最高到图的四分之一；开盘那根特别高时顶到头（见 volumeScale）。
+            if let scale = volumeScale, scale > 0 {
+                let band = size.height * 0.25
+                let step = size.width / CGFloat(max(IntradayAxis.length(for: region), 1))
+                let width = max(step - 0.3, 0.8)
+                var previous = reference
+                for (point, location) in zip(points, locations) {
+                    defer { previous = point.price }
+                    guard let volume = point.volume, volume > 0 else { continue }
+                    let height = max(CGFloat(min(volume / scale, 1)) * band, 0.5)
+                    let bar = CGRect(x: location.x - width / 2, y: size.height - height, width: width, height: height)
+                    switch PriceDirection(point.price - previous) {
+                    case .up: paths.volumeUp.addRect(bar)
+                    case .down: paths.volumeDown.addRect(bar)
+                    case .flat: paths.volumeFlat.addRect(bar)
+                    }
+                }
+            }
+            return paths
         }
     }
 
@@ -154,7 +190,7 @@ struct IntradayChart: View {
         return Scale(
             points: points, region: region, size: size,
             top: middle + span * 0.55, bottom: middle - span * 0.55, reference: reference,
-            high: high, low: low
+            high: high, low: low, volumeScale: series?.volumeScale
         )
     }
 }

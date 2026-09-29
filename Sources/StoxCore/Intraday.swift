@@ -6,11 +6,14 @@ public struct IntradayPoint: Equatable, Sendable {
     public var price: Double
     /// 当天到这一分钟为止的成交均价；指数、算不出来时为 nil。
     public var average: Double?
+    /// 这一分钟的成交量，单位和接口一样（A 股是手，科创板、港股、美股是股）；接口没给时为 nil。
+    public var volume: Double?
 
-    public init(minute: Int, price: Double, average: Double? = nil) {
+    public init(minute: Int, price: Double, average: Double? = nil, volume: Double? = nil) {
         self.minute = minute
         self.price = price
         self.average = average
+        self.volume = volume
     }
 }
 
@@ -49,11 +52,29 @@ public enum TencentMinuteParser {
               let series = entry["data"] as? [String: Any],
               let rows = series["data"] as? [String]
         else { return nil }
-        let parsed = rows.compactMap(row(from:))
-        // 指数的成交量、成交额是成分股加起来的，没有均价。
-        let points = symbol.isIndex ? parsed.map(\.point) : addingAverages(parsed)
+        let points = points(rows.compactMap(row(from:)), isIndex: symbol.isIndex)
         let date = (series["date"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         return IntradaySeries(symbol: symbol, date: date, points: points)
+    }
+
+    /// 一天的分时点：个股带着均价（指数的成交量、成交额是成分股加起来的，没有均价），都带着每分钟的成交量。
+    static func points(_ rows: [Row], isIndex: Bool) -> [IntradayPoint] {
+        var points = isIndex ? rows.map(\.point) : addingAverages(rows)
+        guard points.count == rows.count else { return points }
+        for (index, volume) in minuteVolumes(rows).enumerated() {
+            points[index].volume = volume
+        }
+        return points
+    }
+
+    /// 每一分钟新增的成交量：累计成交量减去前面最大的那个，数据往回跳时当作 0。
+    static func minuteVolumes(_ rows: [Row]) -> [Double?] {
+        var previous = 0.0
+        return rows.map { row in
+            guard let volume = row.volume, volume.isFinite else { return nil }
+            defer { previous = max(previous, volume) }
+            return max(volume - previous, 0)
+        }
     }
 
     /// 一条分时：点，以及到这一分钟为止的累计成交量和累计成交额（美股没有成交额）。
@@ -186,6 +207,15 @@ public enum IntradayAxis {
 }
 
 extension IntradaySeries {
+    /// 画成交量柱时用的最大值。开盘那一分钟带着集合竞价的量，常常比别的分钟大好几倍，把别的柱子压得看不见；
+    /// 最大的一根超过第二大的 3 倍时按第二大的 1.2 倍画（最大的那根顶到头）。没有成交量时为 nil。
+    public var volumeScale: Double? {
+        let volumes = points.compactMap(\.volume).filter { $0 > 0 }.sorted(by: >)
+        guard let first = volumes.first else { return nil }
+        guard volumes.count > 1 else { return first }
+        return first > volumes[1] * 3 ? volumes[1] * 1.2 : first
+    }
+
     /// 横轴上离 offset（0 到 IntradayAxis.length）最近的点，鼠标悬停时用。
     public func point(nearest offset: Double, region: MarketRegion) -> IntradayPoint? {
         points.min { lhs, rhs in
@@ -256,8 +286,7 @@ public enum TencentMultiDayParser {
             guard let rows = day["data"] as? [String] else { continue }
             let date = (day["date"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             // 每天的均价各算各的，和分时图一样指数没有。
-            let parsed = rows.compactMap(TencentMinuteParser.row(from:))
-            let points = symbol.isIndex ? parsed.map(\.point) : TencentMinuteParser.addingAverages(parsed)
+            let points = TencentMinuteParser.points(rows.compactMap(TencentMinuteParser.row(from:)), isIndex: symbol.isIndex)
             days.append(IntradaySeries(symbol: symbol, date: date, points: points))
             closes.append((day["prec"] as? String).flatMap(Double.init).flatMap { $0 > 0 ? $0 : nil })
         }

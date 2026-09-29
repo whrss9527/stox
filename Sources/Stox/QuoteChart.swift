@@ -115,7 +115,8 @@ struct QuoteChartSection: View {
                 hovered: hoveredPoint,
                 showAverage: settings.showMovingAverages,
                 decimals: quote.priceDecimals,
-                cost: cost
+                cost: cost,
+                convention: settings.colorConvention
             )
         case .fiveDay:
             FiveDayChart(
@@ -300,6 +301,10 @@ struct QuoteChartSection: View {
             }
             if settings.showMovingAverages, let average = point.average {
                 text += "  均价 " + price(average)
+            }
+            // 分时接口里 A 股的量是手，科创板和港股、美股是股。
+            if let volume = point.volume, volume > 0 {
+                text += "  量 " + QuoteFormatter.largeNumber(volume) + (region == .cn && !item.symbol.isStarMarket ? "手" : "股")
             }
             return text
         }
