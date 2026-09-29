@@ -18,7 +18,7 @@ final class QuoteStore: ObservableObject {
     /// 看过的五日分时。
     @Published private(set) var fiveDay: [Symbol: MultiDaySeries] = [:]
     /// 每个交易日收盘后记下的持仓盈亏，只在这台 Mac 上。
-    @Published private(set) var profitHistory = ProfitHistory()
+    @Published private(set) var profitHistory: ProfitHistory
     /// 美股个股盘前盘后的最新成交。美股常规交易时段里是空的。
     @Published private(set) var extendedHours: [Symbol: ExtendedHoursQuote] = [:]
     /// 上一次取盘前盘后价的时间和当时取的是哪几只。
@@ -69,10 +69,8 @@ final class QuoteStore: ObservableObject {
         } else {
             items = Watchlist.defaults
         }
-        if let data = defaults.data(forKey: Keys.profitHistory),
-           let history = try? JSONDecoder().decode(ProfitHistory.self, from: data) {
-            profitHistory = history
-        }
+        profitHistory = defaults.data(forKey: Keys.profitHistory)
+            .flatMap { try? JSONDecoder().decode(ProfitHistory.self, from: $0) } ?? ProfitHistory()
         if let data = defaults.data(forKey: Keys.alertState),
            let engine = try? JSONDecoder().decode(AlertEngine.self, from: data) {
             alertEngine = engine
