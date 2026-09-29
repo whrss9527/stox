@@ -294,11 +294,15 @@ final class QuoteStore: ObservableObject {
     }
 
     func phase(for region: MarketRegion, at date: Date = Date()) -> MarketPhase {
-        let latest = quotes.values
+        MarketClock.effectivePhase(for: region, at: date, latestQuoteTime: latestQuoteTime(for: region))
+    }
+
+    /// 这个市场所有行情里最新的时间。
+    func latestQuoteTime(for region: MarketRegion) -> Date? {
+        quotes.values
             .filter { $0.symbol.market.region == region }
             .compactMap(\.timestamp)
             .max()
-        return MarketClock.effectivePhase(for: region, at: date, latestQuoteTime: latest)
     }
 
     // MARK: - 自选管理

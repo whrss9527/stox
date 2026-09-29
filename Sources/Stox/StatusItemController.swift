@@ -488,11 +488,12 @@ final class StatusItemController: NSObject {
         let fiveDay = store.fiveDay.values.map(\.pointCount).max() ?? 0
         let summary = HoldingsSummaryView.summaries(store: store, settings: settings).map(\.region.rawValue).joined(separator: ",")
         let allocation = settings.showAllocation ? HoldingsSummaryView.allocation(store: store, settings: settings).count : -1
+        let realized = HoldingsSummaryView.realized(store: store, settings: settings).map(\.region.rawValue).joined(separator: ",")
         // 有持仓、行情也到了，但今天还没成交的（A 股开盘前行情会清零）：这时价格提醒不会触发。
         let untraded = store.items
             .filter { $0.holding != nil && store.quotes[$0.symbol]?.hasTraded == false }
             .map(\.symbol.rawValue)
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) history=\(store.profitHistory.records.count) alert_log=\(store.alertLog.entries.count) untraded=\(untraded.isEmpty ? "none" : untraded.joined(separator: ",")) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) realized=\(realized.isEmpty ? "none" : realized) history=\(store.profitHistory.records.count) alert_log=\(store.alertLog.entries.count) untraded=\(untraded.isEmpty ? "none" : untraded.joined(separator: ",")) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")

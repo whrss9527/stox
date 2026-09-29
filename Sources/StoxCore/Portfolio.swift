@@ -72,29 +72,34 @@ public struct PortfolioSummary: Equatable, Sendable {
 }
 
 public enum Portfolio {
-    /// 一只证券的持仓盈亏；没有现价时返回 nil。
-    public static func position(_ holding: Holding, quote: Quote) -> PositionValue? {
+    /// 一只证券的持仓盈亏；没有现价时返回 nil。trades 是这只记下的买卖，今天的会算进今日盈亏。
+    public static func position(_ holding: Holding, quote: Quote, trades: [Trade] = []) -> PositionValue? {
         guard holding.isValid, quote.price > 0 else { return nil }
         return PositionValue(
             marketValue: holding.shares * quote.price,
             costValue: holding.costValue,
-            dayProfit: holding.shares * quote.change
+            dayProfit: dayProfit(shares: holding.shares, quote: quote, trades: trades)
         )
     }
 
     /// 按市场所用的货币（人民币、港币、美元）分别合计，按 A 股、港股、美股排序；没有持仓的货币不出现。
+    /// 今天全部卖掉的那只不算持仓，但今天卖出赚的亏的算进今日盈亏。
     public static func summaries(items: [WatchItem], quotes: [Symbol: Quote]) -> [PortfolioSummary] {
         var totals: [MarketRegion: PortfolioSummary] = [:]
         for item in items {
-            guard let holding = item.holding, let quote = quotes[item.symbol],
-                  let position = position(holding, quote: quote)
-            else { continue }
+            guard let quote = quotes[item.symbol] else { continue }
             let region = item.symbol.market.region
             var summary = totals[region] ?? PortfolioSummary(region: region, marketValue: 0, costValue: 0, dayProfit: 0, count: 0)
-            summary.marketValue += position.marketValue
-            summary.costValue += position.costValue
-            summary.dayProfit += position.dayProfit
-            summary.count += 1
+            if let holding = item.holding, let position = position(holding, quote: quote, trades: item.trades) {
+                summary.marketValue += position.marketValue
+                summary.costValue += position.costValue
+                summary.dayProfit += position.dayProfit
+                summary.count += 1
+            } else if let sold = soldOutDayProfit(item, quote: quote) {
+                summary.dayProfit += sold
+            } else {
+                continue
+            }
             totals[region] = summary
         }
         return MarketRegion.allCases.compactMap { totals[$0] }
@@ -206,7 +211,7 @@ extension Portfolio {
         var lines = ["名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组"]
         for item in items {
             guard let holding = item.holding, let quote = quotes[item.symbol],
-                  let position = position(holding, quote: quote)
+                  let position = position(holding, quote: quote, trades: item.trades)
             else { continue }
             let name = quote.name.isEmpty ? item.displayName : quote.name
             lines.append([

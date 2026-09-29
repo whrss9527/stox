@@ -198,9 +198,12 @@ smoke() {
   run_case batch --show-panel --search "601318 09988 TSLA 茅台"
   grep -q "items=8 " shots/batch.log || fail "批量添加在确认前不应该改动自选"
 
-  # 持仓：列表上方按币种合计，展开后显示持仓盈亏。
+  # 持仓：列表上方按币种合计，展开后显示持仓盈亏。茅台今年年初卖过 100 股，记着已实现盈亏。
+  local year
+  year=$(TZ=Asia/Shanghai date +%Y)
   write_watchlist '[{"symbol":"sh000001","name":"上证指数","alias":"上证","pinned":true},
-    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},"note":"等回调到 1200 附近再加仓","alert":{"profitAbove":1}},
+    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},"note":"等回调到 1200 附近再加仓","alert":{"profitAbove":1},
+     "trades":[{"side":"buy","shares":200,"price":1200,"day":"'"$year"'-01-05"},{"side":"sell","shares":100,"price":1300,"day":"'"$year"'-01-06","profit":10000}]},
     {"symbol":"sz000001","name":"平安银行","holding":{"shares":2000,"cost":12.5}},
     {"symbol":"hk00700","name":"腾讯控股","holding":{"shares":200,"cost":380}},
     {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'
@@ -215,6 +218,7 @@ smoke() {
   defaults delete "$DOMAIN" holdings.history
   # 盈亏记录：收盘后 16 小时以内的市场会记一笔，CI 运行的时间不固定，没记到只提醒。
   grep -Eq "history=[1-9]" shots/holdings.log || echo "::warning::这次没有记下盈亏记录（可能没有刚收盘的市场）"
+  grep -q "realized=cn " shots/holdings.log || fail "今年卖出的已实现盈亏没有算出来"
   # 持仓分布：四只持仓，人民币、港币、美元都有，取到汇率时四只都列出来。
   if grep -q "rates=USDCNY:" shots/holdings.log; then
     grep -q "allocation=4 " shots/holdings.log || fail "持仓分布应该列出四只"

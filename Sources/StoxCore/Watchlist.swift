@@ -18,13 +18,16 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
     public var group: String? {
         didSet { group = Self.normalizedGroup(group) }
     }
+    /// 用“记一笔”记下的买卖，最早的在前，最多留 `Trade.limit` 笔。全部卖出、持仓清掉以后也还留着。
+    public var trades: [Trade]
 
     /// 分组名最多这么多个字。
     public static let groupNameLimit = 10
 
     public init(
         symbol: Symbol, name: String = "", alias: String? = nil, pinned: Bool = false,
-        alert: PriceAlert = PriceAlert(), holding: Holding? = nil, note: String? = nil, group: String? = nil
+        alert: PriceAlert = PriceAlert(), holding: Holding? = nil, note: String? = nil, group: String? = nil,
+        trades: [Trade] = []
     ) {
         self.symbol = symbol
         self.name = name
@@ -34,6 +37,7 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
         self.holding = holding
         self.note = note
         self.group = Self.normalizedGroup(group)
+        self.trades = trades
     }
 
     /// 分组名去掉首尾空白，太长的截断，空的当作不分组。
@@ -58,7 +62,7 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
 // 手写 Codable：新增字段时旧数据也能正常读出。
 extension WatchItem: Codable {
     enum CodingKeys: String, CodingKey {
-        case symbol, name, alias, pinned, alert, holding, note, group
+        case symbol, name, alias, pinned, alert, holding, note, group, trades
     }
 
     public init(from decoder: Decoder) throws {
@@ -72,6 +76,7 @@ extension WatchItem: Codable {
         holding = (try? c.decodeIfPresent(Holding.self, forKey: .holding)).flatMap { $0.isValid ? $0 : nil }
         note = (try? c.decodeIfPresent(String.self, forKey: .note)).flatMap { $0.isEmpty ? nil : $0 }
         group = Self.normalizedGroup(try? c.decodeIfPresent(String.self, forKey: .group))
+        trades = (try? c.decodeIfPresent([Trade].self, forKey: .trades)) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -84,6 +89,9 @@ extension WatchItem: Codable {
         try c.encodeIfPresent(holding, forKey: .holding)
         try c.encodeIfPresent(note, forKey: .note)
         try c.encodeIfPresent(group, forKey: .group)
+        if !trades.isEmpty {
+            try c.encode(trades, forKey: .trades)
+        }
     }
 }
 

@@ -8,6 +8,7 @@ struct StockEditorPanel: View {
     let symbol: Symbol
 
     @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
     @State private var pinned = false
     @State private var alias = ""
@@ -25,6 +26,8 @@ struct StockEditorPanel: View {
     @State private var tradePrice = ""
     /// 刚记了一笔买卖：说明算出来的新持仓，保存后才生效。
     @State private var tradeMessage: String?
+    /// 这只的买卖记录（最早的在前），记一笔、删一条都先改这里，保存时一起写回。
+    @State private var trades: [Trade] = []
     @State private var loaded = false
 
     var body: some View {
@@ -100,6 +103,9 @@ struct StockEditorPanel: View {
                                 .font(.system(size: 11))
                                 .foregroundStyle(Color.accentColor)
                                 .fixedSize(horizontal: false, vertical: true)
+                        }
+                        if !trades.isEmpty {
+                            tradeList
                         }
                     }
                     .padding(12)
@@ -194,10 +200,70 @@ struct StockEditorPanel: View {
             Button("买入", action: buy)
                 .disabled(tradeAmount == nil || tradeUnitPrice == nil || holdingState == .invalid)
             Button("卖出", action: sell)
-                .disabled(tradeAmount == nil || !canSell)
+                .disabled(tradeAmount == nil || tradeUnitPrice == nil || !canSell)
         }
         .controlSize(.small)
-        .help("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量。记完检查一下，点保存才生效")
+        .help("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量、按成本价算出赚了多少。记完检查一下，点保存才生效")
+    }
+
+    /// 最近的买卖：最新的在前，最多列 5 笔；下面写今年卖出一共赚了多少。删掉一条只删记录，不改持仓。
+    private var tradeList: some View {
+        let recent = Array(trades.indices.reversed().prefix(5))
+        let realized = trades.realizedProfit(since: Portfolio.yearStart(now: Date()))
+        let sold = trades.contains { $0.side == .sell && $0.day >= Portfolio.yearStart(now: Date()) }
+        return VStack(alignment: .leading, spacing: 3) {
+            Text("最近的买卖")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.secondary)
+            ForEach(recent, id: \.self) { index in
+                tradeLine(trades[index]) {
+                    if trades.indices.contains(index) { trades.remove(at: index) }
+                }
+            }
+            if trades.count > recent.count {
+                Text("还有更早的 \(trades.count - recent.count) 笔")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.tertiary)
+            }
+            if sold {
+                Text("今年卖出已实现 " + QuoteFormatter.signedMoney(realized))
+                    .font(.system(size: 11).monospacedDigit())
+                    .foregroundStyle(Theme.priceColor(for: PriceDirection(realized), convention: settings.colorConvention))
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func tradeLine(_ trade: Trade, remove: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            Text(dayText(trade.day))
+                .foregroundStyle(.secondary)
+            Text("\(trade.side.title) \(QuoteFormatter.plain(trade.shares)) 股 @ \(QuoteFormatter.plain(trade.price))")
+            Spacer(minLength: 4)
+            if let profit = trade.profit {
+                Text(QuoteFormatter.signedMoney(profit))
+                    .foregroundStyle(Theme.priceColor(for: PriceDirection(profit), convention: settings.colorConvention))
+            }
+            Button(action: remove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .buttonStyle(.borderless)
+            .help("删掉这条记录（不改持仓），保存后生效")
+        }
+        .font(.system(size: 11).monospacedDigit())
+        .lineLimit(1)
+    }
+
+    /// 今年的只写月日。
+    private func dayText(_ day: String) -> String {
+        day.hasPrefix(String(Portfolio.yearStart(now: Date()).prefix(5))) ? String(day.dropFirst(5)) : day
+    }
+
+    /// 现在记的一笔算哪个交易日（见 Trade.day）。
+    private var tradeDay: String {
+        let region = symbol.market.region
+        return Trade.day(for: region, now: Date(), latestQuoteTime: store.latestQuoteTime(for: region))
     }
 
     private var currentPriceText: String? {
@@ -237,22 +303,26 @@ struct StockEditorPanel: View {
         }
         shares = QuoteFormatter.plain(updated.shares)
         cost = QuoteFormatter.plain(updated.cost)
+        trades = trades.appending([Trade(side: .buy, shares: amount, price: price, day: tradeDay)])
         tradeMessage = "买入 \(QuoteFormatter.plain(amount)) 股 @ \(QuoteFormatter.plain(price))：持有 \(shares) 股，成本 \(cost)。点保存生效"
         tradeShares = ""
         tradePrice = ""
     }
 
     private func sell() {
-        guard case .valid(let holding) = holdingState, let amount = tradeAmount,
+        guard case .valid(let holding) = holdingState, let amount = tradeAmount, let price = tradeUnitPrice,
               let remaining = holding.selling(shares: amount)
         else { return }
+        let trade = Trade.sell(amount, at: price, from: holding, day: tradeDay)
+        trades = trades.appending([trade])
+        let realized = "已实现 " + QuoteFormatter.signedMoney(trade.profit ?? 0)
         if remaining.isValid {
             shares = QuoteFormatter.plain(remaining.shares)
-            tradeMessage = "卖出 \(QuoteFormatter.plain(amount)) 股：还剩 \(shares) 股，成本不变。点保存生效"
+            tradeMessage = "卖出 \(QuoteFormatter.plain(amount)) 股 @ \(QuoteFormatter.plain(price))，\(realized)：还剩 \(shares) 股，成本不变。点保存生效"
         } else {
             shares = ""
             cost = ""
-            tradeMessage = "全部卖出，保存后清掉持仓"
+            tradeMessage = "全部卖出 @ \(QuoteFormatter.plain(price))，\(realized)。保存后清掉持仓，买卖记录还留着"
         }
         tradeShares = ""
         tradePrice = ""
@@ -363,6 +433,7 @@ struct StockEditorPanel: View {
         note = item.note ?? ""
         group = item.group ?? ""
         cost = format(item.holding?.cost)
+        trades = item.trades
     }
 
     /// 输入框里显示的数字。不用 %g：它只保留 6 位有效数字，大数还会变成科学计数法。
@@ -378,6 +449,7 @@ struct StockEditorPanel: View {
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.note = trimmedNote.isEmpty ? nil : trimmedNote
         updated.group = WatchItem.normalizedGroup(group)
+        updated.trades = trades
         // 没有持仓（或者成本为 0）时止盈止损没有意义，一起清掉。
         var hasCost = false
         if case .valid(let holding) = holdingState {
