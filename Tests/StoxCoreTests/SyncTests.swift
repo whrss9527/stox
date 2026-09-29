@@ -90,3 +90,27 @@ final class SyncTests: XCTestCase {
         XCTAssertNil(SyncDocument.newest([]))
     }
 }
+
+final class BackupTests: XCTestCase {
+    func testImportingKeepsLocalAndAddsTheRest() throws {
+        let moutai = WatchItem(symbol: Symbol("sh600519")!, name: "贵州茅台", group: "白酒")
+        let tencent = WatchItem(symbol: Symbol("hk00700")!, name: "腾讯控股")
+        let apple = WatchItem(symbol: Symbol("usAAPL")!, name: "苹果", holding: Holding(shares: 10, cost: 300))
+        var backupMoutai = moutai
+        backupMoutai.group = "消费"
+        let local = SyncContent(watchlist: [moutai, tencent], settings: SyncedSettings(refreshInterval: 5))
+        let backup = SyncContent(watchlist: [apple, backupMoutai], settings: SyncedSettings(refreshInterval: 30))
+
+        let merged = local.importing(backup)
+        XCTAssertEqual(merged.watchlist.map(\.symbol.rawValue), ["sh600519", "hk00700", "usAAPL"], "本机的在前，备份里多出来的追加在后面")
+        XCTAssertEqual(merged.watchlist[0].group, "白酒", "本机已有的保持本机的设置")
+        XCTAssertEqual(merged.watchlist[2].holding, Holding(shares: 10, cost: 300), "新加的带着备份里的持仓")
+        XCTAssertEqual(merged.settings.refreshInterval, 5, "设置用本机的")
+
+        // 备份文件就是同步文件的格式，写出去再读回来一样。
+        let document = SyncDocument(updatedAt: Date(timeIntervalSince1970: 1_790_000_000), device: "MacBook", content: backup)
+        XCTAssertEqual(try SyncDocument.decode(document.encoded()), document)
+        let noon = Date(timeIntervalSince1970: 1_790_000_000)
+        XCTAssertEqual(SyncContent.backupFileName(on: noon, timeZone: TimeZone(identifier: "Asia/Shanghai")!), "Stox 自选 2026-09-21.json")
+    }
+}

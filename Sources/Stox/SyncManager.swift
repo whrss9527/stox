@@ -66,6 +66,21 @@ final class SyncManager: ObservableObject {
         SyncContent(watchlist: store.items, settings: settings.syncedSettings)
     }
 
+    // MARK: - 备份到文件
+
+    /// 导出的备份：和 iCloud 里的同步文件一样的格式。
+    func backupData() throws -> Data {
+        try SyncDocument(updatedAt: Date(), device: CloudFile.deviceName, content: currentContent).encoded()
+    }
+
+    /// 导入备份：替换本机的自选和设置，或者只添加本机没有的证券。和在本机改动一样，开着同步时会同步上去。
+    func importBackup(_ content: SyncContent, replace: Bool) {
+        let result = replace ? content : currentContent.importing(content)
+        store.replaceWatchlist(result.watchlist)
+        settings.apply(result.settings)
+        Log.info("导入备份：\(replace ? "替换" : "合并")，现在 \(store.items.count) 只")
+    }
+
     // MARK: - 开关
 
     /// 启动时按记录的开关恢复。

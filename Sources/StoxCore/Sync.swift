@@ -57,6 +57,19 @@ public struct SyncContent: Equatable, Sendable {
         self.settings = settings
     }
 
+    /// 从备份文件导入时的“合并”：本机的自选和设置都不动，只把备份里本机没有的证券追加在后面。
+    public func importing(_ backup: SyncContent) -> SyncContent {
+        backup.merging(cloud: self)
+    }
+
+    /// 备份文件默认的文件名，例如“Stox 自选 2026-09-28.json”。
+    public static func backupFileName(on date: Date, timeZone: TimeZone = .current) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let c = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "Stox 自选 %04d-%02d-%02d.json", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+
     /// 首次开启同步时的“合并”：自选以 iCloud 的为准（顺序和每一项的设置），本机独有的追加在后面；设置用 iCloud 的。
     public func merging(cloud: SyncContent) -> SyncContent {
         var seen = Set(cloud.watchlist.map(\.symbol))

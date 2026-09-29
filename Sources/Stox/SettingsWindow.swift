@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import SwiftUI
 import StoxCore
+import UniformTypeIdentifiers
 
 enum SettingsPage: String, CaseIterable, Identifiable {
     case general
@@ -397,6 +398,10 @@ struct ColorPreview: View {
 struct SyncPage: View {
     @ObservedObject var sync: SyncManager
     @ObservedObject var store: QuoteStore
+    /// 选好了、等确认导入的备份。
+    @State private var importing: SyncDocument?
+    /// 导出、导入之后的结果说明。
+    @State private var backupMessage: String?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -428,8 +433,26 @@ struct SyncPage: View {
                         }
                     }
                 }
+                Section("备份到文件") {
+                    HStack {
+                        Button("导出…", action: exportBackup)
+                            .disabled(store.items.isEmpty)
+                        Button("导入…", action: chooseBackup)
+                    }
+                    .confirmationDialog("导入备份", isPresented: importingPresented, titleVisibility: .visible) {
+                        Button("替换本机的自选和设置") { applyBackup(replace: true) }
+                        Button("只添加本机没有的") { applyBackup(replace: false) }
+                        Button("取消", role: .cancel) { importing = nil }
+                    } message: {
+                        Text(importMessage)
+                    }
+                    if let backupMessage {
+                        FormNote(backupMessage)
+                    }
+                    FormNote("不开 iCloud 也能备份和搬到另一台 Mac：导出的是自选（含分组、持仓、提醒、备注）和下面说的那些设置，格式和 iCloud 里的同步文件一样。导入时可以替换本机的，或者只添加本机没有的。")
+                }
                 Section("会同步什么") {
-                    FormNote("自选列表的内容和顺序、每只的菜单栏固定、简称、持仓和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。")
+                    FormNote("自选列表的内容和顺序、每只的菜单栏固定、简称、备注、分组、持仓和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。")
                     FormNote("“只显示图标”、面板外观、快捷键、登录时启动、自动检查更新只和这台 Mac 有关，不同步。")
                 }
                 Section("怎么同步") {
@@ -466,6 +489,54 @@ struct SyncPage: View {
     /// 对话框关闭时不做事：按钮的动作已经把 pending 清掉了。
     private var pendingPresented: Binding<Bool> {
         Binding(get: { sync.pending != nil }, set: { _ in })
+    }
+
+    private var importingPresented: Binding<Bool> {
+        Binding(get: { importing != nil }, set: { if !$0 { importing = nil } })
+    }
+
+    private var importMessage: String {
+        guard let importing else { return "" }
+        let time = importing.updatedAt.formatted(date: .abbreviated, time: .shortened)
+        return "备份里有 \(importing.content.watchlist.count) 只自选，是 \(importing.device) 在 \(time) 导出的。"
+    }
+
+    private func exportBackup() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = SyncContent.backupFileName(on: Date())
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try sync.backupData().write(to: url, options: .atomic)
+            backupMessage = "已把 \(store.items.count) 只自选导出到“\(url.lastPathComponent)”。"
+        } catch {
+            backupMessage = "导出失败：\(error.localizedDescription)"
+        }
+    }
+
+    private func chooseBackup() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            importing = try SyncDocument.decode(Data(contentsOf: url))
+            backupMessage = nil
+        } catch {
+            backupMessage = "读不了这个文件：\(error.localizedDescription)"
+        }
+    }
+
+    private func applyBackup(replace: Bool) {
+        guard let importing else { return }
+        let before = store.items.count
+        sync.importBackup(importing.content, replace: replace)
+        backupMessage = replace
+            ? "已换成备份里的 \(store.items.count) 只自选。"
+            : "添加了 \(store.items.count - before) 只本机没有的自选。"
+        self.importing = nil
     }
 
     private var pendingMessage: String {
