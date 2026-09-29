@@ -100,7 +100,8 @@ jobs:
           for log in shots/*.log; do
             name=$(basename "$log" .log)
             [ -f "shots/$name-full.png" ] || continue
-            frame=$(grep -o 'capture_frame=[0-9 -]*' "$log" | head -1 | cut -d= -f2)
+            # 取最后一次报的范围：晚几秒再报的那次，面板已经按慢到的内容调整好了，和截图时一致。
+            frame=$(grep -o 'capture_frame=[0-9 -]*' "$log" | tail -1 | cut -d= -f2)
             [ -n "$frame" ] || continue
             "$RUNNER_TEMP/crop" "shots/$name-full.png" "shots/$name.jpg" $frame 900 0.85
             "$RUNNER_TEMP/crop" "shots/$name-full.png" "shots/$name-preview.jpg" $frame 640 0.45

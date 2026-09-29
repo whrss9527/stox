@@ -133,10 +133,11 @@ final class StatusItemController: NSObject {
                 }
                 if printDiagnostics {
                     self?.printDiagnostics()
-                    // 盘前盘后价在行情之后才取，过几秒再报一次。
+                    // 盘前盘后价在行情之后才取，过几秒再报一次；面板尺寸也再报一次，那时更新内容这些慢的都到了，布局也调整完了。
                     try? await Task.sleep(nanoseconds: 6_000_000_000)
                     if let self {
                         print("STOX_DIAG late \(self.extendedHoursDiagnostics)")
+                        self.panelDiagnostics().forEach { print("STOX_DIAG late " + $0) }
                         fflush(stdout)
                     }
                 }
@@ -186,7 +187,7 @@ final class StatusItemController: NSObject {
         panel.appearance = settings.appearance.nsAppearance
         panel.pinned = settings.panelPinned
         resizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.keepBelowMenuBar() }
+            Task { @MainActor in self?.panelDidResize() }
         }
         moveObserver = NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.panelMoved() }
@@ -342,6 +343,18 @@ final class StatusItemController: NSObject {
         keepBelowMenuBar()
     }
 
+    /// 窗口尺寸变了：可能是 NSHostingView 按内容自己把窗口撑高了（内容变高时，这比 SwiftUI 报尺寸的回调还早）。
+    /// 顶边挪回菜单栏下面；内容的实际高度和上次量的不一样时，再按实际高度调整一次，放不下就压矮列表。
+    /// 实际高度没变时不再调整，免得放不下又压不动的时候来回改窗口。
+    private func panelDidResize() {
+        keepBelowMenuBar()
+        guard let panel, panel.isVisible, let hostingView else { return }
+        let fitting = hostingView.fittingSize
+        if fitting.height > 0, abs(fitting.height - contentSize.height) > 0.5 {
+            resizePanel(to: fitting)
+        }
+    }
+
     /// SwiftUI 的最小尺寸可能让窗口比我们设的高，这时它会往上长。把顶边挪回菜单栏下面。
     private func keepBelowMenuBar() {
         guard let panel, let limit = topLimit(), panel.frame.maxY > limit + 0.5 else { return }
@@ -495,6 +508,26 @@ final class StatusItemController: NSObject {
 
     // MARK: - 诊断
 
+    /// 面板的位置和尺寸（CI 检查放不放得下），以及截图要裁的范围（菜单栏图标加面板）。
+    private func panelDiagnostics() -> [String] {
+        let screenHeight = NSScreen.screens.first?.frame.height ?? 0
+        func topLeft(_ rect: NSRect) -> String {
+            "\(Int(rect.minX)) \(Int(screenHeight - rect.maxY)) \(Int(rect.width)) \(Int(rect.height))"
+        }
+        var lines: [String] = []
+        let statusFrame = statusItem.button?.window?.frame
+        let panelFrame = panel?.isVisible == true ? panel?.frame : nil
+        if let panelFrame {
+            let fitting = hostingView?.fittingSize ?? .zero
+            lines.append("panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) fitting=\(Int(fitting.height)) list_max=\(Int(router.listMaxHeight)) available=\(Int(availableHeight() ?? -1)) cards=\(Int(router.cardsHeight)) cards_max=\(router.cardsMaxHeight.map { String(Int($0)) } ?? "none")")
+        }
+        let frames = [statusFrame, panelFrame].compactMap { $0 }
+        if let first = frames.first {
+            lines.append("capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
+        }
+        return lines
+    }
+
     /// CI 用：打印菜单栏文字和面板位置，方便检查和截图裁剪。
     func printDiagnostics() {
         let screenHeight = NSScreen.screens.first?.frame.height ?? 0
@@ -508,15 +541,7 @@ final class StatusItemController: NSObject {
         if let statusFrame {
             print("STOX_DIAG status_frame=\(topLeft(statusFrame))")
         }
-        let panelFrame = panel?.isVisible == true ? panel?.frame : nil
-        if let panelFrame {
-            let fitting = hostingView?.fittingSize ?? .zero
-            print("STOX_DIAG panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) fitting=\(Int(fitting.height)) list_max=\(Int(router.listMaxHeight)) available=\(Int(availableHeight() ?? -1)) cards=\(Int(router.cardsHeight)) cards_max=\(router.cardsMaxHeight.map { String(Int($0)) } ?? "none")")
-        }
-        let frames = [statusFrame, panelFrame].compactMap { $0 }
-        if let first = frames.first {
-            print("STOX_DIAG capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
-        }
+        panelDiagnostics().forEach { print("STOX_DIAG " + $0) }
         let holdings = store.items.filter { $0.holding != nil }.count
         let intraday = store.intraday.values.map(\.points.count).max() ?? 0
         let kline = store.klines.values.map(\.candles.count).max() ?? 0
