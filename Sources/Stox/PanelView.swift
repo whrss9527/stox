@@ -138,7 +138,8 @@ struct PanelHeader: View {
                 Text("Stox")
                     .font(.system(size: 14, weight: .semibold))
                 HStack(spacing: 8) {
-                    ForEach(store.activeRegions, id: \.self) { region in
+                    // 期货外汇工作日全天都在交易，不占这里的地方。
+                    ForEach(store.activeRegions.filter { $0 != .global }, id: \.self) { region in
                         let phase = store.phase(for: region)
                         HStack(spacing: 3) {
                             Circle()

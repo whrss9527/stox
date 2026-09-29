@@ -41,6 +41,7 @@ extension WatchlistFilter {
         case .cn: return "A股"
         case .hk: return "港股"
         case .us: return "美股"
+        case .global: return "期货外汇"
         case .holdings: return "持仓"
         case .group(let name): return name
         }

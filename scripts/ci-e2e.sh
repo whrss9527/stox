@@ -326,6 +326,19 @@ smoke() {
   defaults delete "$DOMAIN" watchlist.v1
   grep -q "items=1 quotes=1 holdings=1 summary=cn " shots/fund.log || fail "场外基金的净值没有取到，或者没有算进持仓"
   grep -q "expanded=jj161725" shots/fund.log || fail "场外基金没有展开"
+  # 期货外汇：伦敦金、纽约原油、美元人民币、美元指数和上证指数放在一起，伦敦金钉在菜单栏上；展开伦敦金，没有走势图。
+  write_watchlist '[{"symbol":"hf_XAU","name":"伦敦金","pinned":true},{"symbol":"hf_CL","name":"纽约原油"},
+    {"symbol":"whUSDCNY","name":"美元人民币"},{"symbol":"whUSDX","name":"美元指数"},{"symbol":"sh000001","name":"上证指数"}]'
+  run_case global --show-panel --expand hf_XAU
+  defaults delete "$DOMAIN" watchlist.v1
+  check_fits global
+  grep -q "items=5 quotes=5 " shots/global.log || fail "期货外汇的行情没有取到"
+  grep -q "expanded=hf_XAU" shots/global.log || fail "伦敦金没有展开"
+  grep -q 'status_title="伦敦金 [0-9]' shots/global.log || fail "菜单栏上没有伦敦金"
+  grep -q "intraday=0 " shots/global.log || fail "期货外汇没有分时，不应该去取"
+  # 搜“黄金”：品种表里的伦敦金排在股票前面，按一下方向键选中的就是它。
+  run_case search-gold --show-panel --search 黄金 --keys down
+  grep -q "highlight=hf_XAU" shots/search-gold.log || fail "搜黄金时第一条应该是伦敦金"
 
   # A 股涨跌榜：打开涨幅榜，取到了就列出来；接口偶尔取不到只提示。
   run_case rank --show-panel --rank

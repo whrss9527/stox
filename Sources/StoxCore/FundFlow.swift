@@ -124,11 +124,11 @@ public struct FundFlowDay: Equatable, Sendable {
 public enum TencentFundFlow {
     public static let endpoint = "https://proxy.finance.qq.com/cgi/cgi-bin/fundflow/hsfundtab"
 
-    /// 这只有没有资金流向：沪深北的个股和 ETF（指数、场外基金、港股、美股没有）。
+    /// 这只有没有资金流向：沪深北的个股和 ETF（指数、场外基金、港股、美股、期货外汇没有）。
     public static func supports(_ symbol: Symbol) -> Bool {
         switch symbol.market {
         case .sh, .sz, .bj: return !symbol.isIndex
-        case .hk, .us, .jj: return false
+        case .hk, .us, .jj, .hf, .wh: return false
         }
     }
 

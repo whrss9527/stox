@@ -31,8 +31,9 @@ jobs:
         # 真实请求腾讯行情接口和 GitHub 的发布接口；偶尔抖动时不阻塞构建。
         continue-on-error: true
         run: |
-          swift run stox-cli quote sh000001 sh600519 sz000001 sz399006 sh510300 bj920819 hk00700 hkHSI usAAPL usBRK.B us.IXIC
+          swift run stox-cli quote sh000001 sh600519 sz000001 sz399006 sh510300 bj920819 hk00700 hkHSI usAAPL usBRK.B us.IXIC hf_XAU whUSDCNY
           swift run stox-cli search gzmt
+          swift run stox-cli search 黄金
           swift run stox-cli search 腾讯
           swift run stox-cli kline sh600519 day
           swift run stox-cli kline hk00700 week

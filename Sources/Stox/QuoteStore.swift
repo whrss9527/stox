@@ -288,10 +288,10 @@ final class QuoteStore: ObservableObject {
     }
 
     /// 面板打开、列表显示着的时候调用：给列表里的这些证券取当天的分时，抽成迷你分时。一次取一只，隔一会儿再取下一只，
-    /// 不一下子发一堆请求；交易时段内两分钟一轮，休市时十分钟一轮。场外基金没有分时，不取。面板关上、列表换了就停（任务被取消）。
+    /// 不一下子发一堆请求；交易时段内两分钟一轮，休市时十分钟一轮。场外基金、期货外汇没有分时，不取。面板关上、列表换了就停（任务被取消）。
     func trackSparklines(_ symbols: [Symbol]) async {
         while !Task.isCancelled {
-            for symbol in symbols where !symbol.isFund {
+            for symbol in symbols where symbol.hasCharts {
                 guard !Task.isCancelled else { return }
                 let maxAge: TimeInterval = phase(for: symbol.market.region).isLive ? 110 : 600
                 if let fetched = sparklineFetched[symbol], Date().timeIntervalSince(fetched) < maxAge { continue }

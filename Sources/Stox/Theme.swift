@@ -52,7 +52,7 @@ enum Theme {
         }
     }
 
-    /// 市场标签（沪、深、港、美）的颜色。
+    /// 市场标签（沪、深、港、美、基、期、汇）的颜色。
     static func marketTint(_ market: Market, convention: ColorConvention) -> Color {
         if convention == .neutral { return .secondary }
         switch market {
@@ -60,6 +60,8 @@ enum Theme {
         case .hk: return .purple
         case .us: return .blue
         case .jj: return .orange
+        case .hf: return .brown
+        case .wh: return .teal
         }
     }
 }

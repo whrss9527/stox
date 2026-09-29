@@ -110,6 +110,8 @@ fields "tencent quote fields: funds" "https://qt.gtimg.cn/utf8/q=jj161725,jj1100
 fields "tencent quote fields: CN" "https://qt.gtimg.cn/utf8/q=sh600519,sz000001,sh510300,sh688981,bj920819,sh000001"
 fields "tencent quote fields: HK" "https://qt.gtimg.cn/utf8/q=hk00700,hk09988"
 fields "tencent quote fields: FX guesses" "https://qt.gtimg.cn/utf8/q=whUSDCNY,whHKDCNY,whUSDHKD,fxUSDCNY,USDCNY"
+# 期货外汇（自选里的“期”“汇”）：国际期货和贵金属是逗号分隔，外汇是 ~ 分隔，见 GlobalQuoteParser。
+fields "tencent quote fields: futures and forex" "https://qt.gtimg.cn/utf8/q=hf_XAU,hf_GC,hf_CL,hf_OIL,whUSDCNY,whUSDX,whUSDJPY"
 fetch "tencent smartbox: usdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=usdcny" "UTF-8"
 fetch "tencent smartbox: hkdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=hkdcny" "UTF-8"
 pandata() {
@@ -189,6 +191,7 @@ shape "tencent 5-day: usAAPL (UsDay)" "https://web.ifzq.gtimg.cn/appstock/app/Us
 # 新浪行情（腾讯不可用时的备用）：A 股、ETF、北交所、指数、港股、美股个股和美股指数的写法。
 fetch "sina quote (fallback)" 'https://hq.sinajs.cn/list=sh600519,sz000001,sh000001,sz399006,sh510300,bj920819,hk00700,hkHSI,gb_aapl,gb_brk.b,gb_brk$b,gb_ixic,gb_$ixic,gb_dji,gb_$dji,gb_inx,gb_$inx,sh999999' "GB18030" "https://finance.sina.com.cn/"
 fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030"
+fetch "sina futures (fallback)" "https://hq.sinajs.cn/list=hf_XAU,hf_GC,hf_CL" "GB18030" "https://finance.sina.com.cn/"
 
 # K 线（面板里的日 K、周 K、月 K 用）：只打印每个序列的条数和首尾几条，并检查字段顺序。
 kline() {
