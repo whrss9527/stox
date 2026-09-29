@@ -286,3 +286,9 @@ fetch "tencent fund flow raw" "https://qt.gtimg.cn/q=ff_sh600519,ff_hk00700,ff_u
 fetch "tencent pk" "https://qt.gtimg.cn/q=s_pksh600519,s_pksz000001" "GB18030"
 fetch "tencent fund flow today" "https://proxy.finance.qq.com/cgi/cgi-bin/fundflow/hsfundtab?code=sh600519&type=fundFlow&klineNeedDay=1" "UTF-8"
 fetch "tencent fund flow history" "https://proxy.finance.qq.com/cgi/cgi-bin/fundflow/hsfundtab?code=sh600519&type=historyFundFlow&klineNeedDay=5" "UTF-8"
+FF="https://proxy.finance.qq.com/cgi/cgi-bin/fundflow/hsfundtab?code=sh600519"
+for t in todayFundFlow todayFundTrend fiveDayFundFlow activeFlow "todayFundFlow,fiveDayFundFlow"; do
+  fetch "tencent fund flow type ${t}" "${FF}&type=${t}&klineNeedDay=1" "UTF-8"
+done
+fetch "tencent fund flow sz000001 today" "https://proxy.finance.qq.com/cgi/cgi-bin/fundflow/hsfundtab?code=sz000001&type=todayFundFlow" "UTF-8"
+fetch "tencent fund flow etf" "https://proxy.finance.qq.com/cgi/cgi-bin/fundflow/hsfundtab?code=sh510300&type=todayFundFlow" "UTF-8"
