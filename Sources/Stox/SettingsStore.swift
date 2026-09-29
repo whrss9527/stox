@@ -297,6 +297,10 @@ final class SettingsStore: ObservableObject {
     @Published var menuBarProfit: MenuBarProfit {
         didSet { defaults.set(menuBarProfit.rawValue, forKey: Keys.menuBarProfit) }
     }
+    /// 盈亏日历按年看（每个月一格），否则按月看（每天一格）。只在本机，不同步。
+    @Published var profitCalendarByYear: Bool {
+        didSet { defaults.set(profitCalendarByYear, forKey: Keys.profitCalendarByYear) }
+    }
     /// 面板钉住：点别处时不关闭，可以拖到任何位置。
     @Published var panelPinned: Bool {
         didSet { defaults.set(panelPinned, forKey: Keys.panelPinned) }
@@ -374,6 +378,7 @@ final class SettingsStore: ObservableObject {
         showExtendedHours = defaults.object(forKey: Keys.showExtendedHours) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
         menuBarProfit = defaults.string(forKey: Keys.menuBarProfit).flatMap(MenuBarProfit.init(rawValue:)) ?? .day
+        profitCalendarByYear = defaults.object(forKey: Keys.profitCalendarByYear) as? Bool ?? false
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
         chartPeriod = defaults.string(forKey: Keys.chartPeriod).flatMap(ChartPeriod.init(rawValue:)) ?? .intraday
         tipsDismissed = defaults.object(forKey: Keys.tipsDismissed) as? Bool ?? false
@@ -463,6 +468,7 @@ final class SettingsStore: ObservableObject {
         static let showExtendedHours = "list.extendedHours"
         static let showDayProfit = "ticker.dayProfit"
         static let menuBarProfit = "ticker.profitKind"
+        static let profitCalendarByYear = "calendar.byYear"
         static let panelPinned = "panel.pinned"
         static let pinnedX = "panel.pinnedX"
         static let pinnedY = "panel.pinnedY"
