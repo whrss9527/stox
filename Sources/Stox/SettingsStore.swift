@@ -181,6 +181,10 @@ final class SettingsStore: ObservableObject {
     @Published var rotateTicker: Bool {
         didSet { defaults.set(rotateTicker, forKey: Keys.rotateTicker); onSyncedSettingChange?() }
     }
+    /// 菜单栏行情排成一行，还是上下两行（价格在上、涨跌幅在下，字小一些）。
+    @Published var tickerLayout: TickerLayout {
+        didSet { defaults.set(tickerLayout.rawValue, forKey: Keys.tickerLayout); onSyncedSettingChange?() }
+    }
     @Published var alertsEnabled: Bool {
         didSet { defaults.set(alertsEnabled, forKey: Keys.alertsEnabled); onSyncedSettingChange?() }
     }
@@ -348,6 +352,7 @@ final class SettingsStore: ObservableObject {
         showPrice = defaults.object(forKey: Keys.showPrice) as? Bool ?? true
         showPercent = defaults.object(forKey: Keys.showPercent) as? Bool ?? true
         rotateTicker = defaults.object(forKey: Keys.rotateTicker) as? Bool ?? false
+        tickerLayout = defaults.string(forKey: Keys.tickerLayout).flatMap(TickerLayout.init(rawValue:)) ?? .inline
         alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
         closeSummary = defaults.object(forKey: Keys.closeSummary) as? Bool ?? false
         limitAlerts = defaults.object(forKey: Keys.limitAlerts) as? Bool ?? false
@@ -412,7 +417,8 @@ final class SettingsStore: ObservableObject {
             showPrice: showPrice,
             showPercent: showPercent,
             rotateTicker: rotateTicker,
-            alertsEnabled: alertsEnabled
+            alertsEnabled: alertsEnabled,
+            tickerLayout: tickerLayout.rawValue
         )
     }
 
@@ -429,6 +435,7 @@ final class SettingsStore: ObservableObject {
         if let value = synced.showPrice, value != showPrice { showPrice = value }
         if let value = synced.showPercent, value != showPercent { showPercent = value }
         if let value = synced.rotateTicker, value != rotateTicker { rotateTicker = value }
+        if let value = synced.tickerLayout.flatMap(TickerLayout.init(rawValue:)), value != tickerLayout { tickerLayout = value }
         if let value = synced.alertsEnabled, value != alertsEnabled { alertsEnabled = value }
     }
 
@@ -440,6 +447,7 @@ final class SettingsStore: ObservableObject {
         static let showPrice = "ticker.showPrice"
         static let showPercent = "ticker.showPercent"
         static let rotateTicker = "ticker.rotate"
+        static let tickerLayout = "ticker.layout"
         static let hideTicker = "ticker.hidden"
         static let hideTickerWhenClosed = "ticker.hideWhenClosed"
         static let hotKeyEnabled = "hotKeyEnabled"

@@ -11,6 +11,8 @@ public struct SyncedSettings: Codable, Equatable, Sendable {
     public var showPercent: Bool?
     public var rotateTicker: Bool?
     public var alertsEnabled: Bool?
+    /// 菜单栏行情的排法（TickerLayout 的 rawValue）。旧版本没有这一项，读到时忽略。
+    public var tickerLayout: String?
 
     public init(
         refreshInterval: Double? = nil,
@@ -20,7 +22,8 @@ public struct SyncedSettings: Codable, Equatable, Sendable {
         showPrice: Bool? = nil,
         showPercent: Bool? = nil,
         rotateTicker: Bool? = nil,
-        alertsEnabled: Bool? = nil
+        alertsEnabled: Bool? = nil,
+        tickerLayout: String? = nil
     ) {
         self.refreshInterval = refreshInterval
         self.slowWhenIdle = slowWhenIdle
@@ -30,6 +33,7 @@ public struct SyncedSettings: Codable, Equatable, Sendable {
         self.showPercent = showPercent
         self.rotateTicker = rotateTicker
         self.alertsEnabled = alertsEnabled
+        self.tickerLayout = tickerLayout
     }
 
     /// 用 other 里有值的字段覆盖自己。
@@ -42,7 +46,8 @@ public struct SyncedSettings: Codable, Equatable, Sendable {
             showPrice: other.showPrice ?? showPrice,
             showPercent: other.showPercent ?? showPercent,
             rotateTicker: other.rotateTicker ?? rotateTicker,
-            alertsEnabled: other.alertsEnabled ?? alertsEnabled
+            alertsEnabled: other.alertsEnabled ?? alertsEnabled,
+            tickerLayout: other.tickerLayout ?? tickerLayout
         )
     }
 }

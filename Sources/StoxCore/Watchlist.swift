@@ -219,6 +219,38 @@ public struct TickerOptions: Sendable, Equatable {
     public var isEmpty: Bool { !showName && !showPrice && !showPercent }
 }
 
+/// 菜单栏行情怎么排：一行（名称、价格、涨跌幅连成一行），或者上下两行（价格在上、涨跌幅在下，字小一些，
+/// 同样的地方能放下更多只）。
+public enum TickerLayout: String, CaseIterable, Sendable, Identifiable {
+    case inline, stacked
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .inline: return "一行"
+        case .stacked: return "上下两行"
+        }
+    }
+}
+
+/// 上下两行排法里的一段：左边一行字（名称，或者盈亏前面的“今日”“持仓”），右边上下两行（价格和涨跌幅，
+/// 或者盈亏金额和比例）。右边只有一个数时，它单独占一行、上下居中。
+public struct StackedTickerBlock: Equatable, Sendable {
+    public var label: TickerPart?
+    public var top: TickerPart?
+    public var bottom: TickerPart?
+
+    public init(label: TickerPart? = nil, top: TickerPart? = nil, bottom: TickerPart? = nil) {
+        self.label = label
+        self.top = top
+        self.bottom = bottom
+    }
+
+    /// 读屏和诊断用的一行字，和一行排法的文字一样：`上证 3829.87 +0.16%`。
+    public var text: String { [label, top, bottom].compactMap { $0?.text }.joined(separator: " ") }
+}
+
 /// 菜单栏上显示哪一种盈亏。
 public enum MenuBarProfit: String, CaseIterable, Sendable, Identifiable {
     /// 今日盈亏。
@@ -269,22 +301,52 @@ public enum MenuBarTicker {
     ) -> [TickerPart] {
         guard !summaries.isEmpty else { return [] }
         var parts = [TickerPart(role: .name, text: kind.label, direction: .flat)]
-        // 有好几种货币并且拿到了汇率时，折成人民币只显示一个数，省地方。
-        let shown = Portfolio.combined(summaries, rates: rates).map { [$0] } ?? summaries
-        for summary in shown {
-            let value = kind.value(summary)
-            // 颜色和正负号一致：不到一分钱的算平。
-            let direction: PriceDirection = value >= 0.005 ? .up : (value <= -0.005 ? .down : .flat)
-            let text: String
-            if hidingAmounts {
-                text = kind.percent(summary).map(QuoteFormatter.percent) ?? "--"
-            } else {
-                let sign = direction == .up ? "+" : (direction == .down ? "-" : "")
-                text = sign + summary.region.currencySymbol + QuoteFormatter.compactMoney(abs(value))
-            }
-            parts.append(TickerPart(role: .percent, text: text, direction: direction))
+        for summary in shownProfits(summaries, rates: rates) {
+            let amount = profitAmount(summary, kind: kind)
+            let text = hidingAmounts ? kind.percent(summary).map(QuoteFormatter.percent) ?? "--" : amount.text
+            parts.append(TickerPart(role: .percent, text: text, direction: amount.direction))
         }
         return parts
+    }
+
+    /// 有好几种货币并且拿到了汇率时，折成人民币只显示一个数，省地方。
+    private static func shownProfits(_ summaries: [PortfolioSummary], rates: ExchangeRates?) -> [PortfolioSummary] {
+        Portfolio.combined(summaries, rates: rates).map { [$0] } ?? summaries
+    }
+
+    /// 菜单栏上的盈亏金额：`+¥688`、`-HK$1.20万`。颜色和正负号一致，不到一分钱的算平。
+    private static func profitAmount(_ summary: PortfolioSummary, kind: MenuBarProfit) -> TickerPart {
+        let value = kind.value(summary)
+        let direction: PriceDirection = value >= 0.005 ? .up : (value <= -0.005 ? .down : .flat)
+        let sign = direction == .up ? "+" : (direction == .down ? "-" : "")
+        return TickerPart(role: .price, text: sign + summary.region.currencySymbol + QuoteFormatter.compactMoney(abs(value)), direction: direction)
+    }
+
+    /// 一只证券排成上下两行：名称在左边，价格在上、涨跌幅在下；设置里关掉的那项没有。
+    public static func stacked(_ parts: [TickerPart]) -> StackedTickerBlock {
+        StackedTickerBlock(
+            label: parts.first { $0.role == .name },
+            top: parts.first { $0.role == .price },
+            bottom: parts.first { $0.role == .percent }
+        )
+    }
+
+    /// 盈亏排成上下两行：每种货币一段，上面是金额、下面是比例（今日盈亏相对昨日市值，持仓盈亏相对成本），
+    /// “今日”“持仓”写在第一段左边；隐藏金额时只有比例。给了汇率时折成人民币合成一段。没有持仓时返回空数组。
+    public static func stackedProfit(
+        _ summaries: [PortfolioSummary], kind: MenuBarProfit, rates: ExchangeRates? = nil, hidingAmounts: Bool = false
+    ) -> [StackedTickerBlock] {
+        shownProfits(summaries, rates: rates).enumerated().map { index, summary in
+            let amount = profitAmount(summary, kind: kind)
+            let percent = kind.percent(summary).map {
+                TickerPart(role: .percent, text: QuoteFormatter.percent($0), direction: amount.direction)
+            }
+            return StackedTickerBlock(
+                label: index == 0 ? TickerPart(role: .name, text: kind.label, direction: .flat) : nil,
+                top: hidingAmounts ? nil : amount,
+                bottom: hidingAmounts ? percent ?? TickerPart(role: .percent, text: "--", direction: .flat) : percent
+            )
+        }
     }
 
     /// 每只“显示在菜单栏”的证券对应一组文字片段；没有固定项或全部选项关闭时返回空数组。

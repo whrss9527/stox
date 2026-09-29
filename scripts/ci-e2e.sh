@@ -347,6 +347,21 @@ smoke() {
   # 搜“黄金”：品种表里的伦敦金、纽约黄金排在股票前面。回车添加的是第一条，按一下方向键从它移到第二条。
   run_case search-gold --show-panel --search 黄金 --keys down
   grep -q "highlight=hf_GC" shots/search-gold.log || fail "搜黄金时前两条应该是伦敦金、纽约黄金"
+  # 菜单栏上下两行：上证、茅台、腾讯固定在菜单栏，名称在左，价格在上、涨跌幅在下，画成一张图；
+  # 茅台有持仓，最后是今日盈亏，金额在上、比例在下。
+  write_watchlist '[{"symbol":"sh000001","name":"上证指数","alias":"上证","pinned":true},
+    {"symbol":"sh600519","name":"贵州茅台","alias":"茅台","pinned":true,"holding":{"shares":100,"cost":1200}},
+    {"symbol":"hk00700","name":"腾讯控股","alias":"腾讯","pinned":true}]'
+  defaults write "$DOMAIN" ticker.layout -string stacked
+  defaults write "$DOMAIN" ticker.dayProfit -bool true
+  run_case ticker-stacked --show-panel
+  defaults delete "$DOMAIN" ticker.layout
+  defaults delete "$DOMAIN" ticker.dayProfit
+  defaults delete "$DOMAIN" watchlist.v1
+  grep -q "ticker_layout=stacked" shots/ticker-stacked.log || fail "菜单栏没有改成上下两行"
+  grep -q "image=true" shots/ticker-stacked.log || fail "上下两行的菜单栏应该画成一张图"
+  grep -Eq 'status_title="上证 [0-9.]+ [-+]?[0-9.]+%  茅台 [0-9.]+ [-+]?[0-9.]+%  腾讯 [0-9.]+ [-+]?[0-9.]+%  今日 ' shots/ticker-stacked.log \
+    || fail "上下两行的菜单栏应该依次是上证、茅台、腾讯和今日盈亏"
 
   # A 股涨跌榜：打开涨幅榜，取到了就列出来；接口偶尔取不到只提示。
   run_case rank --show-panel --rank
