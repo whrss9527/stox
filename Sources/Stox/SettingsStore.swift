@@ -100,13 +100,14 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
         }
     }
 
-    /// 这只能看的几项：没有五档的（港股、美股、指数）不列五档，只有 A 股个股和 ETF 列资金。
+    /// 这只能看的几项：没有五档的（港股、美股、指数）不列五档，只有 A 股个股和 ETF 列资金，国际期货只有分时。
     static func available(for quote: Quote?) -> [ChartPeriod] {
         allCases.filter { period in
             switch period {
             case .orderBook: return quote?.orderBook != nil
             case .fundFlow: return quote.map { TencentFundFlow.supports($0.symbol) } ?? false
-            default: return true
+            case .fiveDay, .day, .week, .month: return quote?.symbol.hasKline ?? true
+            case .intraday: return true
             }
         }
     }

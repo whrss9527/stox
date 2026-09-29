@@ -18,14 +18,14 @@ struct QuoteRow: View {
     static let sparklineMinimumWidth: CGFloat = 24
 
     /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。场外基金没有走势图，只有一行净值；
-    /// 期货外汇也没有走势图，是两行行情数据。
+    /// 期货外汇是两行行情数据，国际期货上面还有分时图。
     static func detailHeight(for item: WatchItem) -> CGFloat {
         let note: CGFloat = item.note == nil ? 0 : 20
         if item.symbol.isFund {
             return (item.holding == nil ? 63 : 96) + note
         }
         if item.symbol.isGlobal {
-            return 96 + note
+            return 96 + (item.symbol.hasIntraday ? QuoteChartSection.height + 6 : 0) + note
         }
         return (item.holding == nil ? 129 : 162) + QuoteChartSection.height + 6 + note
     }
@@ -106,9 +106,9 @@ struct QuoteRow: View {
 
     private var color: Color { Theme.priceColor(for: direction, convention: settings.colorConvention) }
 
-    /// 这一行画的迷你分时：设置里打开了、没展开（展开了有大的分时图）、有分时（场外基金、期货外汇没有），末端跟着现价走。
+    /// 这一行画的迷你分时：设置里打开了、没展开（展开了有大的分时图）、有分时（场外基金、外汇没有），末端跟着现价走。
     private var rowSparkline: Sparkline? {
-        guard settings.showSparklines, !expanded, item.symbol.hasCharts, let sparkline = store.sparklines[item.symbol] else { return nil }
+        guard settings.showSparklines, !expanded, item.symbol.hasIntraday, let sparkline = store.sparklines[item.symbol] else { return nil }
         return sparkline.updating(with: quote, region: item.symbol.market.region)
     }
 
@@ -385,7 +385,10 @@ struct QuoteDetailView: View {
                     cell("日涨幅", QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
                 }
             } else if item.symbol.isGlobal {
-                // 期货外汇没有走势图和成交量：开高低收、买价卖价；外汇有 52 周最高最低，期货写振幅。
+                // 期货外汇没有成交量：开高低收、买价卖价；外汇有 52 周最高最低，期货写振幅。国际期货有分时图（来自新浪）。
+                if item.symbol.hasIntraday {
+                    QuoteChartSection(item: item, quote: quote)
+                }
                 HStack(spacing: 0) {
                     cell("今开", positivePrice(quote.open))
                     cell("最高", positivePrice(quote.high))

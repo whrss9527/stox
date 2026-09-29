@@ -179,3 +179,54 @@ public enum GlobalCatalog {
             .map { SearchResult(symbol: $0.entry.symbol, name: $0.entry.name, typeCode: $0.entry.kind) }
     }
 }
+
+/// 新浪的国际期货分时（腾讯的分时接口不认期货）：
+/// `https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1hf_GC=/GlobalFuturesService.getGlobalFuturesMinLine?symbol=GC`，
+/// 返回 `var t1hf_GC=({"minLine_1d":[["2026-09-29","4168.400","cme","","06:00","4148.545","0","0","4149.832","2026-09-29 06:00:00"],
+/// ["06:01","4150.843","0","0","4149.419","2026-09-29 06:01:00"],…]});`。第一条是交易日、昨结算、交易所，后面接着第一分钟；
+/// 之后每条是“时刻、价格、成交量、持仓量、均价、日期时间”，时间是北京时间，都是字符串。
+///
+/// 一个交易日跨过半夜，开盘的时刻各不一样：纽约的期货和伦敦金北京时间早上 6 点（冬令时 7 点），布伦特原油 8 点，
+/// 恒指期货前一天 17:15 的夜盘就算这一天的。所以点的 minute 是离第一条多少分钟，序列的 start 是第一条的时间，横轴从它画 24 小时。
+/// 均价是新浪按价格算的，纽约的期货成交量都是 0，这两样都不用。
+public enum SinaFuturesMinuteParser {
+    public static func url(for symbol: Symbol) -> URL? {
+        guard symbol.market == .hf else { return nil }
+        let code = symbol.code
+        return URL(string: "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1hf_\(code)=/GlobalFuturesService.getGlobalFuturesMinLine?symbol=\(code)")
+    }
+
+    public static func parse(_ data: Data, symbol: Symbol) -> IntradaySeries? {
+        let text = String(decoding: data, as: UTF8.self)
+        // 去掉 JSONP 的外壳：第一个“({”到最后一个“})”。
+        guard let open = text.range(of: "({"), let close = text.range(of: "})", options: .backwards),
+              open.lowerBound < close.lowerBound,
+              let json = try? JSONSerialization.jsonObject(with: Data(text[text.index(after: open.lowerBound)...close.lowerBound].utf8))
+                as? [String: Any],
+              let rows = json["minLine_1d"] as? [[Any]], let first = rows.first
+        else { return nil }
+        func strings(_ row: [Any]) -> [String] { row.map { "\($0)" } }
+        let head = strings(first)
+        guard head.count >= 10, let start = dateTime(head[9]) else { return nil }
+        var points: [IntradayPoint] = []
+        for (index, row) in rows.enumerated() {
+            let fields = strings(row)
+            // 第一条前面多了交易日、昨结算、交易所和一个空字段。
+            let offset = index == 0 ? 4 : 0
+            guard fields.count >= offset + 6, let price = Double(fields[offset + 1]), price > 0, price.isFinite,
+                  let time = dateTime(fields[offset + 5])
+            else { continue }
+            let minute = Int(time.timeIntervalSince(start) / 60)
+            guard (0..<IntradayAxis.length(for: .global)).contains(minute) else { continue }
+            points.append(IntradayPoint(minute: minute, price: price))
+        }
+        guard !points.isEmpty else { return nil }
+        let date = head[0].filter(\.isASCIIDigit)
+        return IntradaySeries(symbol: symbol, date: date.count == 8 ? date : nil, points: points, start: start)
+    }
+
+    /// `2026-09-29 06:00:00`，北京时间。
+    static func dateTime(_ text: String) -> Date? {
+        TencentQuoteParser.parseTimestamp(text, timeZone: MarketRegion.global.timeZone)
+    }
+}

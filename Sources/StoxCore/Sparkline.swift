@@ -10,10 +10,13 @@ public struct Sparkline: Equatable, Sendable {
     public var values: [Double?]
     /// 交易日，和分时一样（`20260929`）；没有时为 nil。
     public var date: String?
+    /// 期货的交易日从这个时刻算起，和分时一样（见 IntradaySeries.start）；股票是 nil。
+    public var start: Date?
 
-    public init(values: [Double?], date: String? = nil) {
+    public init(values: [Double?], date: String? = nil, start: Date? = nil) {
         self.values = values
         self.date = date
+        self.start = start
     }
 
     /// 从一天的分时抽出来。没有点时返回 nil。
@@ -26,6 +29,7 @@ public struct Sparkline: Equatable, Sendable {
         guard values.contains(where: { $0 != nil }) else { return nil }
         self.values = values
         self.date = series.date
+        self.start = series.start
     }
 
     /// 某个时刻（交易所当地时间，自零点起的分钟数）落在第几段。开盘前的算第一段，收盘后的算最后一段。
@@ -38,7 +42,16 @@ public struct Sparkline: Equatable, Sendable {
 
     /// 用实时行情更新最后一段：两次取分时之间，线的末端跟着现价走。行情不是这一天的、没有时间时不动。
     public func updating(with quote: Quote?, region: MarketRegion) -> Sparkline {
-        guard let quote, quote.price > 0, let time = quote.timestamp, let date else { return self }
+        guard let quote, quote.price > 0, let time = quote.timestamp else { return self }
+        if let start {
+            // 期货：离开盘多少分钟，在这个交易日的 24 小时里才算。
+            let minute = Int(time.timeIntervalSince(start) / 60)
+            guard (0..<IntradayAxis.length(for: region)).contains(minute) else { return self }
+            var updated = self
+            updated.values[Self.bucket(of: minute, region: region, buckets: values.count)] = quote.price
+            return updated
+        }
+        guard let date else { return self }
         let calendar = region.calendar
         let day = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: time)
         guard let year = day.year, let month = day.month, let dayOfMonth = day.day, let hour = day.hour, let minute = day.minute,
