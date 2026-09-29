@@ -405,7 +405,9 @@ final class StatusItemController: NSObject {
         // 今日盈亏总是跟在最后，轮流显示时也不参与轮换。
         let profit = hidden || !settings.showDayProfit
             ? []
-            : MenuBarTicker.dayProfitParts(Portfolio.summaries(items: store.items, quotes: store.quotes), rates: store.rates)
+            : MenuBarTicker.dayProfitParts(
+                Portfolio.summaries(items: store.items, quotes: store.quotes), rates: store.rates, hidingAmounts: settings.hideAmounts
+            )
 
         guard !entries.isEmpty || !profit.isEmpty else {
             button.attributedTitle = NSAttributedString(string: "")
@@ -478,7 +480,7 @@ final class StatusItemController: NSObject {
             "\(Int(rect.minX)) \(Int(screenHeight - rect.maxY)) \(Int(rect.width)) \(Int(rect.height))"
         }
         let title = statusItem.button?.attributedTitle.string ?? ""
-        print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil) color=\(settings.colorConvention.rawValue) pinned=\(settings.panelPinned)")
+        print("STOX_DIAG status_title=\"\(title)\" image=\(statusItem.button?.image != nil) color=\(settings.colorConvention.rawValue) pinned=\(settings.panelPinned) hide_amounts=\(settings.hideAmounts)")
         print("STOX_DIAG ticker_hidden=\(tickerHidden) ticker_live=\(tickerMarketsLive) when_closed=\(settings.hideTickerWhenClosed)")
         let statusFrame = statusItem.button?.window?.frame
         if let statusFrame {

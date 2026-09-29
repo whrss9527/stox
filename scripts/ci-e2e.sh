@@ -253,6 +253,17 @@ smoke() {
   run_case holdings-hk --show-panel
   defaults delete "$DOMAIN" list.filter
   grep -q "summary=hk " shots/holdings-hk.log || fail "只看港股时持仓合计应该只算港币"
+  # 隐藏金额：面板里的市值、盈亏金额和持有数量是 ****（看截图），菜单栏的今日盈亏换成比例。
+  defaults write "$DOMAIN" holdings.hideAmounts -bool true
+  defaults write "$DOMAIN" ticker.dayProfit -bool true
+  run_case holdings-hidden --show-panel --expand sh600519
+  defaults delete "$DOMAIN" holdings.hideAmounts
+  defaults delete "$DOMAIN" ticker.dayProfit
+  grep -q "hide_amounts=true" shots/holdings-hidden.log || fail "没有读到“隐藏金额”的设置"
+  grep -Eq 'status_title="[^"]* 今日 [^"]*%' shots/holdings-hidden.log || fail "隐藏金额时菜单栏的今日盈亏应该是比例"
+  if grep -Eq 'status_title="[^"]* 今日 [^"]*[¥$]' shots/holdings-hidden.log; then
+    fail "隐藏金额时菜单栏不应该出现金额"
+  fi
   # 最近的提醒：打开这一页。
   run_case alert-log --show-panel --alerts
   grep -q "route=alerts" shots/alert-log.log || fail "没有打开最近的提醒"

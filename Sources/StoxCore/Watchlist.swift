@@ -221,8 +221,10 @@ public struct TickerOptions: Sendable, Equatable {
 
 public enum MenuBarTicker {
     /// 菜单栏上的今日盈亏，例如“今日 +¥688 -HK$120”，每种货币一段；给了汇率时折成人民币合成一段。
-    /// 没有持仓时返回空数组。
-    public static func dayProfitParts(_ summaries: [PortfolioSummary], rates: ExchangeRates? = nil) -> [TickerPart] {
+    /// 隐藏金额时换成相对昨日市值的比例，例如“今日 +0.62%”。没有持仓时返回空数组。
+    public static func dayProfitParts(
+        _ summaries: [PortfolioSummary], rates: ExchangeRates? = nil, hidingAmounts: Bool = false
+    ) -> [TickerPart] {
         guard !summaries.isEmpty else { return [] }
         var parts = [TickerPart(role: .name, text: "今日", direction: .flat)]
         // 有好几种货币并且拿到了汇率时，折成人民币只显示一个数，省地方。
@@ -231,8 +233,13 @@ public enum MenuBarTicker {
             let value = summary.dayProfit
             // 颜色和正负号一致：不到一分钱的算平。
             let direction: PriceDirection = value >= 0.005 ? .up : (value <= -0.005 ? .down : .flat)
-            let sign = direction == .up ? "+" : (direction == .down ? "-" : "")
-            let text = sign + summary.region.currencySymbol + QuoteFormatter.compactMoney(abs(value))
+            let text: String
+            if hidingAmounts {
+                text = summary.dayProfitPercent.map(QuoteFormatter.percent) ?? "--"
+            } else {
+                let sign = direction == .up ? "+" : (direction == .down ? "-" : "")
+                text = sign + summary.region.currencySymbol + QuoteFormatter.compactMoney(abs(value))
+            }
             parts.append(TickerPart(role: .percent, text: text, direction: direction))
         }
         return parts

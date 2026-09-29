@@ -296,6 +296,7 @@ public enum CloseSummary {
 
     /// 这个市场已经收盘（休市，或者美股进入盘后）、有持仓，最近一个交易日的收盘还不到 16 小时，
     /// 并且这个交易日还没发过时，返回要发的小结。开盘前、午休不发；节假日最新行情是好几天前的，也不发。
+    /// 隐藏金额时只写比例，不写盈亏金额和市值。
     public static func due(
         region: MarketRegion,
         phase: MarketPhase,
@@ -303,21 +304,29 @@ public enum CloseSummary {
         latestQuoteTime: Date?,
         now: Date,
         lastSentDay: String?,
-        movers: [Mover] = []
+        movers: [Mover] = [],
+        hidingAmounts: Bool = false
     ) -> CloseSummaryNote? {
         guard let summary, let today = closedDay(region: region, phase: phase, latestQuoteTime: latestQuoteTime, now: now),
               lastSentDay != today
         else { return nil }
-        let title = "\(region.displayName)收盘 今日盈亏 \(QuoteFormatter.signedMoney(summary.dayProfit))"
         var body = ""
-        if let percent = summary.dayProfitPercent {
-            body += "今日 \(QuoteFormatter.percent(percent))，"
+        let title: String
+        if hidingAmounts {
+            let percent = summary.dayProfitPercent.map(QuoteFormatter.percent) ?? QuoteFormatter.hiddenAmount
+            title = "\(region.displayName)收盘 今日盈亏 \(percent)"
+            body = "持仓盈亏 \(summary.totalProfitPercent.map(QuoteFormatter.percent) ?? QuoteFormatter.hiddenAmount)"
+        } else {
+            title = "\(region.displayName)收盘 今日盈亏 \(QuoteFormatter.signedMoney(summary.dayProfit))"
+            if let percent = summary.dayProfitPercent {
+                body += "今日 \(QuoteFormatter.percent(percent))，"
+            }
+            body += "持仓盈亏 \(QuoteFormatter.signedMoney(summary.totalProfit))"
+            if let percent = summary.totalProfitPercent {
+                body += "（\(QuoteFormatter.percent(percent))）"
+            }
+            body += "，市值 \(QuoteFormatter.money(summary.marketValue))\(region.currencyName)"
         }
-        body += "持仓盈亏 \(QuoteFormatter.signedMoney(summary.totalProfit))"
-        if let percent = summary.totalProfitPercent {
-            body += "（\(QuoteFormatter.percent(percent))）"
-        }
-        body += "，市值 \(QuoteFormatter.money(summary.marketValue))\(region.currencyName)"
         if let text = moversText(movers) {
             body += "。" + text
         }

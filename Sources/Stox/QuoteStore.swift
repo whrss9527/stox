@@ -585,7 +585,8 @@ final class QuoteStore: ObservableObject {
             guard let note = CloseSummary.due(
                 region: region, phase: phase(for: region), summary: summary,
                 latestQuoteTime: latest, now: Date(), lastSentDay: defaults.string(forKey: key),
-                movers: CloseSummary.movers(items: items, quotes: quotes, region: region)
+                movers: CloseSummary.movers(items: items, quotes: quotes, region: region),
+                hidingAmounts: settings.hideAmounts
             ) else { continue }
             defaults.set(note.day, forKey: key)
             closeSummaryCount += 1
@@ -624,7 +625,10 @@ final class QuoteStore: ObservableObject {
         guard !triggers.isEmpty else { return }
         firedAlertCount += triggers.count
         saveAlertState()
-        triggers.forEach { trigger in
+        for fired in triggers {
+            // 隐藏金额时，止盈止损提醒的正文里只写比例。
+            var trigger = fired
+            trigger.hidesAmounts = settings.hideAmounts
             log(trigger)
             onAlert?(trigger)
         }

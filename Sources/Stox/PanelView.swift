@@ -619,8 +619,11 @@ struct HoldingsSummaryView: View {
                         }
                         header("今日盈亏")
                         header("持仓盈亏")
-                        header(showsCurrency ? "市值" : "持仓市值")
-                            .gridColumnAlignment(.trailing)
+                        HStack(spacing: 4) {
+                            header(showsCurrency ? "市值" : "持仓市值")
+                            hideAmountsButton
+                        }
+                        .gridColumnAlignment(.trailing)
                     }
                     ForEach(summaries, id: \.region) { summary in
                         row(summary.region.currencyName, summary, showsCurrency: showsCurrency)
@@ -686,7 +689,7 @@ struct HoldingsSummaryView: View {
                         .frame(width: 42, alignment: .trailing)
                 }
                 .frame(height: 15)
-                .help("\(entry.name)：市值 \(QuoteFormatter.money(entry.marketValue))"
+                .help("\(entry.name)：市值 \(amount(QuoteFormatter.money(entry.marketValue)))"
                     + (entry.profitPercent.map { "，持仓盈亏 \(QuoteFormatter.percent($0))" } ?? ""))
             }
             if view.restCount > 0 {
@@ -731,11 +734,11 @@ struct HoldingsSummaryView: View {
                 .frame(width: 34, alignment: .leading)
             ProfitBars(values: records.map(\.dayProfit), convention: settings.colorConvention)
                 .frame(height: 18)
-                .help(records.last.map { "最近一天 \($0.day) \(QuoteFormatter.signedMoney($0.dayProfit))" } ?? "")
+                .help(records.last.map { "最近一天 \($0.day) \(amount(QuoteFormatter.signedMoney($0.dayProfit)))" } ?? "")
             VStack(alignment: .trailing, spacing: 0) {
-                Text("本周 " + QuoteFormatter.signedMoney(week))
+                Text("本周 " + amount(QuoteFormatter.signedMoney(week)))
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(week), convention: settings.colorConvention))
-                Text("本月 " + QuoteFormatter.signedMoney(month))
+                Text("本月 " + amount(QuoteFormatter.signedMoney(month)))
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(month), convention: settings.colorConvention))
             }
             .font(.system(size: 10).monospacedDigit())
@@ -783,7 +786,7 @@ struct HoldingsSummaryView: View {
                 .foregroundStyle(.secondary)
             ForEach(realized.indices, id: \.self) { index in
                 let entry = realized[index]
-                Text((realized.count > 1 ? entry.region.currencyName + " " : "") + QuoteFormatter.signedMoney(entry.profit))
+                Text((realized.count > 1 ? entry.region.currencyName + " " : "") + amount(QuoteFormatter.signedMoney(entry.profit)))
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(entry.profit), convention: settings.colorConvention))
             }
             Spacer(minLength: 0)
@@ -810,7 +813,7 @@ struct HoldingsSummaryView: View {
             }
             profit(summary.dayProfit, percent: summary.dayProfitPercent)
             profit(summary.totalProfit, percent: summary.totalProfitPercent)
-            Text(QuoteFormatter.money(summary.marketValue))
+            Text(amount(QuoteFormatter.money(summary.marketValue)))
                 .font(.system(size: 12.5, weight: .medium).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -830,10 +833,31 @@ struct HoldingsSummaryView: View {
             .foregroundStyle(.secondary)
     }
 
+    /// 隐藏金额时是 ****，比例照常显示。
+    private func amount(_ text: @autoclosure () -> String) -> String {
+        settings.hideAmounts ? QuoteFormatter.hiddenAmount : text()
+    }
+
+    /// 市值表头旁边的小眼睛：点一下隐藏或显示面板、菜单栏和通知里的金额，给别人看屏幕时用。
+    private var hideAmountsButton: some View {
+        Button {
+            settings.hideAmounts.toggle()
+        } label: {
+            Image(systemName: settings.hideAmounts ? "eye.slash" : "eye")
+                .font(.system(size: 9.5))
+                .foregroundStyle(.secondary)
+                .frame(width: 14, height: 12)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(settings.hideAmounts ? "显示金额" : "隐藏金额：市值、盈亏金额和持有数量换成 ****，比例照常显示，给别人看屏幕时用")
+        .accessibilityLabel(settings.hideAmounts ? "显示金额" : "隐藏金额")
+    }
+
     /// 金额在上、比例在下，窄一点也放得下。
     private func profit(_ value: Double, percent: Double?) -> some View {
         VStack(alignment: .leading, spacing: 1) {
-            Text(QuoteFormatter.signedMoney(value))
+            Text(amount(QuoteFormatter.signedMoney(value)))
                 .font(.system(size: 12.5, weight: .medium).monospacedDigit())
             if let percent {
                 Text(QuoteFormatter.percent(percent))
