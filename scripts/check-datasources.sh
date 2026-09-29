@@ -270,3 +270,7 @@ done
 for b in us_all US_ALL usStock us_china; do
   fetch "rank: tencent US ${b}" "${R}/us/getBoardRankList?_appver=11.17.0&board_code=${b}&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
 done
+fetch "rank: sina HK" "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHKStockData?page=1&num=3&sort=changepercent&asc=0&node=qbgg_hk" "GB18030" "https://finance.sina.com.cn/"
+fetch "rank: sina US" "https://stock.finance.sina.com.cn/usstock/api/jsonp.php/IO.XSRV2.CallbackList/US_CategoryService.getList?page=1&num=3&sort=chg&asc=0&market=&id=" "GB18030" "https://finance.sina.com.cn/"
+fetch "rank: tencent HK (hk)" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/hk/getRankList?_appver=11.17.0&board_code=hk_all&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
+fetch "rank: tencent pt board" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/pt/getRank?board_type=hy&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
