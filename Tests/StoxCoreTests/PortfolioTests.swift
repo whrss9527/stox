@@ -397,3 +397,46 @@ final class CommonIndicesTests: XCTestCase {
         XCTAssertEqual(Watchlist.commonIndices.first?.pinned, true, "上证照旧显示在菜单栏")
     }
 }
+
+final class AllocationTests: XCTestCase {
+    private let moutai = Symbol("sh600519")!
+    private let tencent = Symbol("hk00700")!
+
+    private var items: [WatchItem] {
+        [
+            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200)),
+            WatchItem(symbol: tencent, name: "腾讯控股", holding: Holding(shares: 200, cost: 380)),
+            WatchItem(symbol: Symbol("sh000001")!, name: "上证指数"),
+        ]
+    }
+
+    private var quotes: [Symbol: Quote] {
+        [
+            moutai: Quote(symbol: moutai, name: "贵州茅台", price: 1000, previousClose: 1000),
+            tencent: Quote(symbol: tencent, name: "腾讯控股", price: 400, previousClose: 400),
+        ]
+    }
+
+    func testMixedCurrenciesNeedRates() throws {
+        XCTAssertEqual(Portfolio.allocation(items: items, quotes: quotes, rates: nil), [], "没有汇率时人民币和港币比不了")
+
+        // 茅台 10 万元；腾讯 8 万港币按 0.9 折成 7.2 万元。
+        let entries = Portfolio.allocation(items: items, quotes: quotes, rates: ExchangeRates(hkdCNY: 0.9, usdCNY: 7))
+        XCTAssertEqual(entries.map(\.symbol), [moutai, tencent], "按市值从大到小")
+        XCTAssertEqual(entries[0].share, 100_000 / 172_000 * 100, accuracy: 1e-9)
+        XCTAssertEqual(entries[1].share, 72_000 / 172_000 * 100, accuracy: 1e-9)
+        XCTAssertEqual(entries[1].marketValue, 80_000, "原来币种的市值照旧")
+        XCTAssertEqual(try XCTUnwrap(entries[0].profitPercent), -200.0 / 12, accuracy: 1e-9, "成本 12 万、市值 10 万")
+    }
+
+    func testOneCurrencyNeedsNoRates() {
+        let cnOnly = Array(items.prefix(1)) + [WatchItem(symbol: Symbol("sz000001")!, name: "平安银行", holding: Holding(shares: 1000, cost: 0))]
+        var prices = quotes
+        prices[Symbol("sz000001")!] = Quote(symbol: Symbol("sz000001")!, name: "平安银行", price: 12.5, previousClose: 12.5)
+        let entries = Portfolio.allocation(items: cnOnly, quotes: prices, rates: nil)
+        XCTAssertEqual(entries.map(\.name), ["贵州茅台", "平安银行"])
+        XCTAssertEqual(entries.map(\.share).reduce(0, +), 100, accuracy: 1e-9)
+        XCTAssertNil(entries[1].profitPercent, "成本为 0 时没有盈亏比例")
+        XCTAssertEqual(Portfolio.allocation(items: [], quotes: prices, rates: nil), [])
+    }
+}

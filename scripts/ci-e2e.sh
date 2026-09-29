@@ -198,9 +198,15 @@ smoke() {
     {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'
   defaults write "$DOMAIN" ticker.dayProfit -bool true
   defaults write "$DOMAIN" alerts.closeSummary -bool true
+  defaults write "$DOMAIN" holdings.allocation -bool true
   run_case holdings --show-panel --expand sh600519
   defaults delete "$DOMAIN" ticker.dayProfit
   defaults delete "$DOMAIN" alerts.closeSummary
+  defaults delete "$DOMAIN" holdings.allocation
+  # 持仓分布：四只持仓，人民币、港币、美元都有，取到汇率时四只都列出来。
+  if grep -q "rates=USDCNY:" shots/holdings.log; then
+    grep -q "allocation=4 " shots/holdings.log || fail "持仓分布应该列出四只"
+  fi
   # 编辑页：持仓、记一笔买卖、止盈止损。
   run_case editor --show-panel --edit sh600519
   grep -q "panel_frame=" shots/editor.log || fail "编辑页没有打开"

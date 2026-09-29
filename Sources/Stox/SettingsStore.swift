@@ -221,6 +221,10 @@ final class SettingsStore: ObservableObject {
     @Published var flashOnChange: Bool {
         didSet { defaults.set(flashOnChange, forKey: Keys.flashOnChange) }
     }
+    /// 持仓合计下面展开了持仓分布。
+    @Published var showAllocation: Bool {
+        didSet { defaults.set(showAllocation, forKey: Keys.showAllocation) }
+    }
     /// 紧凑列表：每只一行，名称、代码、现价和色块排在一起，一屏能看到更多。
     @Published var compactRows: Bool {
         didSet { defaults.set(compactRows, forKey: Keys.compactRows) }
@@ -299,6 +303,7 @@ final class SettingsStore: ObservableObject {
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showMovingAverages = defaults.object(forKey: Keys.showMovingAverages) as? Bool ?? true
         compactRows = defaults.object(forKey: Keys.compactRows) as? Bool ?? false
+        showAllocation = defaults.object(forKey: Keys.showAllocation) as? Bool ?? false
         showExtendedHours = defaults.object(forKey: Keys.showExtendedHours) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
@@ -374,6 +379,7 @@ final class SettingsStore: ObservableObject {
         static let flashOnChange = "list.flash"
         static let showMovingAverages = "chart.movingAverages"
         static let compactRows = "list.compact"
+        static let showAllocation = "holdings.allocation"
         static let showExtendedHours = "list.extendedHours"
         static let showDayProfit = "ticker.dayProfit"
         static let panelPinned = "panel.pinned"

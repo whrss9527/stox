@@ -101,6 +101,63 @@ public enum Portfolio {
     }
 }
 
+/// 持仓分布里的一只：市值和占总市值的比例。
+public struct AllocationEntry: Equatable, Sendable {
+    public var symbol: Symbol
+    public var name: String
+    /// 原来币种的市值。
+    public var marketValue: Double
+    /// 用来比较的市值：几种货币都有时折成人民币，只有一种货币时就是原来的。
+    public var value: Double
+    /// 占总市值的比例（%）。
+    public var share: Double
+    /// 持仓盈亏比例（%）；成本为 0 时为 nil。
+    public var profitPercent: Double?
+
+    public init(symbol: Symbol, name: String, marketValue: Double, value: Double, share: Double, profitPercent: Double?) {
+        self.symbol = symbol
+        self.name = name
+        self.marketValue = marketValue
+        self.value = value
+        self.share = share
+        self.profitPercent = profitPercent
+    }
+}
+
+extension Portfolio {
+    /// 持仓分布：每只占总市值的比例，按市值从大到小。几种货币都有时按汇率折成人民币再比，
+    /// 没有汇率时比不了，返回空数组。
+    public static func allocation(items: [WatchItem], quotes: [Symbol: Quote], rates: ExchangeRates?) -> [AllocationEntry] {
+        var positions: [(item: WatchItem, quote: Quote, position: PositionValue)] = []
+        for item in items {
+            guard let holding = item.holding, let quote = quotes[item.symbol],
+                  let position = position(holding, quote: quote), position.marketValue > 0
+            else { continue }
+            positions.append((item, quote, position))
+        }
+        let mixed = Set(positions.map { $0.item.symbol.market.region }).count > 1
+        if mixed, rates == nil { return [] }
+        let values = positions.map { entry -> Double in
+            let rate = mixed ? rates?.toCNY(entry.item.symbol.market.region) ?? 1 : 1
+            return entry.position.marketValue * rate
+        }
+        let total = values.reduce(0, +)
+        guard total > 0 else { return [] }
+        return zip(positions, values)
+            .map { entry, value in
+                AllocationEntry(
+                    symbol: entry.item.symbol,
+                    name: entry.quote.name.isEmpty ? entry.item.displayName : entry.quote.name,
+                    marketValue: entry.position.marketValue,
+                    value: value,
+                    share: value / total * 100,
+                    profitPercent: entry.position.totalProfitPercent
+                )
+            }
+            .sorted { $0.value > $1.value }
+    }
+}
+
 extension MarketRegion {
     /// 界面上显示的货币名称。
     public var currencyName: String {
