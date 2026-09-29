@@ -46,6 +46,21 @@ public struct ProfitHistory: Codable, Equatable, Sendable {
         }
     }
 
+    /// 全部记录，制表符分隔，按日期从早到晚，粘贴到 Numbers、Excel 就是一张表；没有记录时是空的。
+    public var tableText: String {
+        guard !records.isEmpty else { return "" }
+        let lines = records.map { record in
+            [
+                record.day,
+                record.region.currency,
+                QuoteFormatter.fixed(record.dayProfit, decimals: 2),
+                QuoteFormatter.fixed(record.totalProfit, decimals: 2),
+                QuoteFormatter.fixed(record.marketValue, decimals: 2),
+            ].joined(separator: "\t")
+        }
+        return (["日期\t币种\t今日盈亏\t持仓盈亏\t市值"] + lines).joined(separator: "\n")
+    }
+
     /// 有记录的市场，按 A 股、港股、美股排。
     public var regions: [MarketRegion] {
         MarketRegion.allCases.filter { region in records.contains { $0.region == region } }

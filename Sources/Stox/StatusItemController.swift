@@ -119,6 +119,13 @@ final class StatusItemController: NSObject {
                     guard let router = self?.router, router.searchResults.isEmpty || router.isSearching else { break }
                     try? await Task.sleep(nanoseconds: 100_000_000)
                 }
+                // 打开涨跌榜时，等榜单取回来再报。
+                for _ in 0..<50 where route == .rank {
+                    guard let store = self?.store, let settings = self?.settings, store.rankError == nil,
+                          settings.rankKind == .industries ? store.industries == nil : store.rank[settings.rankKind] == nil
+                    else { break }
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
                 if !keys.isEmpty {
                     await self?.simulate(keys)
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
@@ -502,7 +509,7 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
-        print("STOX_DIAG filter=\(filter.id) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count) route=\(router.route.name) groups=\(Watchlist.groups(in: store.items).joined(separator: ",")) compact=\(settings.compactRows)")
+        print("STOX_DIAG filter=\(filter.id) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count) route=\(router.route.name) rank=\(RankPanel.count(store: store, settings: settings)) groups=\(Watchlist.groups(in: store.items).joined(separator: ",")) compact=\(settings.compactRows)")
         // 展开的那只在 K 线图上有几根有 MA20。
         let ma20 = router.expanded
             .flatMap { symbol in settings.chartPeriod.klinePeriod.flatMap { store.klines[KlineKey(symbol: symbol, period: $0)] } }
@@ -537,6 +544,8 @@ enum PanelRoute: Equatable {
     case group(String?, member: Symbol?)
     /// 最近的提醒。
     case alerts
+    /// A 股涨跌榜。
+    case rank
 
     /// 诊断信息里的写法。
     var name: String {
@@ -545,6 +554,7 @@ enum PanelRoute: Equatable {
         case .edit(let symbol): return "edit:" + symbol.rawValue
         case .group(let group, _): return "group:" + (group ?? "new")
         case .alerts: return "alerts"
+        case .rank: return "rank"
         }
     }
 }

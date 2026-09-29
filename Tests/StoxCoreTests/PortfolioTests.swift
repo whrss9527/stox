@@ -513,6 +513,20 @@ final class ProfitHistoryTests: XCTestCase {
         XCTAssertEqual(history.records.first?.dayProfit, 10, "最早的十天丢掉了")
     }
 
+    func testTableText() {
+        var history = ProfitHistory()
+        XCTAssertEqual(history.tableText, "", "没有记录时是空的")
+        history.record(summary(.hk, day: -50.5), day: "2026-09-28")
+        history.record(summary(.cn, day: 100), day: "2026-09-28")
+        history.record(summary(.cn, day: -30), day: "2026-09-25")
+        XCTAssertEqual(history.tableText, [
+            "日期\t币种\t今日盈亏\t持仓盈亏\t市值",
+            "2026-09-25\tCNY\t-30.00\t10000.00\t100000.00",
+            "2026-09-28\tCNY\t100.00\t10000.00\t100000.00",
+            "2026-09-28\tHKD\t-50.50\t10000.00\t100000.00",
+        ].joined(separator: "\n"))
+    }
+
     func testWeekAndMonthStarts() {
         XCTAssertEqual(ProfitHistory.weekStart(of: "2026-09-30", region: .cn), "2026-09-28", "周三所在的那一周从周一开始")
         XCTAssertEqual(ProfitHistory.weekStart(of: "2026-09-28", region: .us), "2026-09-28")

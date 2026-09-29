@@ -34,6 +34,8 @@ struct PanelView: View {
                 GroupEditorPanel(original: name, member: member)
             case .alerts:
                 AlertLogPanel()
+            case .rank:
+                RankPanel()
             }
         }
         .padding(12)
@@ -956,11 +958,14 @@ struct PanelFooter: View {
                     .disabled(!store.items.contains { $0.holding != nil })
                 Button("复制买卖记录") { copyTrades() }
                     .disabled(!store.items.contains { !$0.trades.isEmpty })
+                Button("复制盈亏记录") { copyProfitHistory() }
+                    .disabled(store.profitHistory.records.isEmpty)
                 Divider()
                 Button("新建分组…") { router.route = .group(nil, member: nil) }
                     .disabled(store.items.isEmpty)
                 Button("最近的提醒…") { router.route = .alerts }
                     .disabled(store.alertLog.entries.isEmpty)
+                Button("A 股涨跌榜…") { router.route = .rank }
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
             }
@@ -1009,6 +1014,12 @@ struct PanelFooter: View {
         guard !text.isEmpty else { return }
         let rows = text.components(separatedBy: "\n").count - 1
         copy(text, message: "已复制 \(rows) 笔买卖，可以直接粘贴到表格里")
+    }
+
+    private func copyProfitHistory() {
+        let text = store.profitHistory.tableText
+        guard !text.isEmpty else { return }
+        copy(text, message: "已复制 \(store.profitHistory.records.count) 天的盈亏记录，可以直接粘贴到表格里")
     }
 
     private func copy(_ text: String, message: String) {

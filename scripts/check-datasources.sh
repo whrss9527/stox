@@ -253,3 +253,10 @@ kline "tencent usfqkline: usAAPL.OQ" "https://web.ifzq.gtimg.cn/appstock/app/usf
 kline "tencent usfqkline: us.IXIC" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=us.IXIC,day,,,5,qfq"
 kline "tencent usfqkline: usAAPL month" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL,month,,,3,qfq"
 kline "tencent kline (no adjust): sh600519" "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh600519,day,,,5"
+
+# A 股涨跌榜（面板里的“A 股涨跌榜”用）：涨幅、跌幅、成交额各取 3 条。
+R="https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.0&board_code=aStock&offset=0&count=3"
+fetch "tencent rank: gainers" "${R}&sort_type=priceRatio&direct=down" "UTF-8"
+fetch "tencent rank: losers" "${R}&sort_type=priceRatio&direct=up" "UTF-8"
+fetch "tencent rank: turnover" "${R}&sort_type=turnover&direct=down" "UTF-8"
+fetch "tencent rank: industries" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/pt/getRank?board_type=hy&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"

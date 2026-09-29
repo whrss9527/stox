@@ -134,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///        [--edit sh600519]                                  直接打开这只的持仓、提醒与简称页
     ///        [--group 科技]                                      直接打开这个分组的编辑页
     ///        [--alerts]                                         直接打开最近的提醒
+    ///        [--rank]                                           直接打开 A 股涨跌榜
     ///        [--export-backup 路径] [--import-backup 路径]       启动时导出备份，或者用备份替换自选（不问）
     ///   Stox --show-settings [general|display|sync|about]      打开设置窗口并打印窗口位置
     ///   Stox --check-update                                    先检查一次更新再打开上面两者
@@ -157,6 +158,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let edit = value(after: "--edit").flatMap { Symbol($0) }
         let group = value(after: "--group")
         let alerts = arguments.contains("--alerts")
+        let rank = arguments.contains("--rank")
         if let path = value(after: "--export-backup") {
             do {
                 try sync.backupData().write(to: URL(fileURLWithPath: path), options: .atomic)
@@ -194,7 +196,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 SettingsWindowController.shared.printDiagnostics()
             } else if showPanel {
                 self.statusController?.openPanel(
-                    route: edit.map { PanelRoute.edit($0) } ?? group.map { PanelRoute.group($0, member: nil) } ?? (alerts ? .alerts : .list),
+                    route: edit.map { PanelRoute.edit($0) } ?? group.map { PanelRoute.group($0, member: nil) }
+                        ?? (alerts ? .alerts : (rank ? .rank : .list)),
                     expand: expand, search: search, keys: keys, printDiagnostics: true
                 )
             }

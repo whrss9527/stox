@@ -122,6 +122,8 @@ K 线来自腾讯的前复权 K 线接口，三地各一个地址：A 股 `appst
 
 分时接口一次只能查一只（`code=sh600519,hk00700` 返回“code param error”），所以列表里不画每只的迷你走势，免得每分钟发几十个请求。
 
+A 股涨跌榜来自腾讯的榜单接口 `proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.0&board_code=aStock&sort_type=priceRatio&direct=down&offset=0&count=40`：`sort_type` 是 `priceRatio`（涨跌幅）或 `turnover`（成交额），`direct` 是 `down`（从大到小）或 `up`。返回 JSON，数字都是字符串，`zxj` 现价、`zd` 涨跌额、`zdf` 涨跌幅、`hsl` 换手率、`turnover` 成交额（万元），`code` 带着市场前缀，可以直接当代码用。只在打开榜单页时取，开着时每 30 秒一次。港股、美股的榜单不在这个接口里（猜了几个写法都是 404），东方财富的 `push2` 接口从境外访问返回 502，都没用。涨幅榜常被上市首日（名字前面有 N）和注册制新股前 5 天（有 C）占满，默认不列它们，所以每次取 40 只，筛完再列前 20 只。行业榜是同一个服务的 `rank/pt/getRank?board_type=hy&sort_type=priceRatio&direct=down`，31 个申万一级行业（代码 `pt01801180` 里的 801180 就是申万行业指数的代码），每一行带着领涨股 `lzg`；板块代码不是股票代码，所以行业本身加不进自选，点一下加的是领涨股。新浪的港股、美股涨幅榜（`getHKStockData`、`US_CategoryService.getList`）能取到，但前排多是仙股、权证，暂时不做。
+
 `scripts/check-datasources.sh` 和每周运行的 `datasources` 工作流会打印接口原始返回，接口格式变化时能第一时间发现。手动运行时可以只跑标题匹配某个正则的几项（`ONLY='US|pandata'`），日志短一些。
 
 ## 5. 刷新策略
