@@ -124,6 +124,28 @@ public struct AllocationEntry: Equatable, Sendable {
     }
 }
 
+/// 持仓分布显示出来的样子：前几只各一行，剩下的合成一行。
+public struct AllocationView: Equatable, Sendable {
+    public var shown: [AllocationEntry]
+    /// 没单独列出的有几只、一共占多少（%）。
+    public var restCount: Int
+    public var restShare: Double
+
+    /// 最多单独列几只；只多出一只时也列出来，不值得为一只合一行。
+    public init(_ entries: [AllocationEntry], limit: Int = 8) {
+        if entries.count <= limit + 1 {
+            shown = entries
+            restCount = 0
+            restShare = 0
+        } else {
+            shown = Array(entries.prefix(limit))
+            let rest = entries.dropFirst(limit)
+            restCount = rest.count
+            restShare = rest.reduce(0) { $0 + $1.share }
+        }
+    }
+}
+
 extension Portfolio {
     /// 持仓分布：每只占总市值的比例，按市值从大到小。几种货币都有时按汇率折成人民币再比，
     /// 没有汇率时比不了，返回空数组。

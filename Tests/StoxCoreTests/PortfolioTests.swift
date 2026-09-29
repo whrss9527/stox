@@ -457,6 +457,19 @@ final class AllocationTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(entries[0].profitPercent), -200.0 / 12, accuracy: 1e-9, "成本 12 万、市值 10 万")
     }
 
+    func testFoldsTheTail() {
+        let entries = (0..<11).map { index in
+            AllocationEntry(symbol: Symbol("sh6000\(10 + index)")!, name: "第\(index)只", marketValue: 1, value: 1, share: 100.0 / 11, profitPercent: nil)
+        }
+        let view = AllocationView(entries)
+        XCTAssertEqual(view.shown.count, 8)
+        XCTAssertEqual(view.restCount, 3)
+        XCTAssertEqual(view.restShare, 300.0 / 11, accuracy: 1e-9)
+        let nine = AllocationView(Array(entries.prefix(9)))
+        XCTAssertEqual(nine.shown.count, 9, "只多出一只时也列出来")
+        XCTAssertEqual(nine.restCount, 0)
+    }
+
     func testOneCurrencyNeedsNoRates() {
         let cnOnly = Array(items.prefix(1)) + [WatchItem(symbol: Symbol("sz000001")!, name: "平安银行", holding: Holding(shares: 1000, cost: 0))]
         var prices = quotes
