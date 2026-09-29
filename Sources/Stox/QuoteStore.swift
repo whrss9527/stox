@@ -17,6 +17,10 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var klines: [KlineKey: KlineSeries] = [:]
     /// 看过的五日分时。
     @Published private(set) var fiveDay: [Symbol: MultiDaySeries] = [:]
+    /// 看过的资金流向（A 股个股和 ETF）。
+    @Published private(set) var fundFlows: [Symbol: FundFlow] = [:]
+    /// 取过资金流向的证券，取到了没有都算，用来区分“正在加载”和“没有数据”。
+    @Published private(set) var fundFlowLoaded: Set<Symbol> = []
     /// 每个交易日收盘后记下的持仓盈亏，只在这台 Mac 上。
     @Published private(set) var profitHistory: ProfitHistory
     /// 最近发过的提醒，面板里可以翻看。
@@ -277,6 +281,25 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 切到“资金”时调用：先取一次，之后交易时段内每分钟刷新，休市时十分钟一次，直到收起或换页（任务被取消）。
+    func trackFundFlow(_ symbol: Symbol) async {
+        while !Task.isCancelled {
+            do {
+                let flow = try await provider.fetchFundFlow(for: symbol)
+                if !Task.isCancelled {
+                    // 取不到（开盘前、这只没有）时清掉旧的，免得把昨天的当成今天的。
+                    fundFlows[symbol] = flow
+                    fundFlowLoaded.insert(symbol)
+                }
+            } catch {
+                // 和分时一样，失败时保留上一次的，下一轮再试。
+                fundFlowLoaded.insert(symbol)
+            }
+            let live = phase(for: symbol.market.region).isLive
+            try? await Task.sleep(nanoseconds: (live ? 60 : 600) * 1_000_000_000)
+        }
+    }
+
     /// 取一次涨跌榜的前 count 只（行业榜是前 count 个行业）。
     func loadRank(_ kind: RankKind, count: Int) async {
         do {
@@ -433,6 +456,8 @@ final class QuoteStore: ObservableObject {
         intraday[symbol] = nil
         klines = klines.filter { $0.key.symbol != symbol }
         fiveDay[symbol] = nil
+        fundFlows[symbol] = nil
+        fundFlowLoaded.remove(symbol)
         extendedHours[symbol] = nil
         rapidMoves.forget(symbol)
         alertLog.forget(symbol)

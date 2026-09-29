@@ -129,6 +129,14 @@ smoke() {
   grep -q "chart=orderBook book=5/5 " shots/orderbook.log || echo "::warning::茅台的五档不满（开盘前、停牌或者涨跌停）"
   grep -q "chart=orderBook book=none " shots/orderbook-hk.log || fail "港股不应该有五档"
 
+  # 资金流向：A 股个股有，开盘前（北京时间 9:30 以前）还没有当天的数据，只提示。
+  run_case fundflow --show-panel --expand sh600519 --chart fundFlow
+  run_case fundflow-hk --show-panel --expand hk00700 --chart fundFlow
+  defaults delete "$DOMAIN" chart.period
+  grep -q "chart=fundFlow" shots/fundflow.log || fail "没有切到资金"
+  grep -Eq "flow=[1-9]" shots/fundflow.log || echo "::warning::资金流向没有取到分时（开盘前或者接口取不到）"
+  grep -q "late flow=none" shots/fundflow-hk.log || fail "港股没有资金流向，不应该去取"
+
   # 五日分时：美股要带交易所后缀才取得到。
   run_case fiveday --show-panel --expand usAAPL --chart fiveDay
   defaults delete "$DOMAIN" chart.period

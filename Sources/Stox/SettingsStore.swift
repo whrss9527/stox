@@ -72,6 +72,8 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
     case intraday, fiveDay, day, week, month
     /// 买卖五档，只有 A 股有。
     case orderBook
+    /// 资金流向，只有 A 股个股和 ETF 有。
+    case fundFlow
 
     var id: String { rawValue }
 
@@ -83,25 +85,32 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
         case .week: return "周K"
         case .month: return "月K"
         case .orderBook: return "五档"
+        case .fundFlow: return "资金"
         }
     }
 
-    /// K 线的周期；分时图、五档为 nil。
+    /// K 线的周期；分时图、五档、资金为 nil。
     var klinePeriod: KlinePeriod? {
         switch self {
-        case .intraday, .fiveDay, .orderBook: return nil
+        case .intraday, .fiveDay, .orderBook, .fundFlow: return nil
         case .day: return .day
         case .week: return .week
         case .month: return .month
         }
     }
 
-    /// 这只能看的几项：没有五档的（港股、美股、指数）不列五档。
+    /// 这只能看的几项：没有五档的（港股、美股、指数）不列五档，只有 A 股个股和 ETF 列资金。
     static func available(for quote: Quote?) -> [ChartPeriod] {
-        allCases.filter { $0 != .orderBook || quote?.orderBook != nil }
+        allCases.filter { period in
+            switch period {
+            case .orderBook: return quote?.orderBook != nil
+            case .fundFlow: return quote.map { TencentFundFlow.supports($0.symbol) } ?? false
+            default: return true
+            }
+        }
     }
 
-    /// 实际显示的一项：选了五档而这只没有五档时看分时。
+    /// 实际显示的一项：选了五档、资金而这只没有时看分时。
     func effective(for quote: Quote?) -> ChartPeriod {
         Self.available(for: quote).contains(self) ? self : .intraday
     }

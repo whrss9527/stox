@@ -138,6 +138,7 @@ final class StatusItemController: NSObject {
                     if let self {
                         print("STOX_DIAG late \(self.extendedHoursDiagnostics)")
                         self.panelDiagnostics().forEach { print("STOX_DIAG late " + $0) }
+                        print("STOX_DIAG late flow=\(self.fundFlowDiagnostics)")
                         fflush(stdout)
                     }
                 }
@@ -508,6 +509,12 @@ final class StatusItemController: NSObject {
 
     // MARK: - 诊断
 
+    /// 展开的那只的资金流向：分时有几分钟；取过了但是没有数据是 0，还没取过（或者没有资金流向）是 none。
+    private var fundFlowDiagnostics: String {
+        guard let symbol = router.expanded, store.fundFlowLoaded.contains(symbol) else { return "none" }
+        return String(store.fundFlows[symbol]?.trend.count ?? 0)
+    }
+
     /// 面板的位置和尺寸（CI 检查放不放得下），以及截图要裁的范围（菜单栏图标加面板）。
     private func panelDiagnostics() -> [String] {
         let screenHeight = NSScreen.screens.first?.frame.height ?? 0
@@ -573,7 +580,7 @@ final class StatusItemController: NSObject {
             } ?? 0
         // 展开的那只的五档：买盘、卖盘各有几档，没有五档的是 none。
         let book = router.expanded.flatMap { store.quotes[$0]?.orderBook }.map { "\($0.bids.count)/\($0.asks.count)" } ?? "none"
-        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) book=\(book) marks=\(marks) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
+        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) book=\(book) flow=\(fundFlowDiagnostics) marks=\(marks) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }
 
