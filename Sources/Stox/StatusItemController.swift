@@ -488,7 +488,7 @@ final class StatusItemController: NSObject {
         let fiveDay = store.fiveDay.values.map(\.pointCount).max() ?? 0
         let summary = HoldingsSummaryView.summaries(store: store, settings: settings).map(\.region.rawValue).joined(separator: ",")
         let allocation = settings.showAllocation ? HoldingsSummaryView.allocation(store: store, settings: settings).count : -1
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) history=\(store.profitHistory.records.count) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")

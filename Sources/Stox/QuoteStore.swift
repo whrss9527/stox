@@ -17,6 +17,8 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var klines: [KlineKey: KlineSeries] = [:]
     /// 看过的五日分时。
     @Published private(set) var fiveDay: [Symbol: MultiDaySeries] = [:]
+    /// 每个交易日收盘后记下的持仓盈亏，只在这台 Mac 上。
+    @Published private(set) var profitHistory = ProfitHistory()
     /// 美股个股盘前盘后的最新成交。美股常规交易时段里是空的。
     @Published private(set) var extendedHours: [Symbol: ExtendedHoursQuote] = [:]
     /// 上一次取盘前盘后价的时间和当时取的是哪几只。
@@ -66,6 +68,10 @@ final class QuoteStore: ObservableObject {
             items = saved
         } else {
             items = Watchlist.defaults
+        }
+        if let data = defaults.data(forKey: Keys.profitHistory),
+           let history = try? JSONDecoder().decode(ProfitHistory.self, from: data) {
+            profitHistory = history
         }
         if let data = defaults.data(forKey: Keys.alertState),
            let engine = try? JSONDecoder().decode(AlertEngine.self, from: data) {
@@ -150,6 +156,7 @@ final class QuoteStore: ObservableObject {
             evaluateAlerts()
             checkRapidMoves(result)
             checkCloseSummaries()
+            recordProfitHistory()
             await refreshRatesIfNeeded()
             await refreshExtendedHoursIfNeeded()
         } catch {
@@ -494,6 +501,23 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 收盘后把各市场的持仓盈亏记下来，同一天再记就更新。和收盘小结不同，不管开没开通知都记。
+    private func recordProfitHistory() {
+        var history = profitHistory
+        for summary in Portfolio.summaries(items: items, quotes: quotes) {
+            let region = summary.region
+            let latest = quotes.values.filter { $0.symbol.market.region == region }.compactMap(\.timestamp).max()
+            guard let day = CloseSummary.closedDay(region: region, phase: phase(for: region), latestQuoteTime: latest, now: Date())
+            else { continue }
+            history.record(summary, day: day)
+        }
+        guard history != profitHistory else { return }
+        profitHistory = history
+        if let data = try? JSONEncoder().encode(history) {
+            defaults.set(data, forKey: Keys.profitHistory)
+        }
+    }
+
     /// 这次运行发出的提醒条数和收盘小结条数，CI 的诊断信息里用。
     private(set) var firedAlertCount = 0
     private(set) var closeSummaryCount = 0
@@ -561,6 +585,7 @@ final class QuoteStore: ObservableObject {
         static let watchlist = "watchlist.v1"
         static let alertState = "alerts.fired.v1"
         static let closeSummaryPrefix = "alerts.closeSummary.sent."
+        static let profitHistory = "holdings.history.v1"
     }
 }
 

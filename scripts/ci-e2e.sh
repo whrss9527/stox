@@ -199,10 +199,14 @@ smoke() {
   defaults write "$DOMAIN" ticker.dayProfit -bool true
   defaults write "$DOMAIN" alerts.closeSummary -bool true
   defaults write "$DOMAIN" holdings.allocation -bool true
+  defaults write "$DOMAIN" holdings.history -bool true
   run_case holdings --show-panel --expand sh600519
   defaults delete "$DOMAIN" ticker.dayProfit
   defaults delete "$DOMAIN" alerts.closeSummary
   defaults delete "$DOMAIN" holdings.allocation
+  defaults delete "$DOMAIN" holdings.history
+  # 盈亏记录：收盘后 16 小时以内的市场会记一笔，CI 运行的时间不固定，没记到只提醒。
+  grep -Eq "history=[1-9]" shots/holdings.log || echo "::warning::这次没有记下盈亏记录（可能没有刚收盘的市场）"
   # 持仓分布：四只持仓，人民币、港币、美元都有，取到汇率时四只都列出来。
   if grep -q "rates=USDCNY:" shots/holdings.log; then
     grep -q "allocation=4 " shots/holdings.log || fail "持仓分布应该列出四只"
