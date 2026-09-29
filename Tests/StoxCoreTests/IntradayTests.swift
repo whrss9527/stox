@@ -201,6 +201,26 @@ final class FiveDayTests: XCTestCase {
         XCTAssertEqual(noon.point.minute, 12 * 60, "最后一天的中午")
     }
 
+    func testVolumeBucketsAndCap() {
+        let symbol = Symbol("sh600519")!
+        func day(_ date: String, _ points: [(Int, Double)]) -> IntradaySeries {
+            IntradaySeries(symbol: symbol, date: date, points: points.map { IntradayPoint(minute: $0.0, price: 10, volume: $0.1) })
+        }
+        // A 股每天 240 分钟，两天分成 4 段，每段半天。收盘那一分钟算在自己那一天，午休归到上午。
+        let series = MultiDaySeries(symbol: symbol, days: [
+            day("20260928", [(570, 5000), (600, 100), (780, 200), (900, 300)]),
+            day("20260929", [(570, 4000), (720, 50)]),
+        ], previousClose: 10, dayPreviousCloses: [10, 10])
+        XCTAssertEqual(series.volumeBuckets(count: 4, region: .cn), [5100, 500, 4000, 50])
+        XCTAssertEqual(series.volumeBuckets(count: 0, region: .cn), [])
+
+        // 两根开盘的特别高：按排在 95% 的 1.5 倍顶满，别的柱子看得见。
+        let buckets = Array(repeating: 100.0, count: 20) + [5000, 5000] + [0, 0]
+        XCTAssertEqual(MultiDaySeries.volumeCap(buckets), 150)
+        XCTAssertEqual(MultiDaySeries.volumeCap([50, 500, 4000, 5100]), 5100, "不超过最大的")
+        XCTAssertNil(MultiDaySeries.volumeCap([0, 0]))
+    }
+
     func testFiveDayURLs() {
         XCTAssertEqual(TencentProvider.fiveDayURL(for: Symbol("sh600519")!)?.absoluteString,
                        "https://web.ifzq.gtimg.cn/appstock/app/day/query?code=sh600519")

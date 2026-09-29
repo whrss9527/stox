@@ -243,6 +243,33 @@ public struct MultiDaySeries: Equatable, Sendable {
 
     public var pointCount: Int { days.reduce(0) { $0 + $1.points.count } }
 
+    /// 五日图下面的成交量柱：横轴平均分成 count 段（每天占一样宽），落在同一段里的每分钟成交量加起来。
+    /// 单位和分时一样（A 股是手，科创板、港股、美股是股）。
+    public func volumeBuckets(count: Int, region: MarketRegion) -> [Double] {
+        let length = Double(IntradayAxis.length(for: region))
+        guard count > 0, !days.isEmpty, length > 1 else { return [] }
+        var buckets = [Double](repeating: 0, count: count)
+        for (day, series) in days.enumerated() {
+            for point in series.points {
+                guard let volume = point.volume, volume > 0 else { continue }
+                // 收盘那一分钟和第二天开盘在横轴上是同一个位置，往前挪一点，算在自己那一天。
+                let offset = min(Double(IntradayAxis.offset(of: point.minute, region: region)), length - 1)
+                let position = (Double(day) * length + offset) / (Double(days.count) * length)
+                buckets[min(max(Int(position * Double(count)), 0), count - 1)] += volume
+            }
+        }
+        return buckets
+    }
+
+    /// 量柱顶满时对应的量。每天开盘那一段带着集合竞价，常常比别的大好几倍；按不为 0 的那些里排在 95% 的那个的
+    /// 1.5 倍算（不超过最大的），更大的顶到头，别的柱子不会被压得看不见。都是 0 时为 nil。
+    public static func volumeCap(_ buckets: [Double]) -> Double? {
+        let sorted = buckets.filter { $0 > 0 }.sorted()
+        guard let largest = sorted.last else { return nil }
+        let percentile = sorted[Int(Double(sorted.count - 1) * 0.95)]
+        return min(largest, percentile * 1.5)
+    }
+
     /// 横轴位置 fraction（0 到 1）最近的点：第几天、哪个点。每天占一样宽。
     public func point(nearest fraction: Double, region: MarketRegion) -> (day: Int, point: IntradayPoint)? {
         guard !days.isEmpty else { return nil }
