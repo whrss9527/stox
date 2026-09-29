@@ -1,12 +1,13 @@
 import Foundation
 
 /// 交易所。rawValue 与腾讯行情接口的代码前缀一致（sh600519、hk00700、usAAPL）。
+/// jj 是场外基金（jj161725），不在交易所交易，每个交易日晚上公布一次净值，算在 A 股里（人民币）。
 public enum Market: String, Codable, CaseIterable, Sendable {
-    case sh, sz, bj, hk, us
+    case sh, sz, bj, hk, us, jj
 
     public var region: MarketRegion {
         switch self {
-        case .sh, .sz, .bj: return .cn
+        case .sh, .sz, .bj, .jj: return .cn
         case .hk: return .hk
         case .us: return .us
         }
@@ -20,6 +21,7 @@ public enum Market: String, Codable, CaseIterable, Sendable {
         case .bj: return "北"
         case .hk: return "港"
         case .us: return "美"
+        case .jj: return "基"
         }
     }
 }

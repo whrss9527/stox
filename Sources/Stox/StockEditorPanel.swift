@@ -99,7 +99,7 @@ struct StockEditorPanel: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("持仓")
                                     .font(.system(size: 12.5, weight: .semibold))
-                                numberField("持有数量", text: $shares, unit: "股", placeholder: "没有持仓")
+                                numberField("持有数量", text: $shares, unit: shareUnit, placeholder: "没有持仓")
                                 numberField("成本价", text: $cost, unit: currency, placeholder: "每股成本", allowZero: true)
                                 tradeRow
                                 dividendRow
@@ -206,7 +206,7 @@ struct StockEditorPanel: View {
                 .textFieldStyle(.roundedBorder)
                 .multilineTextAlignment(.trailing)
                 .frame(width: 64)
-            Text("股")
+            Text(shareUnit)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("", text: $tradePrice, prompt: Text(currentPriceText ?? "价格"))
@@ -222,8 +222,11 @@ struct StockEditorPanel: View {
         .help("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量、按成本价算出赚了多少。记完检查一下，点保存才生效")
     }
 
-    /// A 股的分红按“每 10 股”说（10 派 25 元、10 送 4 股），港股、美股按每股。
-    private var perTen: Bool { symbol.market.region == .cn }
+    /// A 股的分红按“每 10 股”说（10 派 25 元、10 送 4 股），港股、美股按每股，场外基金按每份。
+    private var perTen: Bool { symbol.market.region == .cn && !symbol.isFund }
+
+    /// 数量的单位：场外基金是份，别的是股。
+    private var shareUnit: String { symbol.isFund ? "份" : "股" }
 
     /// 分红送转：现金分红从总成本里扣掉，送转的股加到数量里，成本价跟着摊薄。港股、美股只有现金分红。
     private var dividendRow: some View {
@@ -231,7 +234,7 @@ struct StockEditorPanel: View {
             Text("分红送转")
                 .font(.system(size: 12.5))
             Spacer(minLength: 4)
-            Text(perTen ? "10股派" : "每股派")
+            Text(perTen ? "10股派" : "每\(shareUnit)派")
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
             TextField("", text: $dividendCash, prompt: Text("0"))
@@ -256,7 +259,7 @@ struct StockEditorPanel: View {
         .controlSize(.small)
         .help(perTen
             ? "按公告填，比如“10 派 25 元”填 25，“10 送 4 股”在送转里填 4。现金分红从成本里扣掉，送转的股加到持有数量里，成本价跟着摊薄。点保存才生效"
-            : "按公告填每股派多少。现金分红从成本里扣掉，成本价跟着摊薄。点保存才生效")
+            : "按公告填每\(shareUnit)派多少。现金分红从成本里扣掉，成本价跟着摊薄。点保存才生效")
     }
 
     /// 填好的分红送转，换算成每股：(现金, 送转)。没填、填错或者没有持仓时为 nil。
@@ -283,14 +286,14 @@ struct StockEditorPanel: View {
         trades = trades.appending([trade])
         shares = QuoteFormatter.plain(updated.shares)
         cost = QuoteFormatter.plain(updated.cost)
-        tradeMessage = "\(dividendText(trade))，到手 \(QuoteFormatter.money(trade.profit ?? 0))：持有 \(shares) 股，成本摊薄到 \(cost)。点保存生效"
+        tradeMessage = "\(dividendText(trade))，到手 \(QuoteFormatter.money(trade.profit ?? 0))：持有 \(shares) \(shareUnit)，成本摊薄到 \(cost)。点保存生效"
         dividendCash = ""
         dividendBonus = ""
     }
 
     /// “10 派 25、送 4”或“每股派 0.5”。
     private func dividendText(_ trade: Trade) -> String {
-        guard perTen else { return "每股派 " + QuoteFormatter.plain(trade.price) }
+        guard perTen else { return "每\(shareUnit)派 " + QuoteFormatter.plain(trade.price) }
         var parts: [String] = []
         if trade.price > 0 { parts.append("10 派 " + QuoteFormatter.plain(trade.price * 10)) }
         if let bonus = trade.bonus, bonus > 0 { parts.append("送转 " + QuoteFormatter.plain(bonus * 10)) }
@@ -333,7 +336,7 @@ struct StockEditorPanel: View {
             if trade.side == .dividend {
                 Text("分红 " + dividendText(trade))
             } else {
-                Text("\(trade.side.title) \(QuoteFormatter.plain(trade.shares)) 股 @ \(QuoteFormatter.plain(trade.price))")
+                Text("\(trade.side.title) \(QuoteFormatter.plain(trade.shares)) \(shareUnit) @ \(QuoteFormatter.plain(trade.price))")
             }
             Spacer(minLength: 4)
             if let profit = trade.profit {
@@ -400,7 +403,7 @@ struct StockEditorPanel: View {
         shares = QuoteFormatter.plain(updated.shares)
         cost = QuoteFormatter.plain(updated.cost)
         trades = trades.appending([Trade(side: .buy, shares: amount, price: price, day: tradeDay)])
-        tradeMessage = "买入 \(QuoteFormatter.plain(amount)) 股 @ \(QuoteFormatter.plain(price))：持有 \(shares) 股，成本 \(cost)。点保存生效"
+        tradeMessage = "买入 \(QuoteFormatter.plain(amount)) \(shareUnit) @ \(QuoteFormatter.plain(price))：持有 \(shares) \(shareUnit)，成本 \(cost)。点保存生效"
         tradeShares = ""
         tradePrice = ""
     }
@@ -414,7 +417,7 @@ struct StockEditorPanel: View {
         let realized = "已实现 " + QuoteFormatter.signedMoney(trade.profit ?? 0)
         if remaining.isValid {
             shares = QuoteFormatter.plain(remaining.shares)
-            tradeMessage = "卖出 \(QuoteFormatter.plain(amount)) 股 @ \(QuoteFormatter.plain(price))，\(realized)：还剩 \(shares) 股，成本不变。点保存生效"
+            tradeMessage = "卖出 \(QuoteFormatter.plain(amount)) \(shareUnit) @ \(QuoteFormatter.plain(price))，\(realized)：还剩 \(shares) \(shareUnit)，成本不变。点保存生效"
         } else {
             shares = ""
             cost = ""

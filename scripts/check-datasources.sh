@@ -104,6 +104,8 @@ PY
   fi
 }
 fields "tencent quote fields: US" "https://qt.gtimg.cn/utf8/q=usAAPL,usTSLA,usNVDA"
+# 场外基金：jj 代码只有单位净值、累计净值、日涨跌幅和净值日期。
+fields "tencent quote fields: funds" "https://qt.gtimg.cn/utf8/q=jj161725,jj110022"
 # 五档盘口和内外盘：A 股（含科创板、北交所、ETF）和港股逐个字段打印，看买卖五档、成交量的单位有没有变。
 fields "tencent quote fields: CN" "https://qt.gtimg.cn/utf8/q=sh600519,sz000001,sh510300,sh688981,bj920819,sh000001"
 fields "tencent quote fields: HK" "https://qt.gtimg.cn/utf8/q=hk00700,hk09988"

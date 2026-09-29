@@ -37,6 +37,8 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote] {
+        // 场外基金新浪这里没有，不请求。
+        let symbols = symbols.filter { !$0.isFund }
         guard !symbols.isEmpty, let url = Self.quoteURL(for: symbols) else { return [:] }
         let data = try await HTTP.get(url, session: session, timeout: timeout, headers: ["Referer": Self.referer])
         return SinaQuoteParser.parse(Self.decodeText(data), symbols: symbols)

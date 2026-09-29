@@ -324,12 +324,13 @@ final class QuoteStore: ObservableObject {
         MarketClock.effectivePhase(for: region, at: date, latestQuoteTime: latestQuoteTime(for: region))
     }
 
-    /// 这个市场所有行情里最新的时间。
+    /// 这个市场所有行情里最新的时间。场外基金的时间是净值日期，比盘中的行情晚一天，不算在里面，
+    /// 免得只加了基金时交易日被当成休市。
     func latestQuoteTime(for region: MarketRegion) -> Date? {
-        quotes.values
-            .filter { $0.symbol.market.region == region }
-            .compactMap(\.timestamp)
-            .max()
+        let inRegion = quotes.values.filter { $0.symbol.market.region == region }
+        let live = inRegion.filter { !$0.symbol.isFund }.compactMap(\.timestamp).max()
+        // 只有基金时只能看净值日期。
+        return live ?? inRegion.compactMap(\.timestamp).max()
     }
 
     // MARK: - 自选管理
@@ -541,7 +542,7 @@ final class QuoteStore: ObservableObject {
         var history = profitHistory
         for summary in Portfolio.summaries(items: items, quotes: quotes) {
             let region = summary.region
-            let latest = quotes.values.filter { $0.symbol.market.region == region }.compactMap(\.timestamp).max()
+            let latest = latestQuoteTime(for: region)
             guard let day = CloseSummary.closedDay(region: region, phase: phase(for: region), latestQuoteTime: latest, now: Date())
             else { continue }
             history.record(summary, day: day)
@@ -579,7 +580,7 @@ final class QuoteStore: ObservableObject {
         guard settings.closeSummary else { return }
         for summary in Portfolio.summaries(items: items, quotes: quotes) {
             let region = summary.region
-            let latest = quotes.values.filter { $0.symbol.market.region == region }.compactMap(\.timestamp).max()
+            let latest = latestQuoteTime(for: region)
             let key = Keys.closeSummaryPrefix + region.rawValue
             guard let note = CloseSummary.due(
                 region: region, phase: phase(for: region), summary: summary,

@@ -13,9 +13,13 @@ struct QuoteRow: View {
         compact ? compactRowHeight : standardRowHeight
     }
 
-    /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。
+    /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。场外基金没有走势图，只有一行净值。
     static func detailHeight(for item: WatchItem) -> CGFloat {
-        (item.holding == nil ? 129 : 162) + QuoteChartSection.height + 6 + (item.note == nil ? 0 : 20)
+        let note: CGFloat = item.note == nil ? 0 : 20
+        if item.symbol.isFund {
+            return (item.holding == nil ? 63 : 96) + note
+        }
+        return (item.holding == nil ? 129 : 162) + QuoteChartSection.height + 6 + note
     }
 
     let item: WatchItem
@@ -317,8 +321,10 @@ struct QuoteRow: View {
                 }
             }
         }
-        Button("在雪球中查看") {
-            if let url = QuoteLinks.xueqiu(item.symbol) { NSWorkspace.shared.open(url) }
+        if let web = QuoteLinks.web(item.symbol) {
+            Button("在\(web.title)中查看") {
+                NSWorkspace.shared.open(web.url)
+            }
         }
         Button("复制代码") {
             NSPasteboard.general.clearContents()
@@ -347,32 +353,42 @@ struct QuoteDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            QuoteChartSection(item: item, quote: quote)
-            HStack(spacing: 0) {
-                cell("今开", price(quote.open))
-                cell("最高", price(quote.high))
-                cell("最低", price(quote.low))
-                cell("昨收", price(quote.previousClose))
-            }
-            HStack(spacing: 0) {
-                cell("涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
-                cell("成交量", QuoteFormatter.volume(quote.volume, market: item.symbol.market))
-                cell("成交额", quote.amount > 0 ? QuoteFormatter.largeNumber(quote.amount) : "--")
-                cell("换手率", quote.turnoverRate.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
-            }
-            HStack(spacing: 0) {
-                if let marketCap = quote.marketCap {
-                    cell("市值", QuoteFormatter.largeNumber(marketCap))
-                } else {
-                    cell("振幅", quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+            if item.symbol.isFund {
+                // 场外基金只有每天的净值：单位净值、累计净值和这一天的涨跌。
+                HStack(spacing: 0) {
+                    cell("单位净值", price(quote.price))
+                    cell("累计净值", quote.cumulativeNAV.map(price) ?? "--")
+                    cell("日涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
+                    cell("日涨幅", QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
                 }
-                cell("市盈率", peText)
-                cell("52周最高", quote.high52Week.map(price) ?? "--")
-                cell("52周最低", quote.low52Week.map(price) ?? "--")
+            } else {
+                QuoteChartSection(item: item, quote: quote)
+                HStack(spacing: 0) {
+                    cell("今开", price(quote.open))
+                    cell("最高", price(quote.high))
+                    cell("最低", price(quote.low))
+                    cell("昨收", price(quote.previousClose))
+                }
+                HStack(spacing: 0) {
+                    cell("涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
+                    cell("成交量", QuoteFormatter.volume(quote.volume, market: item.symbol.market))
+                    cell("成交额", quote.amount > 0 ? QuoteFormatter.largeNumber(quote.amount) : "--")
+                    cell("换手率", quote.turnoverRate.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                }
+                HStack(spacing: 0) {
+                    if let marketCap = quote.marketCap {
+                        cell("市值", QuoteFormatter.largeNumber(marketCap))
+                    } else {
+                        cell("振幅", quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                    }
+                    cell("市盈率", peText)
+                    cell("52周最高", quote.high52Week.map(price) ?? "--")
+                    cell("52周最低", quote.low52Week.map(price) ?? "--")
+                }
             }
             if let holding = item.holding {
                 HStack(spacing: 0) {
-                    cell("持有", QuoteFormatter.plain(holding.shares) + "股")
+                    cell("持有", QuoteFormatter.plain(holding.shares) + (item.symbol.isFund ? "份" : "股"))
                     cell("成本", QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))
                     if let position = Portfolio.position(holding, quote: quote, trades: item.trades) {
                         cell("持仓盈亏", QuoteFormatter.signedMoney(position.totalProfit), color: profitColor(position.totalProfit))
@@ -399,8 +415,8 @@ struct QuoteDetailView: View {
                     .minimumScaleFactor(0.85)
                 Spacer()
                 Button(item.symbol.isIndex ? "提醒" : "持仓与提醒") { router.route = .edit(item.symbol) }
-                Button("雪球") {
-                    if let url = QuoteLinks.xueqiu(item.symbol) { NSWorkspace.shared.open(url) }
+                if let web = QuoteLinks.web(item.symbol) {
+                    Button(web.title) { NSWorkspace.shared.open(web.url) }
                 }
             }
             .buttonStyle(.borderless)
@@ -440,6 +456,11 @@ struct QuoteDetailView: View {
 
     private var timeText: String {
         let region = item.symbol.market.region
+        // 场外基金写净值是哪天的，每个交易日晚上才出当天的。
+        if item.symbol.isFund {
+            guard let timestamp = quote.timestamp else { return "净值每个交易日晚上更新" }
+            return "净值日期 " + ProfitHistory.day(of: timestamp, region: .cn) + " · 每个交易日晚上更新"
+        }
         // 美股不在常规交易时，这一行换成盘前盘后价和它的成交时间；行情时间这时总是收盘那一刻，不用再写。
         if settings.showExtendedHours, let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
             var text = "\(extended.label) \(extended.priceText) \(QuoteFormatter.percent(extended.percent))"
