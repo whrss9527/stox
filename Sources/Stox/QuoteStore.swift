@@ -379,11 +379,14 @@ final class QuoteStore: ObservableObject {
     }
 
     func phase(for region: MarketRegion, at date: Date = Date()) -> MarketPhase {
-        MarketClock.effectivePhase(for: region, at: date, latestQuoteTime: latestQuoteTime(for: region))
+        // 节假日靠盘中行情的时间认出来。只有场外基金时没有盘中行情，净值日期总是前一个交易日，
+        // 拿它来认会把每个交易日都当成休市，所以这时只按时间表。
+        let live = quotes.values.filter { $0.symbol.market.region == region && !$0.symbol.isFund }.compactMap(\.timestamp).max()
+        return MarketClock.effectivePhase(for: region, at: date, latestQuoteTime: live)
     }
 
-    /// 这个市场所有行情里最新的时间。场外基金的时间是净值日期，比盘中的行情晚一天，不算在里面，
-    /// 免得只加了基金时交易日被当成休市。
+    /// 这个市场所有行情里最新的时间，收盘小结、盈亏记录和记一笔的交易日用它。场外基金的时间是净值日期，
+    /// 比盘中的行情晚一天，有盘中行情时不算基金。
     func latestQuoteTime(for region: MarketRegion) -> Date? {
         let inRegion = quotes.values.filter { $0.symbol.market.region == region }
         let live = inRegion.filter { !$0.symbol.isFund }.compactMap(\.timestamp).max()
