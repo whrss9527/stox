@@ -17,6 +17,24 @@ struct PanelSizeKey: PreferenceKey {
     }
 }
 
+/// 列表上方几张卡片（更新提示、小技巧、持仓合计）各自的高度，屏幕放不下时用来算它们能占多高。
+struct CardHeightsKey: PreferenceKey {
+    static let defaultValue: [CGFloat] = []
+
+    static func reduce(value: inout [CGFloat], nextValue: () -> [CGFloat]) {
+        value += nextValue()
+    }
+}
+
+extension View {
+    /// 报告这张卡片的高度（见 CardHeightsKey）。
+    func reportsCardHeight() -> some View {
+        background(GeometryReader { proxy in
+            Color.clear.preference(key: CardHeightsKey.self, value: [proxy.size.height])
+        })
+    }
+}
+
 /// 面板根视图：自选列表页和单只证券的编辑页，外面是一层玻璃。
 @MainActor
 struct PanelView: View {
@@ -42,6 +60,9 @@ struct PanelView: View {
         .frame(width: Theme.panelWidth)
         .background(GlassPanelBackground())
         .padding(8)
+        // 按内容本来的高度量：窗口比内容矮时 SwiftUI 会把内容压扁去凑窗口，量出来的就不是真的高度，
+        // 放不下时也就不会去压矮列表。
+        .fixedSize(horizontal: false, vertical: true)
         .background(GeometryReader { proxy in
             Color.clear.preference(key: PanelSizeKey.self, value: proxy.size)
         })
@@ -66,8 +87,19 @@ struct WatchlistPanel: View {
             PanelHeader()
             SearchBar()
             if router.trimmedQuery.isEmpty {
-                TipsCards()
-                HoldingsSummaryView()
+                if let maxHeight = router.cardsMaxHeight {
+                    // 屏幕太矮、列表已经压到最矮还放不下时，列表上方的提示和持仓合计放进一个能滚动的区域。
+                    ScrollView {
+                        VStack(spacing: 10) {
+                            TipsCards()
+                            HoldingsSummaryView()
+                        }
+                    }
+                    .frame(height: min(maxHeight, router.cardsHeight))
+                } else {
+                    TipsCards()
+                    HoldingsSummaryView()
+                }
                 WatchlistView()
             } else if router.batch != nil {
                 BatchAddView()
@@ -79,6 +111,13 @@ struct WatchlistPanel: View {
         }
         .task(id: router.searchText) {
             await router.runSearch(using: store)
+        }
+        .onPreferenceChange(CardHeightsKey.self) { heights in
+            // 几张卡片之间隔着 10。
+            let total = heights.reduce(0, +) + CGFloat(max(heights.count - 1, 0)) * 10
+            if abs(total - router.cardsHeight) > 0.5 {
+                router.cardsHeight = total
+            }
         }
     }
 }
@@ -525,6 +564,7 @@ struct TipsCards: View {
             }
             .padding(10)
             .glassCard()
+            .reportsCardHeight()
             .task(id: version) {
                 whatsNewNotes = await Self.loadNotes(version)
             }
@@ -547,6 +587,7 @@ struct TipsCards: View {
             }
             .padding(10)
             .glassCard()
+            .reportsCardHeight()
         }
     }
 
@@ -652,6 +693,7 @@ struct HoldingsSummaryView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .glassCard()
+            .reportsCardHeight()
             .help((filtered ? "只算列表上方选中的“\(filter.title)”。" : "")
                 + "按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币")
         }

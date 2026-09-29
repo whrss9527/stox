@@ -68,12 +68,24 @@ run_case() {
   wait "$pid" 2>/dev/null || true
 }
 
+# 面板放得下：窗口不比屏幕能放的高，内容也不比窗口高，底下的按钮总看得见。
+check_fits() {
+  local name="$1" frame_h fitting available
+  read -r frame_h fitting available < <(sed -nE 's/.*panel_frame=[0-9-]+ [0-9-]+ [0-9]+ ([0-9]+) content=[0-9]+x[0-9]+ fitting=([0-9]+) list_max=[0-9]+ available=([0-9]+).*/\1 \2 \3/p' "shots/$name.log" | tail -1) || true
+  [[ -n "${available:-}" ]] || fail "$name：没有面板尺寸的诊断信息"
+  if (( frame_h > available + 1 || fitting > available + 1 )); then
+    fail "$name：面板比屏幕能放的高（窗口 $frame_h，内容 $fitting，屏幕 $available），底下的按钮会看不到"
+  fi
+}
+
 smoke() {
   # CI 里不去 GitHub 检查更新，也就不会弹出通知挡住截图；使用提示单独截一张，其他截图里不显示。
   defaults write "$DOMAIN" update.autoCheck -bool false
   defaults write "$DOMAIN" tips.dismissed -bool true
   run_case panel --show-panel
+  check_fits panel
   run_case detail --show-panel --expand sh600519
+  check_fits detail
   run_case search --show-panel --search 腾讯
   run_case settings-general --show-settings general
   run_case settings-display --show-settings display
@@ -159,6 +171,7 @@ smoke() {
   defaults delete "$DOMAIN" tips.dismissed
   defaults write "$DOMAIN" app.lastVersion -string 0.1.0
   run_case tips --show-panel
+  check_fits tips
   defaults write "$DOMAIN" tips.dismissed -bool true
   defaults delete "$DOMAIN" update.whatsNew 2>/dev/null || true
 
@@ -227,6 +240,7 @@ smoke() {
   defaults write "$DOMAIN" holdings.allocation -bool true
   defaults write "$DOMAIN" holdings.history -bool true
   run_case holdings --show-panel --expand sh600519
+  check_fits holdings
   defaults delete "$DOMAIN" ticker.dayProfit
   defaults delete "$DOMAIN" alerts.closeSummary
   defaults delete "$DOMAIN" holdings.allocation
@@ -257,6 +271,7 @@ smoke() {
   defaults write "$DOMAIN" holdings.hideAmounts -bool true
   defaults write "$DOMAIN" ticker.dayProfit -bool true
   run_case holdings-hidden --show-panel --expand sh600519
+  check_fits holdings-hidden
   defaults delete "$DOMAIN" holdings.hideAmounts
   defaults delete "$DOMAIN" ticker.dayProfit
   grep -q "hide_amounts=true" shots/holdings-hidden.log || fail "没有读到“隐藏金额”的设置"
