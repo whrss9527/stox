@@ -23,6 +23,29 @@ final class IntradayTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(series.points[0].average), 43_136_400 / 34_900, accuracy: 1e-9)
         XCTAssertEqual(try XCTUnwrap(series.points[1].average), 201_743_930.45 / 163_500, accuracy: 1e-9)
         XCTAssertEqual(try XCTUnwrap(series.latestAverage), 2_783_140_281 / 2_253_700, accuracy: 1e-9)
+
+        // 每分钟的成交量是累计量的差，单位和接口一样（手）。
+        XCTAssertEqual(series.points.map(\.volume), [349, 1286, 7365, 100, 13437])
+    }
+
+    func testMinuteVolumesAndScale() throws {
+        let json = #"""
+        {"code":0,"msg":"","data":{"sh000001":{"data":{"data":["0930 3878.41 3901496 6172666205.40","0931 3869.86 20844108 1",
+        "0932 3870.00 20000000 1","0933 3871.00 21000000 1"],"date":"20260928"}}}}
+        """#
+        let index = try XCTUnwrap(TencentMinuteParser.parse(Data(json.utf8), symbol: Symbol("sh000001")!))
+        XCTAssertEqual(index.points.map(\.volume), [3_901_496, 16_942_612, 0, 155_892], "指数也有量；累计量往回跳的那分钟当作 0")
+
+        // 开盘那一分钟比第二大的大 3 倍以上时，按第二大的 1.2 倍画。
+        func series(_ volumes: [Double?]) -> IntradaySeries {
+            IntradaySeries(symbol: Symbol("sh600519")!, date: nil, points: volumes.enumerated().map {
+                IntradayPoint(minute: 570 + $0.offset, price: 10, volume: $0.element)
+            })
+        }
+        XCTAssertEqual(series([1000, 100, 50]).volumeScale, 120)
+        XCTAssertEqual(series([200, 100, 50]).volumeScale, 200)
+        XCTAssertEqual(series([80]).volumeScale, 80)
+        XCTAssertNil(series([nil, 0]).volumeScale)
     }
 
     func testHongKongAverageUsesShares() throws {
