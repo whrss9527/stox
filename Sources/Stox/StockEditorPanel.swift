@@ -8,6 +8,7 @@ struct StockEditorPanel: View {
     let symbol: Symbol
 
     @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
     @State private var pinned = false
     @State private var alias = ""
@@ -23,108 +24,129 @@ struct StockEditorPanel: View {
     @State private var group = ""
     @State private var tradeShares = ""
     @State private var tradePrice = ""
+    /// 分红送转：A 股填每 10 股派多少、送转多少，港股美股填每股派多少。
+    @State private var dividendCash = ""
+    @State private var dividendBonus = ""
     /// 刚记了一笔买卖：说明算出来的新持仓，保存后才生效。
     @State private var tradeMessage: String?
+    /// 这只的买卖记录（最早的在前），记一笔、删一条都先改这里，保存时一起写回。
+    @State private var trades: [Trade] = []
     @State private var loaded = false
+    /// 滚动区里三块内容的高度，量出来以后滚动区就这么高（屏幕放不下时再矮一些）。
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 10) {
             header
             if let item {
-                VStack(spacing: 0) {
-                    Toggle("显示在菜单栏", isOn: $pinned)
-                        .toggleStyle(.switch)
-                        .padding(.vertical, 8)
-                    Divider()
-                    HStack {
-                        Text("菜单栏简称")
-                        Spacer()
-                        TextField("", text: $alias, prompt: Text(NameAbbreviator.abbreviate(item.displayName)))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 150)
-                    }
-                    .padding(.vertical, 8)
-                    Divider()
-                    HStack {
-                        Text("分组")
-                        Spacer()
-                        TextField("", text: $group, prompt: Text("不分组"))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 150)
-                        Menu {
-                            ForEach(existingGroups, id: \.self) { name in
-                                Button(name) { group = name }
+                // 三块内容放在一个滚动区里：屏幕矮、放不下时在里面滚动，底下的按钮总在。
+                ScrollView {
+                    VStack(spacing: 10) {
+                        VStack(spacing: 0) {
+                            Toggle("显示在菜单栏", isOn: $pinned)
+                                .toggleStyle(.switch)
+                                .padding(.vertical, 8)
+                            Divider()
+                            HStack {
+                                Text("菜单栏简称")
+                                Spacer()
+                                TextField("", text: $alias, prompt: Text(NameAbbreviator.abbreviate(item.displayName)))
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 150)
                             }
-                            if !existingGroups.isEmpty {
-                                Divider()
+                            .padding(.vertical, 8)
+                            Divider()
+                            HStack {
+                                Text("分组")
+                                Spacer()
+                                TextField("", text: $group, prompt: Text("不分组"))
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 150)
+                                Menu {
+                                    ForEach(existingGroups, id: \.self) { name in
+                                        Button(name) { group = name }
+                                    }
+                                    if !existingGroups.isEmpty {
+                                        Divider()
+                                    }
+                                    Button("不分组") { group = "" }
+                                } label: {
+                                    Image(systemName: "chevron.down")
+                                }
+                                .menuStyle(.button)
+                                .buttonStyle(.borderless)
+                                .menuIndicator(.hidden)
+                                .fixedSize()
+                                .help("选一个已有的分组")
                             }
-                            Button("不分组") { group = "" }
-                        } label: {
-                            Image(systemName: "chevron.down")
+                            .padding(.vertical, 8)
+                            Divider()
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("备注")
+                                Spacer()
+                                TextField("", text: $note, prompt: Text("比如关注的理由"), axis: .vertical)
+                                    .textFieldStyle(.roundedBorder)
+                                    .lineLimit(1...3)
+                                    .frame(width: 220)
+                            }
+                            .padding(.vertical, 8)
                         }
-                        .menuStyle(.button)
-                        .buttonStyle(.borderless)
-                        .menuIndicator(.hidden)
-                        .fixedSize()
-                        .help("选一个已有的分组")
-                    }
-                    .padding(.vertical, 8)
-                    Divider()
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("备注")
-                        Spacer()
-                        TextField("", text: $note, prompt: Text("比如关注的理由"), axis: .vertical)
-                            .textFieldStyle(.roundedBorder)
-                            .lineLimit(1...3)
-                            .frame(width: 220)
-                    }
-                    .padding(.vertical, 8)
-                }
-                .font(.system(size: 12.5))
-                .padding(.horizontal, 12)
-                .glassCard()
+                        .font(.system(size: 12.5))
+                        .padding(.horizontal, 12)
+                        .glassCard()
 
-                if !symbol.isIndex {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("持仓")
-                            .font(.system(size: 12.5, weight: .semibold))
-                        numberField("持有数量", text: $shares, unit: "股", placeholder: "没有持仓")
-                        numberField("成本价", text: $cost, unit: currency, placeholder: "每股成本", allowZero: true)
-                        tradeRow
-                        Text(holdingFooter)
-                            .font(.system(size: 11))
-                            .foregroundStyle(holdingState == .invalid ? Color.orange : Color.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let tradeMessage {
-                            Text(tradeMessage)
+                        if !symbol.isIndex {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("持仓")
+                                    .font(.system(size: 12.5, weight: .semibold))
+                                numberField("持有数量", text: $shares, unit: "股", placeholder: "没有持仓")
+                                numberField("成本价", text: $cost, unit: currency, placeholder: "每股成本", allowZero: true)
+                                tradeRow
+                                dividendRow
+                                Text(holdingFooter)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(holdingState == .invalid ? Color.orange : Color.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let tradeMessage {
+                                    Text(tradeMessage)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Color.accentColor)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                if !trades.isEmpty {
+                                    tradeList
+                                }
+                            }
+                            .padding(12)
+                            .glassCard()
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("价格提醒")
+                                .font(.system(size: 12.5, weight: .semibold))
+                            numberField("价格高于", text: $priceAbove, unit: currency)
+                            numberField("价格低于", text: $priceBelow, unit: currency)
+                            numberField("涨幅达到", text: $riseAbove, unit: "%")
+                            numberField("跌幅达到", text: $fallBelow, unit: "%")
+                            // 止盈止损按持仓成本算，填了持仓才有。
+                            if case .valid(let holding) = holdingState, holding.cost > 0 {
+                                numberField("持仓盈利达到", text: $profitAbove, unit: "%")
+                                numberField("持仓亏损达到", text: $lossBelow, unit: "%")
+                            }
+                            Text(alertFooter)
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
+                        .padding(12)
+                        .glassCard()
                     }
-                    .padding(12)
-                    .glassCard()
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: EditorContentHeightKey.self, value: proxy.size.height)
+                    })
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("价格提醒")
-                        .font(.system(size: 12.5, weight: .semibold))
-                    numberField("价格高于", text: $priceAbove, unit: currency)
-                    numberField("价格低于", text: $priceBelow, unit: currency)
-                    numberField("涨幅达到", text: $riseAbove, unit: "%")
-                    numberField("跌幅达到", text: $fallBelow, unit: "%")
-                    // 止盈止损按持仓成本算，填了持仓才有。
-                    if case .valid(let holding) = holdingState, holding.cost > 0 {
-                        numberField("持仓盈利达到", text: $profitAbove, unit: "%")
-                        numberField("持仓亏损达到", text: $lossBelow, unit: "%")
-                    }
-                    Text(alertFooter)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(12)
-                .glassCard()
+                .frame(height: contentHeight > 0 ? min(contentHeight, router.pageMaxHeight) : nil)
+                .onPreferenceChange(EditorContentHeightKey.self) { contentHeight = $0 }
 
                 HStack {
                     Button("删除自选", role: .destructive) {
@@ -194,10 +216,150 @@ struct StockEditorPanel: View {
             Button("买入", action: buy)
                 .disabled(tradeAmount == nil || tradeUnitPrice == nil || holdingState == .invalid)
             Button("卖出", action: sell)
-                .disabled(tradeAmount == nil || !canSell)
+                .disabled(tradeAmount == nil || tradeUnitPrice == nil || !canSell)
         }
         .controlSize(.small)
-        .help("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量。记完检查一下，点保存才生效")
+        .help("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量、按成本价算出赚了多少。记完检查一下，点保存才生效")
+    }
+
+    /// A 股的分红按“每 10 股”说（10 派 25 元、10 送 4 股），港股、美股按每股。
+    private var perTen: Bool { symbol.market.region == .cn }
+
+    /// 分红送转：现金分红从总成本里扣掉，送转的股加到数量里，成本价跟着摊薄。港股、美股只有现金分红。
+    private var dividendRow: some View {
+        HStack(spacing: 6) {
+            Text("分红送转")
+                .font(.system(size: 12.5))
+            Spacer(minLength: 4)
+            Text(perTen ? "10股派" : "每股派")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField("", text: $dividendCash, prompt: Text("0"))
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.trailing)
+                .frame(width: 48)
+            if perTen {
+                Text("送转")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                TextField("", text: $dividendBonus, prompt: Text("0"))
+                    .textFieldStyle(.roundedBorder)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 36)
+                Text("股")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+            Button("记一笔", action: recordDividend)
+                .disabled(dividendInput == nil)
+        }
+        .controlSize(.small)
+        .help(perTen
+            ? "按公告填，比如“10 派 25 元”填 25，“10 送 4 股”在送转里填 4。现金分红从成本里扣掉，送转的股加到持有数量里，成本价跟着摊薄。点保存才生效"
+            : "按公告填每股派多少。现金分红从成本里扣掉，成本价跟着摊薄。点保存才生效")
+    }
+
+    /// 填好的分红送转，换算成每股：(现金, 送转)。没填、填错或者没有持仓时为 nil。
+    private var dividendInput: (cash: Double, bonus: Double)? {
+        guard case .valid(let holding) = holdingState else { return nil }
+        let scale = perTen ? 10.0 : 1.0
+        var values: [Double] = []
+        for text in [dividendCash, perTen ? dividendBonus : ""] {
+            switch parse(text, allowZero: true) {
+            case .empty: values.append(0)
+            case .value(let value): values.append(value / scale)
+            case .invalid: return nil
+            }
+        }
+        guard holding.applyingDividend(cash: values[0], bonus: values[1]) != nil else { return nil }
+        return (values[0], values[1])
+    }
+
+    private func recordDividend() {
+        guard case .valid(let holding) = holdingState, let input = dividendInput,
+              let updated = holding.applyingDividend(cash: input.cash, bonus: input.bonus)
+        else { return }
+        let trade = Trade.dividend(cash: input.cash, bonus: input.bonus, holding: holding, day: tradeDay)
+        trades = trades.appending([trade])
+        shares = QuoteFormatter.plain(updated.shares)
+        cost = QuoteFormatter.plain(updated.cost)
+        tradeMessage = "\(dividendText(trade))，到手 \(QuoteFormatter.money(trade.profit ?? 0))：持有 \(shares) 股，成本摊薄到 \(cost)。点保存生效"
+        dividendCash = ""
+        dividendBonus = ""
+    }
+
+    /// “10 派 25、送 4”或“每股派 0.5”。
+    private func dividendText(_ trade: Trade) -> String {
+        guard perTen else { return "每股派 " + QuoteFormatter.plain(trade.price) }
+        var parts: [String] = []
+        if trade.price > 0 { parts.append("10 派 " + QuoteFormatter.plain(trade.price * 10)) }
+        if let bonus = trade.bonus, bonus > 0 { parts.append("送转 " + QuoteFormatter.plain(bonus * 10)) }
+        return parts.joined(separator: "、")
+    }
+
+    /// 最近的买卖：最新的在前，最多列 3 笔（编辑页不滚动，太长小屏幕放不下），标题行写着一共几笔和今年卖出、
+    /// 分红一共赚了多少。删掉一条只删记录，不改持仓。
+    private var tradeList: some View {
+        let recent = Array(trades.indices.reversed().prefix(3))
+        let yearStart = Portfolio.yearStart(now: Date())
+        let realized = trades.realizedProfit(since: yearStart)
+        let hasRealized = trades.contains { $0.profit != nil && $0.day >= yearStart }
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Text(trades.count > recent.count ? "最近的买卖（共 \(trades.count) 笔）" : "最近的买卖")
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                if hasRealized {
+                    Text("今年已实现 " + QuoteFormatter.signedMoney(realized))
+                        .foregroundStyle(Theme.priceColor(for: PriceDirection(realized), convention: settings.colorConvention))
+                        .help("今年卖出和分红一共赚了多少")
+                }
+            }
+            .font(.system(size: 11, weight: .medium).monospacedDigit())
+            .lineLimit(1)
+            ForEach(recent, id: \.self) { index in
+                tradeLine(trades[index]) {
+                    if trades.indices.contains(index) { trades.remove(at: index) }
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func tradeLine(_ trade: Trade, remove: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            Text(dayText(trade.day))
+                .foregroundStyle(.secondary)
+            if trade.side == .dividend {
+                Text("分红 " + dividendText(trade))
+            } else {
+                Text("\(trade.side.title) \(QuoteFormatter.plain(trade.shares)) 股 @ \(QuoteFormatter.plain(trade.price))")
+            }
+            Spacer(minLength: 4)
+            if let profit = trade.profit {
+                Text(QuoteFormatter.signedMoney(profit))
+                    .foregroundStyle(Theme.priceColor(for: PriceDirection(profit), convention: settings.colorConvention))
+            }
+            Button(action: remove) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .semibold))
+            }
+            .buttonStyle(.borderless)
+            .help("删掉这条记录（不改持仓），保存后生效")
+        }
+        .font(.system(size: 11).monospacedDigit())
+        .lineLimit(1)
+    }
+
+    /// 今年的只写月日。
+    private func dayText(_ day: String) -> String {
+        day.hasPrefix(String(Portfolio.yearStart(now: Date()).prefix(5))) ? String(day.dropFirst(5)) : day
+    }
+
+    /// 现在记的一笔算哪个交易日（见 Trade.day）。
+    private var tradeDay: String {
+        let region = symbol.market.region
+        return Trade.day(for: region, now: Date(), latestQuoteTime: store.latestQuoteTime(for: region))
     }
 
     private var currentPriceText: String? {
@@ -237,22 +399,26 @@ struct StockEditorPanel: View {
         }
         shares = QuoteFormatter.plain(updated.shares)
         cost = QuoteFormatter.plain(updated.cost)
+        trades = trades.appending([Trade(side: .buy, shares: amount, price: price, day: tradeDay)])
         tradeMessage = "买入 \(QuoteFormatter.plain(amount)) 股 @ \(QuoteFormatter.plain(price))：持有 \(shares) 股，成本 \(cost)。点保存生效"
         tradeShares = ""
         tradePrice = ""
     }
 
     private func sell() {
-        guard case .valid(let holding) = holdingState, let amount = tradeAmount,
+        guard case .valid(let holding) = holdingState, let amount = tradeAmount, let price = tradeUnitPrice,
               let remaining = holding.selling(shares: amount)
         else { return }
+        let trade = Trade.sell(amount, at: price, from: holding, day: tradeDay)
+        trades = trades.appending([trade])
+        let realized = "已实现 " + QuoteFormatter.signedMoney(trade.profit ?? 0)
         if remaining.isValid {
             shares = QuoteFormatter.plain(remaining.shares)
-            tradeMessage = "卖出 \(QuoteFormatter.plain(amount)) 股：还剩 \(shares) 股，成本不变。点保存生效"
+            tradeMessage = "卖出 \(QuoteFormatter.plain(amount)) 股 @ \(QuoteFormatter.plain(price))，\(realized)：还剩 \(shares) 股，成本不变。点保存生效"
         } else {
             shares = ""
             cost = ""
-            tradeMessage = "全部卖出，保存后清掉持仓"
+            tradeMessage = "全部卖出 @ \(QuoteFormatter.plain(price))，\(realized)。保存后清掉持仓，买卖记录还留着"
         }
         tradeShares = ""
         tradePrice = ""
@@ -363,6 +529,7 @@ struct StockEditorPanel: View {
         note = item.note ?? ""
         group = item.group ?? ""
         cost = format(item.holding?.cost)
+        trades = item.trades
     }
 
     /// 输入框里显示的数字。不用 %g：它只保留 6 位有效数字，大数还会变成科学计数法。
@@ -378,6 +545,7 @@ struct StockEditorPanel: View {
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         updated.note = trimmedNote.isEmpty ? nil : trimmedNote
         updated.group = WatchItem.normalizedGroup(group)
+        updated.trades = trades
         // 没有持仓（或者成本为 0）时止盈止损没有意义，一起清掉。
         var hasCost = false
         if case .valid(let holding) = holdingState {
@@ -399,5 +567,14 @@ struct StockEditorPanel: View {
         }
         store.update(updated)
         router.route = .list
+    }
+}
+
+/// 编辑页滚动区里内容的高度。
+private struct EditorContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

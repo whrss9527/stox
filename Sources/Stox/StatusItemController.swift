@@ -87,6 +87,9 @@ final class StatusItemController: NSObject {
         }
     }
 
+    /// 编辑页上除了滚动区以外占的高度：面板的边距、标题和底下一排按钮。
+    static let pageChrome: CGFloat = 150
+
     /// 打开面板。后几个参数用于调试和 CI 截图：展开某一行、预填搜索词、模拟按键、打印诊断信息。
     func openPanel(
         route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil, keys: [PanelKey] = [],
@@ -98,6 +101,7 @@ final class StatusItemController: NSObject {
         guard let panel else { return }
         router.route = route
         router.listMaxHeight = WatchlistView.defaultMaxHeight
+        router.pageMaxHeight = max(240, (availableHeight() ?? 760) - Self.pageChrome)
         if let expand { router.expanded = expand }
         if let search { router.searchText = search }
         store.panelWillOpen()
@@ -488,11 +492,12 @@ final class StatusItemController: NSObject {
         let fiveDay = store.fiveDay.values.map(\.pointCount).max() ?? 0
         let summary = HoldingsSummaryView.summaries(store: store, settings: settings).map(\.region.rawValue).joined(separator: ",")
         let allocation = settings.showAllocation ? HoldingsSummaryView.allocation(store: store, settings: settings).count : -1
+        let realized = HoldingsSummaryView.realized(store: store, settings: settings).map(\.region.rawValue).joined(separator: ",")
         // 有持仓、行情也到了，但今天还没成交的（A 股开盘前行情会清零）：这时价格提醒不会触发。
         let untraded = store.items
             .filter { $0.holding != nil && store.quotes[$0.symbol]?.hasTraded == false }
             .map(\.symbol.rawValue)
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) history=\(store.profitHistory.records.count) alert_log=\(store.alertLog.entries.count) untraded=\(untraded.isEmpty ? "none" : untraded.joined(separator: ",")) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) realized=\(realized.isEmpty ? "none" : realized) history=\(store.profitHistory.records.count) alert_log=\(store.alertLog.entries.count) untraded=\(untraded.isEmpty ? "none" : untraded.joined(separator: ",")) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")
@@ -504,9 +509,15 @@ final class StatusItemController: NSObject {
             .map { KlineChartData(series: $0).averages.last?.compactMap { $0 }.count ?? 0 } ?? 0
         // 展开的那只分时图上有几分钟有均价。
         let averages = router.expanded.flatMap { store.intraday[$0] }?.points.filter { $0.average != nil }.count ?? 0
+        // 展开的那只在 K 线上标了几根买卖点。
+        let marks = router.expanded
+            .flatMap { symbol in settings.chartPeriod.klinePeriod.flatMap { store.klines[KlineKey(symbol: symbol, period: $0)] } }
+            .map { series in
+                KlineChartData(series: series).tradeMarks(store.item(for: series.symbol)?.trades ?? [], region: series.symbol.market.region).count
+            } ?? 0
         // 展开的那只的五档：买盘、卖盘各有几档，没有五档的是 none。
         let book = router.expanded.flatMap { store.quotes[$0]?.orderBook }.map { "\($0.bids.count)/\($0.asks.count)" } ?? "none"
-        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) book=\(book) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
+        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) book=\(book) marks=\(marks) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }
 
@@ -545,6 +556,8 @@ final class PanelRouter: ObservableObject {
     @Published var searchText = ""
     /// 自选列表的最大高度。屏幕矮、放不下整个面板时由 StatusItemController 调低，每次打开面板时恢复。
     @Published var listMaxHeight = WatchlistView.defaultMaxHeight
+    /// 编辑页滚动区最高多少：按屏幕上能放多高算，每次打开面板时更新。
+    @Published var pageMaxHeight: CGFloat = 560
     @Published var expanded: Symbol?
     /// 键盘上下方向键选中的那一只：搜索时是搜索结果里的，否则是自选列表里的。
     @Published var highlighted: Symbol?

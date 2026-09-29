@@ -183,6 +183,10 @@ final class SettingsStore: ObservableObject {
     @Published var limitAlerts: Bool {
         didSet { defaults.set(limitAlerts, forKey: Keys.limitAlerts) }
     }
+    /// 自选里的证券创 52 周新高、新低时提醒。只在本机，不同步。
+    @Published var yearHighLowAlerts: Bool {
+        didSet { defaults.set(yearHighLowAlerts, forKey: Keys.yearHighLowAlerts) }
+    }
     /// 异动提醒：几分钟内涨跌超过这个幅度（%）时提醒；0 是关闭。只在本机。
     @Published var rapidMoveThreshold: Double {
         didSet { defaults.set(rapidMoveThreshold, forKey: Keys.rapidMoveThreshold) }
@@ -250,6 +254,10 @@ final class SettingsStore: ObservableObject {
     @Published var showMovingAverages: Bool {
         didSet { defaults.set(showMovingAverages, forKey: Keys.showMovingAverages) }
     }
+    /// 有持仓的在分时图、K 线上画成本线，K 线上标出记过买卖的那几根。
+    @Published var showCostAndTrades: Bool {
+        didSet { defaults.set(showCostAndTrades, forKey: Keys.showCostAndTrades) }
+    }
     /// 美股个股不在常规交易时段时显示盘前盘后价。
     @Published var showExtendedHours: Bool {
         didSet { defaults.set(showExtendedHours, forKey: Keys.showExtendedHours) }
@@ -304,6 +312,7 @@ final class SettingsStore: ObservableObject {
         alertsEnabled = defaults.object(forKey: Keys.alertsEnabled) as? Bool ?? true
         closeSummary = defaults.object(forKey: Keys.closeSummary) as? Bool ?? false
         limitAlerts = defaults.object(forKey: Keys.limitAlerts) as? Bool ?? false
+        yearHighLowAlerts = defaults.object(forKey: Keys.yearHighLowAlerts) as? Bool ?? false
         let rapid = defaults.object(forKey: Keys.rapidMoveThreshold) as? Double ?? 0
         rapidMoveThreshold = Self.rapidMoveOptions.contains(rapid) ? rapid : 0
         hideTicker = defaults.object(forKey: Keys.hideTicker) as? Bool ?? false
@@ -319,6 +328,7 @@ final class SettingsStore: ObservableObject {
         changeDisplay = defaults.string(forKey: Keys.changeDisplay).flatMap(ChangeDisplay.init(rawValue:)) ?? .percent
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showMovingAverages = defaults.object(forKey: Keys.showMovingAverages) as? Bool ?? true
+        showCostAndTrades = defaults.object(forKey: Keys.showCostAndTrades) as? Bool ?? true
         compactRows = defaults.object(forKey: Keys.compactRows) as? Bool ?? false
         showAllocation = defaults.object(forKey: Keys.showAllocation) as? Bool ?? false
         showProfitHistory = defaults.object(forKey: Keys.showProfitHistory) as? Bool ?? false
@@ -387,6 +397,7 @@ final class SettingsStore: ObservableObject {
         static let alertsEnabled = "alertsEnabled"
         static let closeSummary = "alerts.closeSummary"
         static let limitAlerts = "alerts.limit"
+        static let yearHighLowAlerts = "alerts.yearHighLow"
         static let rapidMoveThreshold = "alerts.rapid"
         static let autoCheckUpdates = "update.autoCheck"
         static let syncEnabled = "sync.enabled"
@@ -396,6 +407,7 @@ final class SettingsStore: ObservableObject {
         static let changeDisplay = "list.pill"
         static let flashOnChange = "list.flash"
         static let showMovingAverages = "chart.movingAverages"
+        static let showCostAndTrades = "chart.costAndTrades"
         static let compactRows = "list.compact"
         static let showAllocation = "holdings.allocation"
         static let showProfitHistory = "holdings.history"

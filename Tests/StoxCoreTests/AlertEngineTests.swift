@@ -37,6 +37,35 @@ final class AlertEngineTests: XCTestCase {
         XCTAssertTrue(PriceAlert().isEmpty, "涨停跌停不算单只的提醒条件")
     }
 
+    func testYearHighAndLowNeedTheSwitch() {
+        var engine = AlertEngine()
+        let index = Symbol("sh000001")!
+        let items = [WatchItem(symbol: symbol, name: "贵州茅台"), WatchItem(symbol: index, name: "上证指数")]
+        let time = MarketRegion.cn.calendar.date(from: DateComponents(year: 2026, month: 9, day: 28, hour: 10))!
+        // 茅台今天最高 1550，达到了 52 周最高；上证今天最低 3741，达到了 52 周最低。
+        let high = Quote(symbol: symbol, name: "贵州茅台", price: 1545, previousClose: 1500, open: 1510, high: 1550, low: 1505,
+                         volume: 100, high52Week: 1550, low52Week: 1150, timestamp: time)
+        let low = Quote(symbol: index, name: "上证指数", price: 3750, previousClose: 3800, open: 3790, high: 3795, low: 3741,
+                        volume: 100, high52Week: 4258, low52Week: 3741.11, timestamp: time)
+        let quotes = [symbol: high, index: low]
+
+        XCTAssertTrue(engine.evaluate(items: items, quotes: quotes, now: time).isEmpty, "没打开开关时不提醒")
+        let fired = engine.evaluate(items: items, quotes: quotes, now: time, yearAlerts: true)
+        XCTAssertEqual(fired.map(\.condition), [.yearHigh, .yearLow], "指数也看")
+        XCTAssertEqual(fired.first?.title, "贵州茅台 创 52 周新高")
+        XCTAssertEqual(fired.first?.body, "现价 1545.00，今天最高 1550.00，涨跌 +45.00（+3.00%）")
+        XCTAssertEqual(fired.last?.title, "上证指数 创 52 周新低")
+        XCTAssertTrue(engine.evaluate(items: items, quotes: quotes, now: time, yearAlerts: true).isEmpty, "当天不再提醒")
+
+        var below = high
+        below.high = 1549
+        var fresh = AlertEngine()
+        XCTAssertTrue(fresh.evaluate(items: [items[0]], quotes: [symbol: below], now: time, yearAlerts: true).isEmpty, "没到 52 周最高")
+        var unknown = high
+        unknown.high52Week = nil
+        XCTAssertTrue(fresh.evaluate(items: [items[0]], quotes: [symbol: unknown], now: time, yearAlerts: true).isEmpty)
+    }
+
     func testFiresOncePerDay() {
         var engine = AlertEngine()
         let items = [item(PriceAlert(priceAbove: 105))]

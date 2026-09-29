@@ -95,6 +95,20 @@ smoke() {
   # 多取了 20 根历史，取到了的话图上 60 根都有 MA20。
   grep -Eq "ma20=60 " shots/kline.log || echo "::warning::日 K 上的均线没有从最左边开始"
 
+  # 买卖点：上个月记过一买一卖，月 K 上那个月的一根标着 B 和 S。
+  local month
+  month=$(TZ=Asia/Shanghai date -v1d -v-1m +%Y-%m)
+  write_watchlist '[{"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},
+    "trades":[{"side":"buy","shares":100,"price":1200,"day":"'"$month"'-03"},{"side":"sell","shares":50,"price":1250,"day":"'"$month"'-20","profit":2500}]}]'
+  run_case kline-marks --show-panel --expand sh600519 --chart month
+  defaults delete "$DOMAIN" chart.period
+  defaults delete "$DOMAIN" watchlist.v1
+  if grep -Eq "kline=[1-9]" shots/kline-marks.log; then
+    grep -q "marks=1 " shots/kline-marks.log || fail "月 K 上应该标出上个月的买卖"
+  else
+    echo "::warning::月 K 没有取到数据，这次不检查买卖点"
+  fi
+
   # 五档：A 股个股有买卖五档，开盘前、停牌、涨跌停时不满，只提示。港股没有五档，选着五档时看分时，也不列五档。
   run_case orderbook --show-panel --expand sh600519 --chart orderBook
   run_case orderbook-hk --show-panel --expand hk00700 --chart orderBook
@@ -198,9 +212,13 @@ smoke() {
   run_case batch --show-panel --search "601318 09988 TSLA 茅台"
   grep -q "items=8 " shots/batch.log || fail "批量添加在确认前不应该改动自选"
 
-  # 持仓：列表上方按币种合计，展开后显示持仓盈亏。
+  # 持仓：列表上方按币种合计，展开后显示持仓盈亏。茅台今年年初卖过 100 股，记着已实现盈亏。
+  local year
+  year=$(TZ=Asia/Shanghai date +%Y)
   write_watchlist '[{"symbol":"sh000001","name":"上证指数","alias":"上证","pinned":true},
-    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},"note":"等回调到 1200 附近再加仓","alert":{"profitAbove":1}},
+    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200},"note":"等回调到 1200 附近再加仓","alert":{"profitAbove":1},
+     "trades":[{"side":"buy","shares":200,"price":1200,"day":"'"$year"'-01-05"},{"side":"sell","shares":100,"price":1300,"day":"'"$year"'-01-06","profit":10000},
+       {"side":"dividend","shares":100,"price":27.6,"day":"'"$year"'-06-20","profit":2760}]},
     {"symbol":"sz000001","name":"平安银行","holding":{"shares":2000,"cost":12.5}},
     {"symbol":"hk00700","name":"腾讯控股","holding":{"shares":200,"cost":380}},
     {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'
@@ -215,6 +233,7 @@ smoke() {
   defaults delete "$DOMAIN" holdings.history
   # 盈亏记录：收盘后 16 小时以内的市场会记一笔，CI 运行的时间不固定，没记到只提醒。
   grep -Eq "history=[1-9]" shots/holdings.log || echo "::warning::这次没有记下盈亏记录（可能没有刚收盘的市场）"
+  grep -q "realized=cn " shots/holdings.log || fail "今年卖出的已实现盈亏没有算出来"
   # 持仓分布：四只持仓，人民币、港币、美元都有，取到汇率时四只都列出来。
   if grep -q "rates=USDCNY:" shots/holdings.log; then
     grep -q "allocation=4 " shots/holdings.log || fail "持仓分布应该列出四只"
@@ -222,6 +241,12 @@ smoke() {
   # 编辑页：持仓、记一笔买卖、止盈止损。
   run_case editor --show-panel --edit sh600519
   grep -q "panel_frame=" shots/editor.log || fail "编辑页没有打开"
+  # 编辑页放得下：内容比屏幕高时在滚动区里滚，面板不超出屏幕，底下的保存按钮总看得见。
+  local fitting available
+  read -r fitting available < <(sed -nE 's/.*fitting=([0-9]+) list_max=[0-9]+ available=([0-9]+).*/\1 \2/p' shots/editor.log | head -1) || true
+  if [[ -n "${fitting:-}" && -n "${available:-}" && "$fitting" -gt "$available" ]]; then
+    fail "编辑页比屏幕能放的还高（$fitting > $available），保存按钮会看不到"
+  fi
   grep -Eq "items=5 quotes=[0-9]+ holdings=4 summary=cn,hk,us " shots/holdings.log || fail "持仓没有读出来"
   # 列表上方只看港股时，持仓合计也只算港股。
   defaults write "$DOMAIN" list.filter -string hk

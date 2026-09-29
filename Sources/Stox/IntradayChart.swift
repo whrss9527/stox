@@ -1,7 +1,7 @@
 import SwiftUI
 import StoxCore
 
-/// 展开后的分时图：当天的价格走势，虚线是昨收，橙色的线是成交均价（个股才有）。横轴按交易时段排，
+/// 展开后的分时图：当天的价格走势，虚线是昨收，橙色的线是成交均价（个股才有），有持仓时青色的虚线是成本价。横轴按交易时段排，
 /// 午休不占位置，所以上午收盘和下午开盘接在一起，还没到的时间留空。鼠标指着的点画一条竖线和一个圆点。
 struct IntradayChart: View {
     static let height: CGFloat = 56
@@ -15,6 +15,8 @@ struct IntradayChart: View {
     var showAverage = true
     /// 左上、左下角标的价格用几位小数。
     var decimals = 2
+    /// 持仓成本价：落在图的范围里时画一条虚线，不画时为 nil。
+    var cost: Double?
 
     var body: some View {
         GeometryReader { proxy in
@@ -28,6 +30,22 @@ struct IntradayChart: View {
                     paths.baseline
                         .stroke(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 0.6, dash: [3, 3]))
                     ChartRangeLabels(high: scale.high, low: scale.low, reference: previousClose, decimals: decimals)
+                    // 成本线的字写在中间，四个角留给最高最低。
+                    if let cost, cost > scale.bottom, cost < scale.top {
+                        let costY = scale.y(cost)
+                        Path { path in
+                            path.move(to: CGPoint(x: 0, y: costY))
+                            path.addLine(to: CGPoint(x: proxy.size.width, y: costY))
+                        }
+                        .stroke(KlineChart.costColor, style: StrokeStyle(lineWidth: 1, dash: [4, 2]))
+                        Text("成本 " + QuoteFormatter.price(cost, decimals: decimals))
+                            .font(.system(size: 8, weight: .medium).monospacedDigit())
+                            .foregroundStyle(KlineChart.costColor)
+                            .padding(.horizontal, 2)
+                            .background(RoundedRectangle(cornerRadius: 2).fill(KlineChart.labelBackground))
+                            .fixedSize()
+                            .position(x: proxy.size.width / 2, y: max(costY - 7, 6))
+                    }
                     if showAverage {
                         paths.average
                             .stroke(Self.averageColor.opacity(0.9), style: StrokeStyle(lineWidth: 0.9, lineCap: .round, lineJoin: .round))

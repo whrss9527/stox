@@ -91,6 +91,18 @@ struct QuoteChartSection: View {
 
     private var fiveDaySeries: MultiDaySeries? { store.fiveDay[item.symbol] }
 
+    /// 图上画的成本线：有持仓、成本价大于 0、设置里没关掉时才有。
+    private var cost: Double? {
+        guard settings.showCostAndTrades, let cost = item.holding?.cost, cost > 0 else { return nil }
+        return cost
+    }
+
+    /// K 线上的买卖点。
+    private func tradeMarks(in data: KlineChartData?) -> [KlineTradeMark] {
+        guard settings.showCostAndTrades, let data else { return [] }
+        return data.tradeMarks(item.trades, region: region)
+    }
+
     @ViewBuilder
     private var chart: some View {
         switch period {
@@ -102,7 +114,8 @@ struct QuoteChartSection: View {
                 color: Theme.priceColor(for: quote.direction, convention: settings.colorConvention),
                 hovered: hoveredPoint,
                 showAverage: settings.showMovingAverages,
-                decimals: quote.priceDecimals
+                decimals: quote.priceDecimals,
+                cost: cost
             )
         case .fiveDay:
             FiveDayChart(
@@ -120,7 +133,9 @@ struct QuoteChartSection: View {
                 convention: settings.colorConvention,
                 hoveredIndex: hoveredCandle(in: data),
                 showAverages: settings.showMovingAverages,
-                decimals: quote.priceDecimals
+                decimals: quote.priceDecimals,
+                cost: cost,
+                marks: tradeMarks(in: data)
             )
         case .orderBook:
             OrderBookView(
@@ -299,12 +314,15 @@ struct QuoteChartSection: View {
         if let volume = candle.volume, volume > 0 {
             text += " 量" + QuoteFormatter.largeNumber(volume) + (region == .cn && !item.symbol.isStarMarket ? "手" : "股")
         }
+        if let mark = tradeMarks(in: data).first(where: { $0.index == index }) {
+            text += mark.bought && mark.sold ? " 有买卖" : (mark.bought ? " 有买入" : " 有卖出")
+        }
         return text
     }
 }
 
 /// K 线图：每根一个实体加上下影线，红涨绿跌跟着设置走。不显示红绿时阳线空心、阴线实心。
-/// 最下面四分之一淡淡地画着成交量柱。
+/// 最下面四分之一淡淡地画着成交量柱。有持仓时成本价落在图里就画一条虚线，记过买卖的那几根下面标 B、上面标 S。
 /// 画均线时上方留一行写 MA5、MA10、MA20 的值：鼠标指着时是那一根的，否则是最后一根的。
 struct KlineChart: View {
     static let legendHeight: CGFloat = 11
@@ -316,6 +334,10 @@ struct KlineChart: View {
     var hoveredIndex: Int?
     var showAverages = true
     var decimals = 2
+    /// 持仓成本价，不画时为 nil。
+    var cost: Double?
+    /// 记过买卖的那几根。
+    var marks: [KlineTradeMark] = []
 
     var body: some View {
         GeometryReader { _ in
@@ -415,28 +437,61 @@ struct KlineChart: View {
             }
         }
 
-        guard showAverages else { return }
         // 均线画在 K 线上面；前面根数不够算的地方空着。
-        for (line, values) in data.averages.enumerated() {
-            var path = Path()
-            var drawing = false
-            for (index, value) in values.enumerated() {
-                guard let value else {
-                    drawing = false
-                    continue
+        if showAverages {
+            for (line, values) in data.averages.enumerated() {
+                var path = Path()
+                var drawing = false
+                for (index, value) in values.enumerated() {
+                    guard let value else {
+                        drawing = false
+                        continue
+                    }
+                    let point = CGPoint(x: CGFloat(layout.centerX(of: index)), y: y(value))
+                    if drawing {
+                        path.addLine(to: point)
+                    } else {
+                        path.move(to: point)
+                        drawing = true
+                    }
                 }
-                let point = CGPoint(x: CGFloat(layout.centerX(of: index)), y: y(value))
-                if drawing {
-                    path.addLine(to: point)
-                } else {
-                    path.move(to: point)
-                    drawing = true
-                }
+                context.stroke(
+                    path, with: .color(Self.color(ofAverage: line).opacity(0.9)),
+                    style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round)
+                )
             }
-            context.stroke(
-                path, with: .color(Self.color(ofAverage: line).opacity(0.9)),
-                style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round)
+        }
+
+        // 成本线：落在图的范围里才画，右边写着成本价，垫一块底色，压在均线和成交量柱上也看得清。
+        if let cost, cost > bottom, cost < top {
+            let costY = y(cost)
+            var line = Path()
+            line.move(to: CGPoint(x: 0, y: costY))
+            line.addLine(to: CGPoint(x: size.width, y: costY))
+            context.stroke(line, with: .color(Self.costColor), style: StrokeStyle(lineWidth: 1, dash: [4, 2]))
+            let label = context.resolve(
+                Text("成本 " + QuoteFormatter.price(cost, decimals: decimals))
+                    .font(.system(size: 8, weight: .medium).monospacedDigit())
+                    .foregroundColor(Self.costColor)
             )
+            let textSize = label.measure(in: size)
+            // 放在线的上面，贴着顶边时放到下面。
+            let labelY = costY - textSize.height - 2 >= 0 ? costY - textSize.height - 2 : costY + 2
+            let box = CGRect(x: size.width - textSize.width - 5, y: labelY, width: textSize.width + 4, height: textSize.height)
+            context.fill(Path(roundedRect: box, cornerRadius: 2), with: .color(Self.labelBackground))
+            context.draw(label, in: box.insetBy(dx: 2, dy: 0))
+        }
+
+        // 买卖点：买入在那一根的最低价下面标 B，卖出在最高价上面标 S，不出图的边。
+        for mark in marks where candles.indices.contains(mark.index) {
+            let x = CGFloat(layout.centerX(of: mark.index))
+            let candle = candles[mark.index]
+            if mark.bought {
+                Self.badge("B", color: color(for: .up), center: CGPoint(x: x, y: min(y(candle.low) + 6, size.height - 5)), in: &context)
+            }
+            if mark.sold {
+                Self.badge("S", color: color(for: .down), center: CGPoint(x: x, y: max(y(candle.high) - 6, 5)), in: &context)
+            }
         }
     }
 
@@ -445,5 +500,18 @@ struct KlineChart: View {
             return Color.primary.opacity(0.75)
         }
         return Theme.priceColor(for: direction, convention: convention)
+    }
+
+    /// 成本线的颜色，分时图上也用它。
+    static let costColor = Color.teal
+    /// 图上文字下面垫的底色。
+    static let labelBackground = Color(nsColor: .windowBackgroundColor).opacity(0.85)
+
+    /// 一个小圆点里写一个字母。
+    static func badge(_ letter: String, color: Color, center: CGPoint, in context: inout GraphicsContext) {
+        let rect = CGRect(x: center.x - 4.5, y: center.y - 4.5, width: 9, height: 9)
+        context.fill(Path(ellipseIn: rect), with: .color(color))
+        let text = Text(letter).font(.system(size: 6.5, weight: .bold)).foregroundColor(.white)
+        context.draw(context.resolve(text), at: center, anchor: .center)
     }
 }

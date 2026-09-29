@@ -263,7 +263,7 @@ struct QuoteRow: View {
 
     private var position: PositionValue? {
         guard let holding = item.holding, let quote else { return nil }
-        return Portfolio.position(holding, quote: quote)
+        return Portfolio.position(holding, quote: quote, trades: item.trades)
     }
 
     /// 列表里的持仓盈亏：有成本时显示比例，成本为 0 时显示金额。
@@ -374,7 +374,7 @@ struct QuoteDetailView: View {
                 HStack(spacing: 0) {
                     cell("持有", QuoteFormatter.plain(holding.shares) + "股")
                     cell("成本", QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))
-                    if let position = Portfolio.position(holding, quote: quote) {
+                    if let position = Portfolio.position(holding, quote: quote, trades: item.trades) {
                         cell("持仓盈亏", QuoteFormatter.signedMoney(position.totalProfit), color: profitColor(position.totalProfit))
                         cell("今日盈亏", QuoteFormatter.signedMoney(position.dayProfit), color: profitColor(position.dayProfit))
                     } else {

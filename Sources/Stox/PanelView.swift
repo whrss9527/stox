@@ -630,6 +630,11 @@ struct HoldingsSummaryView: View {
                         row("合计", total, showsCurrency: true, help: combinedHelp)
                     }
                 }
+                // 今年卖出和分红的已实现盈亏：编辑页里记了卖出、分红才有。
+                let realized = Self.realized(store: store, settings: settings)
+                if !realized.isEmpty {
+                    realizedRow(realized)
+                }
                 // 两只以上持仓时可以展开看每只占多少。
                 if summaries.reduce(0, { $0 + $1.count }) > 1 {
                     allocation
@@ -761,6 +766,30 @@ struct HoldingsSummaryView: View {
     static func allocation(store: QuoteStore, settings: SettingsStore) -> [AllocationEntry] {
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
         return Portfolio.allocation(items: filter.apply(store.items), quotes: store.quotes, rates: store.rates)
+    }
+
+    /// 列表上方筛选出来的那些，今年卖出的已实现盈亏，按币种。
+    static func realized(store: QuoteStore, settings: SettingsStore) -> [(region: MarketRegion, profit: Double)] {
+        let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
+        return Portfolio.realizedProfit(items: filter.apply(store.items), since: Portfolio.yearStart(now: Date()))
+    }
+
+    /// 今年已实现：人民币 +1234.00 · 美元 -56.00。只有一种货币时不写币种。
+    private func realizedRow(_ realized: [(region: MarketRegion, profit: Double)]) -> some View {
+        HStack(spacing: 8) {
+            Text("今年已实现")
+                .foregroundStyle(.secondary)
+            ForEach(realized.indices, id: \.self) { index in
+                let entry = realized[index]
+                Text((realized.count > 1 ? entry.region.currencyName + " " : "") + QuoteFormatter.signedMoney(entry.profit))
+                    .foregroundStyle(Theme.priceColor(for: PriceDirection(entry.profit), convention: settings.colorConvention))
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.system(size: 10.5).monospacedDigit())
+        .lineLimit(1)
+        .minimumScaleFactor(0.8)
+        .help("今年卖出的部分按当时的成本价算出的盈亏，加上记下的现金分红，来自编辑页里“记一笔”记下的卖出和分红")
     }
 
     /// 列表上方筛选出来的那些持仓，按币种合计。
@@ -925,6 +954,8 @@ struct PanelFooter: View {
                     .disabled(store.items.isEmpty)
                 Button("复制持仓表格") { copyHoldings() }
                     .disabled(!store.items.contains { $0.holding != nil })
+                Button("复制买卖记录") { copyTrades() }
+                    .disabled(!store.items.contains { !$0.trades.isEmpty })
                 Divider()
                 Button("新建分组…") { router.route = .group(nil, member: nil) }
                     .disabled(store.items.isEmpty)
@@ -971,6 +1002,13 @@ struct PanelFooter: View {
         guard !text.isEmpty else { return }
         let rows = text.components(separatedBy: "\n").count - 1
         copy(text, message: "已复制 \(rows) 行持仓，可以直接粘贴到表格里")
+    }
+
+    private func copyTrades() {
+        let text = Portfolio.tradesText(items: store.items)
+        guard !text.isEmpty else { return }
+        let rows = text.components(separatedBy: "\n").count - 1
+        copy(text, message: "已复制 \(rows) 笔买卖，可以直接粘贴到表格里")
     }
 
     private func copy(_ text: String, message: String) {
