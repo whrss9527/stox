@@ -336,9 +336,9 @@ smoke() {
   grep -q "expanded=hf_XAU" shots/global.log || fail "伦敦金没有展开"
   grep -q 'status_title="伦敦金 [0-9]' shots/global.log || fail "菜单栏上没有伦敦金"
   grep -q "intraday=0 " shots/global.log || fail "期货外汇没有分时，不应该去取"
-  # 搜“黄金”：品种表里的伦敦金排在股票前面，按一下方向键选中的就是它。
+  # 搜“黄金”：品种表里的伦敦金、纽约黄金排在股票前面。回车添加的是第一条，按一下方向键从它移到第二条。
   run_case search-gold --show-panel --search 黄金 --keys down
-  grep -q "highlight=hf_XAU" shots/search-gold.log || fail "搜黄金时第一条应该是伦敦金"
+  grep -q "highlight=hf_GC" shots/search-gold.log || fail "搜黄金时前两条应该是伦敦金、纽约黄金"
 
   # A 股涨跌榜：打开涨幅榜，取到了就列出来；接口偶尔取不到只提示。
   run_case rank --show-panel --rank
