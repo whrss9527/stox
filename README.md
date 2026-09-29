@@ -193,3 +193,13 @@ git tag v0.2.0 && git push origin v0.2.0
 ```
 
 设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。
+
+## 许可证
+
+Copyright © 2026 whrss9527
+
+Stox 是自由软件，以 [GNU 通用公共许可证第 3 版（GPL-3.0）](LICENSE) 发布：可以自由使用、研究、修改和分享；分发 Stox 或修改后的版本时，需要以同样的许可证提供源代码。
+
+「Stox」这个名字和 Stox 的图标不在 GPL 授权范围内（GPL-3.0 第 7 条 e 项）。介绍 Stox、分享未经修改的副本时可以使用；分发修改后的版本时，请换用自己的名字和图标。
+
+贡献需接受 [CONTRIBUTING.md](CONTRIBUTING.md) 里的贡献者协议。
