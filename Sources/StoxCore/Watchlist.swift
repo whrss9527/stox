@@ -76,7 +76,8 @@ extension WatchItem: Codable {
         holding = (try? c.decodeIfPresent(Holding.self, forKey: .holding)).flatMap { $0.isValid ? $0 : nil }
         note = (try? c.decodeIfPresent(String.self, forKey: .note)).flatMap { $0.isEmpty ? nil : $0 }
         group = Self.normalizedGroup(try? c.decodeIfPresent(String.self, forKey: .group))
-        trades = (try? c.decodeIfPresent([Trade].self, forKey: .trades)) ?? []
+        // 一笔一笔地读，读不懂的那笔（比如以后的版本加的新类型）跳过，别的照常。
+        trades = (try? c.decodeIfPresent([Lenient<Trade>].self, forKey: .trades))?.compactMap(\.value) ?? []
     }
 
     public func encode(to encoder: Encoder) throws {

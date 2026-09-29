@@ -140,6 +140,11 @@ final class TradeLogTests: XCTestCase {
         XCTAssertEqual(old.trades, [], "旧版本的数据没有买卖记录")
         let broken = try JSONDecoder().decode(WatchItem.self, from: Data(#"{"symbol":"sh600519","trades":"x"}"#.utf8))
         XCTAssertEqual(broken.trades, [], "读不懂的买卖记录当作没有")
+        let future = try JSONDecoder().decode(WatchItem.self, from: Data(#"""
+            {"symbol":"sh600519","trades":[{"side":"buy","shares":100,"price":10,"day":"2026-09-28"},
+            {"side":"split","shares":2,"price":0,"day":"2026-09-29"}]}
+            """#.utf8))
+        XCTAssertEqual(future.trades, [Trade(side: .buy, shares: 100, price: 10, day: "2026-09-28")], "认不出的那一笔跳过，别的留着")
 
         let many = (0..<Trade.limit).map { Trade(side: .buy, shares: 1, price: Double($0), day: "2026-09-29") }
         let appended = many.appending([Trade(side: .buy, shares: 1, price: 999, day: "2026-09-29")])
