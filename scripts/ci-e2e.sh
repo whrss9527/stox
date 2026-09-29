@@ -264,6 +264,13 @@ smoke() {
     grep -Eq "alerts=[1-9]" shots/holdings.log || fail "持仓盈利达到阈值时没有提醒"
     grep -Eq "alert_log=[1-9]" shots/alert-log.log || fail "最近的提醒里应该有刚才的止盈提醒"
   fi
+  # 场外基金：只有净值，展开后是单位净值、累计净值和日涨跌，没有走势图；持仓按份额算。
+  write_watchlist '[{"symbol":"jj161725","name":"招商中证白酒指数A","holding":{"shares":10000,"cost":0.5}}]'
+  run_case fund --show-panel --expand jj161725
+  defaults delete "$DOMAIN" watchlist.v1
+  grep -q "items=1 quotes=1 holdings=1 summary=cn " shots/fund.log || fail "场外基金的净值没有取到，或者没有算进持仓"
+  grep -q "expanded=jj161725" shots/fund.log || fail "场外基金没有展开"
+
   # A 股涨跌榜：打开涨幅榜，取到了就列出来；接口偶尔取不到只提示。
   run_case rank --show-panel --rank
   grep -q "route=rank" shots/rank.log || fail "没有打开涨跌榜"

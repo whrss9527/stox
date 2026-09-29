@@ -262,15 +262,24 @@ public enum MenuBarTicker {
 }
 
 public enum QuoteLinks {
-    /// 雪球个股页：SH600519、00700、HKHSI、AAPL、.IXIC。
+    /// 雪球个股页：SH600519、00700、HKHSI、AAPL、.IXIC。场外基金没有，返回 nil。
     public static func xueqiu(_ symbol: Symbol) -> URL? {
         let path: String
         switch symbol.market {
         case .sh, .sz, .bj: path = symbol.market.rawValue.uppercased() + symbol.code
         case .hk: path = symbol.isIndex ? "HK" + symbol.code : symbol.code
         case .us: path = symbol.code
+        case .jj: return nil
         }
         return URL(string: "https://xueqiu.com/S/" + path)
+    }
+
+    /// 在网页上看这一只：股票和指数去雪球，场外基金去天天基金。返回按钮上写的名字和地址。
+    public static func web(_ symbol: Symbol) -> (title: String, url: URL)? {
+        if symbol.isFund {
+            return URL(string: "https://fund.eastmoney.com/\(symbol.code).html").map { ("天天基金", $0) }
+        }
+        return xueqiu(symbol).map { ("雪球", $0) }
     }
 }
 

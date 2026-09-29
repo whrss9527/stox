@@ -56,6 +56,7 @@ public enum TencentQuoteParser {
         let fields = payload.split(separator: "~", omittingEmptySubsequences: false).map {
             $0.trimmingCharacters(in: .whitespaces)
         }
+        if symbol.isFund { return parseFund(symbol: symbol, fields: fields) }
         guard fields.count > 38 else { return nil }
 
         func number(_ index: Int) -> Double? {
@@ -124,6 +125,26 @@ public enum TencentQuoteParser {
             priceDecimals: isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4]),
             exchangeCode: fields[2].isEmpty ? nil : fields[2],
             orderBook: isCN && !isIndex ? orderBook(number, lot: lot) : nil
+        )
+    }
+
+    /// 场外基金：`v_jj161725="161725~招商中证白酒指数A~0.0000~0.0000~~0.5166~2.2327~-0.8065~2026-09-28~";`，
+    /// 5 是单位净值、6 是累计净值、7 是日涨跌幅（%）、8 是净值日期；2、3 位是 0（没有盘中估值）。
+    /// 现价是单位净值，昨收按涨跌幅倒推（上一个净值），时间是净值日期那天 15:00（北京时间）。
+    static func parseFund(symbol: Symbol, fields: [String]) -> Quote? {
+        guard fields.count > 8, !fields[1].isEmpty, let nav = Double(fields[5]), nav > 0, nav.isFinite else { return nil }
+        let percent = Double(fields[7]).flatMap { $0.isFinite && $0 > -100 ? $0 : nil } ?? 0
+        let previous = nav / (1 + percent / 100)
+        let date = fields[8].filter(\.isASCIIDigit)
+        return Quote(
+            symbol: symbol,
+            name: fields[1],
+            price: nav,
+            previousClose: previous,
+            changePercent: percent,
+            timestamp: date.count == 8 ? parseTimestamp(date + "150000", timeZone: MarketRegion.cn.timeZone) : nil,
+            priceDecimals: 4,
+            cumulativeNAV: Double(fields[6]).flatMap { $0 > 0 ? $0 : nil }
         )
     }
 

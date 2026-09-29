@@ -59,6 +59,7 @@ enum Theme {
         case .sh, .sz, .bj: return .red
         case .hk: return .purple
         case .us: return .blue
+        case .jj: return .orange
         }
     }
 }

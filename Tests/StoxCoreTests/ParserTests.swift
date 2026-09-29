@@ -155,9 +155,10 @@ final class TencentSearchParserTests: XCTestCase {
         XCTAssertEqual(results.map(\.symbol.rawValue), ["us.HXC", "us.IXIC", "usNDAQ", "us.NDX"])
     }
 
-    func testSkipsUnsupportedMarkets() {
+    func testIncludesFunds() {
         let results = TencentSearchParser.parse(Fixtures.search00700)
-        XCTAssertEqual(results.map(\.symbol.rawValue), ["hk00700", "sz000700", "sz300700", "sh600700"])
+        XCTAssertEqual(results.map(\.symbol.rawValue), ["hk00700", "jj007005", "sz000700", "sz300700", "sh600700"], "场外基金也搜得到")
+        XCTAssertEqual(results[1].typeLabel, "基金")
         XCTAssertEqual(results.last?.name, "*ST数码")
     }
 

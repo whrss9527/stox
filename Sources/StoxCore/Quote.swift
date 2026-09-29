@@ -48,6 +48,8 @@ public struct Quote: Sendable, Equatable {
     public var exchangeCode: String?
     /// 买卖五档，只有 A 股（不含指数）有；开盘前、停牌时是空的盘口。
     public var orderBook: OrderBook?
+    /// 场外基金的累计净值；别的是 nil。场外基金的现价是单位净值，时间是净值日期。
+    public var cumulativeNAV: Double?
 
     public init(
         symbol: Symbol,
@@ -71,7 +73,8 @@ public struct Quote: Sendable, Equatable {
         timestamp: Date? = nil,
         priceDecimals: Int = 2,
         exchangeCode: String? = nil,
-        orderBook: OrderBook? = nil
+        orderBook: OrderBook? = nil,
+        cumulativeNAV: Double? = nil
     ) {
         self.symbol = symbol
         self.name = name
@@ -96,12 +99,13 @@ public struct Quote: Sendable, Equatable {
         self.priceDecimals = priceDecimals
         self.exchangeCode = exchangeCode
         self.orderBook = orderBook
+        self.cumulativeNAV = cumulativeNAV
     }
 
     public var direction: PriceDirection { PriceDirection(change) }
 
-    /// 今天是否有过成交。交易时段内仍为 false 通常意味着停牌。
-    public var hasTraded: Bool { volume > 0 || open > 0 }
+    /// 今天是否有过成交。交易时段内仍为 false 通常意味着停牌。场外基金没有成交，有净值就算。
+    public var hasTraded: Bool { symbol.isFund ? price > 0 : volume > 0 || open > 0 }
 
     /// 振幅（%）。
     public var amplitude: Double? {

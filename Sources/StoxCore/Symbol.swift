@@ -31,8 +31,12 @@ public struct Symbol: Hashable, Sendable {
         case .bj: return code.hasPrefix("899")
         case .hk: return !code.allSatisfy(\.isASCIIDigit)
         case .us: return code.hasPrefix(".")
+        case .jj: return false
         }
     }
+
+    /// 场外基金：只有每天的净值，没有盘中行情、分时和 K 线。
+    public var isFund: Bool { market == .jj }
 
     /// 科创板（上交所 688、689 开头）：腾讯接口里它的成交量、K 线的量是股，别的 A 股是手。
     public var isStarMarket: Bool {
@@ -49,7 +53,7 @@ public struct Symbol: Hashable, Sendable {
         let code = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !code.isEmpty else { return nil }
         switch market {
-        case .sh, .sz, .bj:
+        case .sh, .sz, .bj, .jj:
             guard code.count == 6, code.allSatisfy(\.isASCIIDigit) else { return nil }
             return code
         case .hk:
@@ -97,7 +101,7 @@ extension Symbol: Codable {
 /// 把用户随手输入的代码解析成 Symbol。
 ///
 /// 支持：`sh600519`、`600519.SH`、`600519`（按号段推断沪深北）、`700`/`00700`（港股）、
-/// `AAPL`/`brk.b`（美股）、`us.IXIC`、`hkHSI`。
+/// `AAPL`/`brk.b`（美股）、`us.IXIC`、`hkHSI`，场外基金 `jj161725`、`161725.OF`。
 public enum SymbolInput {
     public static func parse(_ input: String) -> Symbol? {
         let text = input.filter { !$0.isWhitespace }
@@ -112,7 +116,7 @@ public enum SymbolInput {
                 let restIsDigits = rest.allSatisfy(\.isASCIIDigit)
                 let accept: Bool
                 switch market {
-                case .sh, .sz, .bj: accept = true
+                case .sh, .sz, .bj, .jj: accept = true
                 case .hk: accept = restIsDigits || prefix == "hk"
                 case .us: accept = prefix == "us" || rest.hasPrefix(".")
                 }
@@ -131,6 +135,7 @@ public enum SymbolInput {
             case "BJ": market = .bj
             case "HK": market = .hk
             case "US": market = .us
+            case "OF": market = .jj  // 场外基金，比如 161725.OF
             default: market = nil
             }
             if let market, let symbol = Symbol(market: market, code: code) { return symbol }
@@ -156,7 +161,7 @@ public enum SymbolInput {
         if text.count > 2, text.hasPrefix("us") || text.hasPrefix("hk") { return true }
         if let dot = text.lastIndex(of: ".") {
             let suffix = text[text.index(after: dot)...].uppercased()
-            return ["SH", "SS", "SZ", "BJ", "HK", "US"].contains(suffix)
+            return ["SH", "SS", "SZ", "BJ", "HK", "US", "OF"].contains(suffix)
         }
         return false
     }
