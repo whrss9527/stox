@@ -21,6 +21,21 @@ final class HiddenAmountsTests: XCTestCase {
         XCTAssertEqual(combined.last?.direction, .down)
     }
 
+    func testMenuBarCanShowTheHoldingProfit() {
+        // 持仓盈亏：市值减成本，隐藏金额时相对成本。
+        let parts = MenuBarTicker.profitParts(summaries, kind: .total)
+        XCTAssertEqual(parts.map(\.text), ["持仓", "+¥2000", "+HK$1.20万", "+$404"])
+        XCTAssertEqual(parts.map(\.direction), [.flat, .up, .up, .up])
+        let hidden = MenuBarTicker.profitParts(summaries, kind: .total, hidingAmounts: true)
+        XCTAssertEqual(hidden.map(\.text), ["持仓", "+1.38%", "+15.74%", "+13.47%"])
+        // 有汇率时折成人民币：(2000 + 11960 × 0.85 + 404 × 7) / (145000 + 76000 × 0.85 + 3000 × 7)。
+        let rates = ExchangeRates(hkdCNY: 0.85, usdCNY: 7)
+        XCTAssertEqual(MenuBarTicker.profitParts(summaries, kind: .total, rates: rates).map(\.text), ["持仓", "+¥1.50万"])
+        XCTAssertEqual(MenuBarTicker.profitParts(summaries, kind: .total, rates: rates, hidingAmounts: true).map(\.text), ["持仓", "+6.50%"])
+        XCTAssertEqual(MenuBarTicker.profitParts(summaries, kind: .day), MenuBarTicker.dayProfitParts(summaries), "今日盈亏和原来一样")
+        XCTAssertEqual(MenuBarProfit.total.title, "持仓盈亏")
+    }
+
     func testCloseSummaryLeavesOutAmounts() throws {
         let time = { (text: String) in TencentQuoteParser.parseTimestamp(text, timeZone: MarketRegion.cn.timeZone)! }
         let note = try XCTUnwrap(CloseSummary.due(
