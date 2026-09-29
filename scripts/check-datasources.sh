@@ -261,3 +261,12 @@ fetch "rank: eastmoney HK" "${EM}m:128+t:3,m:128+t:4,m:128+t:1,m:128+t:2" "UTF-8
 fetch "rank: eastmoney US" "${EM}m:105,m:106,m:107" "UTF-8"
 fetch "rank: sina A shares" "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=1&num=5&sort=changepercent&asc=0&node=hs_a" "GB18030" "https://finance.sina.com.cn/"
 fetch "rank: tencent A shares" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.0&board_code=aStock&sort_type=priceRatio&direct=down&offset=0&count=5" "UTF-8"
+R="https://proxy.finance.qq.com/cgi/cgi-bin/rank"
+fetch "rank: tencent A shares losers" "${R}/hs/getBoardRankList?_appver=11.17.0&board_code=aStock&sort_type=priceRatio&direct=up&offset=0&count=3" "UTF-8"
+fetch "rank: tencent A shares turnover" "${R}/hs/getBoardRankList?_appver=11.17.0&board_code=aStock&sort_type=turnover&direct=down&offset=0&count=3" "UTF-8"
+for b in hk_all HK_ALL hkMainBoard hkStock; do
+  fetch "rank: tencent HK ${b}" "${R}/hk/getBoardRankList?_appver=11.17.0&board_code=${b}&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
+done
+for b in us_all US_ALL usStock us_china; do
+  fetch "rank: tencent US ${b}" "${R}/us/getBoardRankList?_appver=11.17.0&board_code=${b}&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
+done
