@@ -47,6 +47,33 @@ final class ProfitCalendarTests: XCTestCase {
         XCTAssertEqual(empty.profitDays + empty.lossDays, 0)
     }
 
+    func testSummarisesTheYear() throws {
+        var history = history()
+        history.record(PortfolioSummary(region: .cn, marketValue: 1000, costValue: 900, dayProfit: -400, count: 1), day: "2026-03-02")
+        history.record(PortfolioSummary(region: .cn, marketValue: 1000, costValue: 900, dayProfit: 70, count: 1), day: "2025-12-31")
+        let year = ProfitYear(history: history, region: .cn, year: 2026)
+        XCTAssertEqual(year.title, "2026年")
+        XCTAssertEqual(year.months.count, 12)
+        XCTAssertEqual(year.months[8].total ?? 0, 250.001, accuracy: 1e-9, "9 月")
+        XCTAssertEqual(year.months[8].recordedDays, 4)
+        XCTAssertEqual(year.months[7].total, 30, "8 月 31 号")
+        XCTAssertEqual(year.months[2].total, -400)
+        XCTAssertNil(year.months[0].total, "1 月没有记录")
+        XCTAssertEqual(year.months[0].recordedDays, 0)
+        XCTAssertEqual(year.recordedMonths.map(\.month), [3, 8, 9], "去年 12 月的不算")
+        XCTAssertEqual(try XCTUnwrap(year.total), -119.999, accuracy: 1e-9)
+        XCTAssertEqual(year.profitMonths, 2)
+        XCTAssertEqual(year.lossMonths, 1)
+        XCTAssertEqual(year.largestMagnitude, 400)
+
+        XCTAssertEqual(ProfitYear(history: history, region: .hk, year: 2026).recordedMonths.map(\.month), [9], "港币分开算")
+        let empty = ProfitYear(history: history, region: .us, year: 2026)
+        XCTAssertNil(empty.total)
+        XCTAssertNil(empty.largestMagnitude)
+        XCTAssertEqual(ProfitYear.yearRange(of: history, region: .cn), 2025...2026)
+        XCTAssertNil(ProfitYear.yearRange(of: history, region: .us))
+    }
+
     func testMonthNavigation() throws {
         func shifted(_ year: Int, _ month: Int, _ offset: Int) -> [Int] {
             let result = ProfitCalendar.shift(year: year, month: month, by: offset)

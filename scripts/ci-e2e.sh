@@ -301,17 +301,25 @@ smoke() {
   # 最近的提醒：打开这一页。
   run_case alert-log --show-panel --alerts
   grep -q "route=alerts" shots/alert-log.log || fail "没有打开最近的提醒"
-  # 盈亏日历：这个月的 1 号、2 号记过人民币的今日盈亏，3 号记过港币的，打开日历页能看到人民币那两天。
-  local this_month
+  # 盈亏日历：这个月的 1 号、2 号记过人民币的今日盈亏，3 号记过港币的，打开日历页能看到人民币那两天；
+  # 今年 1 月 15 号也记过一笔，按年看时 1 月和这个月都有数（这个月就是 1 月时只有一个月）。
+  local this_month this_year
   this_month=$(TZ=Asia/Shanghai date +%Y-%m)
+  this_year=$(TZ=Asia/Shanghai date +%Y)
   defaults write "$DOMAIN" holdings.history.v1 -data "$(printf '%s' '{"records":[
+    {"day":"'"$this_year"'-01-15","region":"cn","dayProfit":-2500,"totalProfit":3000,"marketValue":140000},
     {"day":"'"$this_month"'-01","region":"cn","dayProfit":1200,"totalProfit":5000,"marketValue":150000},
     {"day":"'"$this_month"'-02","region":"cn","dayProfit":-800,"totalProfit":4200,"marketValue":149000},
     {"day":"'"$this_month"'-03","region":"hk","dayProfit":300,"totalProfit":900,"marketValue":86000}]}' | xxd -p | tr -d '\n')"
   run_case calendar --show-panel --calendar
+  defaults write "$DOMAIN" calendar.byYear -bool true
+  run_case calendar-year --show-panel --calendar
+  defaults delete "$DOMAIN" calendar.byYear
   defaults delete "$DOMAIN" holdings.history.v1
   grep -q "route=calendar" shots/calendar.log || fail "没有打开盈亏日历"
   grep -Eq "calendar=[2-9]" shots/calendar.log || fail "盈亏日历里应该有这个月记的两天"
+  grep -q "calendar_by_year=true" shots/calendar-year.log || fail "盈亏日历没有按年看"
+  grep -Eq "calendar_months=[1-9]" shots/calendar-year.log || fail "按年看时应该有记过的月份"
   # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来，也记在最近的提醒里。A 股开盘前（北京时间 9 点多）
   # 行情清零、茅台今天还没成交，这时按规则不提醒，只提示一下。
   if grep -Eq "untraded=[^ ]*sh600519" shots/holdings.log; then
