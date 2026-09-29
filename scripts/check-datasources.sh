@@ -253,3 +253,11 @@ kline "tencent usfqkline: usAAPL.OQ" "https://web.ifzq.gtimg.cn/appstock/app/usf
 kline "tencent usfqkline: us.IXIC" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=us.IXIC,day,,,5,qfq"
 kline "tencent usfqkline: usAAPL month" "https://web.ifzq.gtimg.cn/appstock/app/usfqkline/get?param=usAAPL,month,,,3,qfq"
 kline "tencent kline (no adjust): sh600519" "https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sh600519,day,,,5"
+
+# 涨跌榜候选：东方财富 clist、新浪 getHQNodeData、腾讯 rank，各取 5 条。
+EM="https://push2.eastmoney.com/api/qt/clist/get?pn=1&pz=5&po=1&np=1&fltt=2&invt=2&fid=f3&fields=f12,f13,f14,f2,f3,f4,f6,f8&fs="
+fetch "rank: eastmoney A shares" "${EM}m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048" "UTF-8"
+fetch "rank: eastmoney HK" "${EM}m:128+t:3,m:128+t:4,m:128+t:1,m:128+t:2" "UTF-8"
+fetch "rank: eastmoney US" "${EM}m:105,m:106,m:107" "UTF-8"
+fetch "rank: sina A shares" "https://vip.stock.finance.sina.com.cn/quotes_service/api/json_v2.php/Market_Center.getHQNodeData?page=1&num=5&sort=changepercent&asc=0&node=hs_a" "GB18030" "https://finance.sina.com.cn/"
+fetch "rank: tencent A shares" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList?_appver=11.17.0&board_code=aStock&sort_type=priceRatio&direct=down&offset=0&count=5" "UTF-8"
