@@ -101,6 +101,63 @@ public enum Portfolio {
     }
 }
 
+/// 持仓分布里的一只：市值和占总市值的比例。
+public struct AllocationEntry: Equatable, Sendable {
+    public var symbol: Symbol
+    public var name: String
+    /// 原来币种的市值。
+    public var marketValue: Double
+    /// 用来比较的市值：几种货币都有时折成人民币，只有一种货币时就是原来的。
+    public var value: Double
+    /// 占总市值的比例（%）。
+    public var share: Double
+    /// 持仓盈亏比例（%）；成本为 0 时为 nil。
+    public var profitPercent: Double?
+
+    public init(symbol: Symbol, name: String, marketValue: Double, value: Double, share: Double, profitPercent: Double?) {
+        self.symbol = symbol
+        self.name = name
+        self.marketValue = marketValue
+        self.value = value
+        self.share = share
+        self.profitPercent = profitPercent
+    }
+}
+
+extension Portfolio {
+    /// 持仓分布：每只占总市值的比例，按市值从大到小。几种货币都有时按汇率折成人民币再比，
+    /// 没有汇率时比不了，返回空数组。
+    public static func allocation(items: [WatchItem], quotes: [Symbol: Quote], rates: ExchangeRates?) -> [AllocationEntry] {
+        var positions: [(item: WatchItem, quote: Quote, position: PositionValue)] = []
+        for item in items {
+            guard let holding = item.holding, let quote = quotes[item.symbol],
+                  let position = position(holding, quote: quote), position.marketValue > 0
+            else { continue }
+            positions.append((item, quote, position))
+        }
+        let mixed = Set(positions.map { $0.item.symbol.market.region }).count > 1
+        if mixed, rates == nil { return [] }
+        let values = positions.map { entry -> Double in
+            let rate = mixed ? rates?.toCNY(entry.item.symbol.market.region) ?? 1 : 1
+            return entry.position.marketValue * rate
+        }
+        let total = values.reduce(0, +)
+        guard total > 0 else { return [] }
+        return zip(positions, values)
+            .map { entry, value in
+                AllocationEntry(
+                    symbol: entry.item.symbol,
+                    name: entry.quote.name.isEmpty ? entry.item.displayName : entry.quote.name,
+                    marketValue: entry.position.marketValue,
+                    value: value,
+                    share: value / total * 100,
+                    profitPercent: entry.position.totalProfitPercent
+                )
+            }
+            .sorted { $0.value > $1.value }
+    }
+}
+
 extension MarketRegion {
     /// 界面上显示的货币名称。
     public var currencyName: String {
@@ -124,7 +181,7 @@ extension MarketRegion {
 extension Portfolio {
     /// 持仓表格，制表符分隔，粘贴到 Numbers、Excel 就是一张表。金额不用万、亿，保留两位小数，方便再计算。
     public static func tableText(items: [WatchItem], quotes: [Symbol: Quote]) -> String {
-        var lines = ["名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏"]
+        var lines = ["名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组"]
         for item in items {
             guard let holding = item.holding, let quote = quotes[item.symbol],
                   let position = position(holding, quote: quote)
@@ -141,6 +198,7 @@ extension Portfolio {
                 QuoteFormatter.fixed(position.totalProfit, decimals: 2),
                 position.totalProfitPercent.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "",
                 QuoteFormatter.fixed(position.dayProfit, decimals: 2),
+                item.group ?? "",
             ].joined(separator: "\t"))
         }
         return lines.count > 1 ? lines.joined(separator: "\n") : ""
@@ -160,6 +218,38 @@ public enum CloseSummary {
     /// 收盘后多久以内还补发：晚上才打开 Mac 也能收到，但第二天早上开盘前就不再发前一天的了。
     public static let window: TimeInterval = 16 * 3600
 
+    /// 一只持仓今天的涨跌幅，小结里写涨得最多、跌得最多的是哪只。
+    public struct Mover: Equatable, Sendable {
+        public var name: String
+        public var changePercent: Double
+
+        public init(name: String, changePercent: Double) {
+            self.name = name
+            self.changePercent = changePercent
+        }
+    }
+
+    /// 这个市场的持仓今天各涨跌多少。
+    public static func movers(items: [WatchItem], quotes: [Symbol: Quote], region: MarketRegion) -> [Mover] {
+        items.compactMap { item in
+            guard item.holding != nil, item.symbol.market.region == region, let quote = quotes[item.symbol], quote.hasTraded
+            else { return nil }
+            return Mover(name: quote.name.isEmpty ? item.displayName : quote.name, changePercent: quote.changePercent)
+        }
+    }
+
+    /// “涨得最多的是贵州茅台 +2.10%，跌得最多的是平安银行 -1.20%”：两只以上持仓时才写，没涨（跌）的那一半不写。
+    static func moversText(_ movers: [Mover]) -> String? {
+        guard movers.count > 1,
+              let best = movers.max(by: { $0.changePercent < $1.changePercent }),
+              let worst = movers.min(by: { $0.changePercent < $1.changePercent })
+        else { return nil }
+        var parts: [String] = []
+        if best.changePercent > 0 { parts.append("涨得最多的是\(best.name) \(QuoteFormatter.percent(best.changePercent))") }
+        if worst.changePercent < 0 { parts.append("跌得最多的是\(worst.name) \(QuoteFormatter.percent(worst.changePercent))") }
+        return parts.isEmpty ? nil : parts.joined(separator: "，")
+    }
+
     /// 这个市场已经收盘（休市，或者美股进入盘后）、有持仓，最近一个交易日的收盘还不到 16 小时，
     /// 并且这个交易日还没发过时，返回要发的小结。开盘前、午休不发；节假日最新行情是好几天前的，也不发。
     public static func due(
@@ -168,7 +258,8 @@ public enum CloseSummary {
         summary: PortfolioSummary?,
         latestQuoteTime: Date?,
         now: Date,
-        lastSentDay: String?
+        lastSentDay: String?,
+        movers: [Mover] = []
     ) -> CloseSummaryNote? {
         guard phase == .closed || phase == .afterHours, let summary, let latestQuoteTime,
               now.timeIntervalSince(latestQuoteTime) < window
@@ -185,6 +276,9 @@ public enum CloseSummary {
             body += "（\(QuoteFormatter.percent(percent))）"
         }
         body += "，市值 \(QuoteFormatter.money(summary.marketValue))\(region.currencyName)"
+        if let text = moversText(movers) {
+            body += "。" + text
+        }
         return CloseSummaryNote(region: region, day: today, title: title, body: body)
     }
 }

@@ -601,30 +601,36 @@ struct HoldingsSummaryView: View {
             // 只有一种货币、也没有筛选时不需要第一列；筛选着的时候第一列的表头写着筛的是什么。
             let filtered = filter != .all
             let showsCurrency = summaries.count > 1 || filtered
-            Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
-                GridRow {
-                    if filtered {
-                        Text(filter.title)
-                            .font(.system(size: 10, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    } else if showsCurrency {
-                        Color.clear
-                            .gridCellUnsizedAxes([.horizontal, .vertical])
+            VStack(alignment: .leading, spacing: 6) {
+                Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 6) {
+                    GridRow {
+                        if filtered {
+                            Text(filter.title)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        } else if showsCurrency {
+                            Color.clear
+                                .gridCellUnsizedAxes([.horizontal, .vertical])
+                        }
+                        header("今日盈亏")
+                        header("持仓盈亏")
+                        header(showsCurrency ? "市值" : "持仓市值")
+                            .gridColumnAlignment(.trailing)
                     }
-                    header("今日盈亏")
-                    header("持仓盈亏")
-                    header(showsCurrency ? "市值" : "持仓市值")
-                        .gridColumnAlignment(.trailing)
+                    ForEach(summaries, id: \.region) { summary in
+                        row(summary.region.currencyName, summary, showsCurrency: showsCurrency)
+                    }
+                    // 几种货币都有时，按现在的汇率折成人民币再合计一行。
+                    if let total = Portfolio.combined(summaries, rates: store.rates) {
+                        Divider()
+                            .gridCellUnsizedAxes(.horizontal)
+                        row("合计", total, showsCurrency: true, help: combinedHelp)
+                    }
                 }
-                ForEach(summaries, id: \.region) { summary in
-                    row(summary.region.currencyName, summary, showsCurrency: showsCurrency)
-                }
-                // 几种货币都有时，按现在的汇率折成人民币再合计一行。
-                if let total = Portfolio.combined(summaries, rates: store.rates) {
-                    Divider()
-                        .gridCellUnsizedAxes(.horizontal)
-                    row("合计", total, showsCurrency: true, help: combinedHelp)
+                // 两只以上持仓时可以展开看每只占多少。
+                if summaries.reduce(0, { $0 + $1.count }) > 1 {
+                    allocation
                 }
             }
             .padding(.horizontal, 12)
@@ -633,6 +639,64 @@ struct HoldingsSummaryView: View {
             .help((filtered ? "只算列表上方选中的“\(filter.title)”。" : "")
                 + "按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币")
         }
+    }
+
+    /// 持仓分布：点一下展开或收起，展开后每只一行，横条是占总市值的比例。
+    @ViewBuilder
+    private var allocation: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                settings.showAllocation.toggle()
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text("持仓分布")
+                Image(systemName: settings.showAllocation ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 7.5, weight: .semibold))
+            }
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(settings.showAllocation ? "收起持仓分布" : "看每只持仓占总市值多少")
+        if settings.showAllocation {
+            let entries = Self.allocation(store: store, settings: settings)
+            if entries.isEmpty {
+                Text("几种货币都有时，要等取到汇率才能放在一起比。")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+            ForEach(entries, id: \.symbol) { entry in
+                HStack(spacing: 6) {
+                    Text(entry.name)
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                        .frame(width: 84, alignment: .leading)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color.primary.opacity(0.06))
+                            Capsule()
+                                .fill(Color.accentColor.opacity(0.55))
+                                .frame(width: max(2, proxy.size.width * CGFloat(entry.share / 100)))
+                        }
+                    }
+                    .frame(height: 5)
+                    Text(QuoteFormatter.fixed(entry.share, decimals: 1) + "%")
+                        .font(.system(size: 10.5).monospacedDigit())
+                        .frame(width: 42, alignment: .trailing)
+                }
+                .frame(height: 15)
+                .help("\(entry.name)：市值 \(QuoteFormatter.money(entry.marketValue))"
+                    + (entry.profitPercent.map { "，持仓盈亏 \(QuoteFormatter.percent($0))" } ?? ""))
+            }
+        }
+    }
+
+    /// 列表上方筛选出来的那些持仓，各占总市值多少。
+    static func allocation(store: QuoteStore, settings: SettingsStore) -> [AllocationEntry] {
+        let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
+        return Portfolio.allocation(items: filter.apply(store.items), quotes: store.quotes, rates: store.rates)
     }
 
     /// 列表上方筛选出来的那些持仓，按币种合计。

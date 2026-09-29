@@ -237,6 +237,34 @@ final class CloseSummaryTests: XCTestCase {
         ), "第二天早上不再发前一天的")
     }
 
+    func testNamesTheBiggestMovers() throws {
+        let moutai = Symbol("sh600519")!, bank = Symbol("sz000001")!, index = Symbol("sh000001")!
+        let items = [
+            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200)),
+            WatchItem(symbol: bank, name: "平安银行", holding: Holding(shares: 2000, cost: 12.5)),
+            WatchItem(symbol: index, name: "上证指数"),
+            WatchItem(symbol: Symbol("hk00700")!, name: "腾讯控股", holding: Holding(shares: 200, cost: 380)),
+        ]
+        let quotes: [Symbol: Quote] = [
+            moutai: Quote(symbol: moutai, name: "贵州茅台", price: 1243.88, previousClose: 1237, open: 1236, volume: 100),
+            bank: Quote(symbol: bank, name: "平安银行", price: 11.29, previousClose: 11.3, open: 11.28, volume: 100),
+            index: Quote(symbol: index, name: "上证指数", price: 3823.62, previousClose: 3888.37, open: 3878.41, volume: 100),
+        ]
+        let movers = CloseSummary.movers(items: items, quotes: quotes, region: .cn)
+        XCTAssertEqual(movers.map(\.name), ["贵州茅台", "平安银行"], "只算这个市场有持仓的")
+
+        let note = try XCTUnwrap(CloseSummary.due(
+            region: .cn, phase: .closed, summary: summary,
+            latestQuoteTime: time("20260928150003", .cn), now: time("20260928160000", .cn), lastSentDay: nil, movers: movers
+        ))
+        XCTAssertEqual(note.body, "今日 +0.47%，持仓盈亏 +2000.00（+1.38%），市值 14.70万人民币。涨得最多的是贵州茅台 +0.56%，跌得最多的是平安银行 -0.09%")
+
+        XCTAssertNil(CloseSummary.moversText(Array(movers.prefix(1))), "只有一只时不写")
+        XCTAssertEqual(CloseSummary.moversText([
+            CloseSummary.Mover(name: "甲", changePercent: 1), CloseSummary.Mover(name: "乙", changePercent: 2),
+        ]), "涨得最多的是乙 +2.00%", "都涨了就不写跌得最多的")
+    }
+
     func testSkipsWhileTradingOnHolidaysAndWithoutHoldings() {
         let quoteTime = time("20260928150003", .cn)
         let now = time("20260928160000", .cn)
@@ -374,7 +402,7 @@ final class TableTests: XCTestCase {
         let tencent = Symbol("hk00700")!
         let items = [
             WatchItem(symbol: Symbol("sh000001")!, name: "上证指数"),
-            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200)),
+            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200), group: "白酒"),
             WatchItem(symbol: tencent, name: "腾讯控股", holding: Holding(shares: 200, cost: 380)),
             WatchItem(symbol: Symbol("usAAPL")!, name: "苹果", holding: Holding(shares: 10, cost: 300)),
         ]
@@ -384,9 +412,9 @@ final class TableTests: XCTestCase {
         ]
         let rows = Portfolio.tableText(items: items, quotes: quotes).components(separatedBy: "\n")
         XCTAssertEqual(rows.count, 3, "指数没有持仓，苹果没有行情，都不列")
-        XCTAssertEqual(rows[0], "名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏")
-        XCTAssertEqual(rows[1], "贵州茅台\t600519\tCNY\t100\t1200\t1243.88\t124388.00\t4388.00\t3.66%\t688.00")
-        XCTAssertEqual(rows[2], "腾讯控股\t00700\tHKD\t200\t380\t439.800\t87960.00\t11960.00\t15.74%\t640.00")
+        XCTAssertEqual(rows[0], "名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组")
+        XCTAssertEqual(rows[1], "贵州茅台\t600519\tCNY\t100\t1200\t1243.88\t124388.00\t4388.00\t3.66%\t688.00\t白酒")
+        XCTAssertEqual(rows[2], "腾讯控股\t00700\tHKD\t200\t380\t439.800\t87960.00\t11960.00\t15.74%\t640.00\t", "没分组的最后一列是空的")
         XCTAssertEqual(Portfolio.tableText(items: Array(items.prefix(1)), quotes: quotes), "", "没有持仓时是空的")
     }
 }
@@ -395,5 +423,48 @@ final class CommonIndicesTests: XCTestCase {
     func testCommonIndices() {
         XCTAssertEqual(Watchlist.commonIndices.map(\.symbol.rawValue), ["sh000001", "sz399001", "sz399006", "hkHSI", "us.IXIC"])
         XCTAssertEqual(Watchlist.commonIndices.first?.pinned, true, "上证照旧显示在菜单栏")
+    }
+}
+
+final class AllocationTests: XCTestCase {
+    private let moutai = Symbol("sh600519")!
+    private let tencent = Symbol("hk00700")!
+
+    private var items: [WatchItem] {
+        [
+            WatchItem(symbol: moutai, name: "贵州茅台", holding: Holding(shares: 100, cost: 1200)),
+            WatchItem(symbol: tencent, name: "腾讯控股", holding: Holding(shares: 200, cost: 380)),
+            WatchItem(symbol: Symbol("sh000001")!, name: "上证指数"),
+        ]
+    }
+
+    private var quotes: [Symbol: Quote] {
+        [
+            moutai: Quote(symbol: moutai, name: "贵州茅台", price: 1000, previousClose: 1000),
+            tencent: Quote(symbol: tencent, name: "腾讯控股", price: 400, previousClose: 400),
+        ]
+    }
+
+    func testMixedCurrenciesNeedRates() throws {
+        XCTAssertEqual(Portfolio.allocation(items: items, quotes: quotes, rates: nil), [], "没有汇率时人民币和港币比不了")
+
+        // 茅台 10 万元；腾讯 8 万港币按 0.9 折成 7.2 万元。
+        let entries = Portfolio.allocation(items: items, quotes: quotes, rates: ExchangeRates(hkdCNY: 0.9, usdCNY: 7))
+        XCTAssertEqual(entries.map(\.symbol), [moutai, tencent], "按市值从大到小")
+        XCTAssertEqual(entries[0].share, 100_000 / 172_000 * 100, accuracy: 1e-9)
+        XCTAssertEqual(entries[1].share, 72_000 / 172_000 * 100, accuracy: 1e-9)
+        XCTAssertEqual(entries[1].marketValue, 80_000, "原来币种的市值照旧")
+        XCTAssertEqual(try XCTUnwrap(entries[0].profitPercent), -200.0 / 12, accuracy: 1e-9, "成本 12 万、市值 10 万")
+    }
+
+    func testOneCurrencyNeedsNoRates() {
+        let cnOnly = Array(items.prefix(1)) + [WatchItem(symbol: Symbol("sz000001")!, name: "平安银行", holding: Holding(shares: 1000, cost: 0))]
+        var prices = quotes
+        prices[Symbol("sz000001")!] = Quote(symbol: Symbol("sz000001")!, name: "平安银行", price: 12.5, previousClose: 12.5)
+        let entries = Portfolio.allocation(items: cnOnly, quotes: prices, rates: nil)
+        XCTAssertEqual(entries.map(\.name), ["贵州茅台", "平安银行"])
+        XCTAssertEqual(entries.map(\.share).reduce(0, +), 100, accuracy: 1e-9)
+        XCTAssertNil(entries[1].profitPercent, "成本为 0 时没有盈亏比例")
+        XCTAssertEqual(Portfolio.allocation(items: [], quotes: prices, rates: nil), [])
     }
 }

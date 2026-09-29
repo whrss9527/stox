@@ -507,7 +507,8 @@ final class QuoteStore: ObservableObject {
             let key = Keys.closeSummaryPrefix + region.rawValue
             guard let note = CloseSummary.due(
                 region: region, phase: phase(for: region), summary: summary,
-                latestQuoteTime: latest, now: Date(), lastSentDay: defaults.string(forKey: key)
+                latestQuoteTime: latest, now: Date(), lastSentDay: defaults.string(forKey: key),
+                movers: CloseSummary.movers(items: items, quotes: quotes, region: region)
             ) else { continue }
             defaults.set(note.day, forKey: key)
             closeSummaryCount += 1
