@@ -274,3 +274,9 @@ fetch "rank: sina HK" "https://vip.stock.finance.sina.com.cn/quotes_service/api/
 fetch "rank: sina US" "https://stock.finance.sina.com.cn/usstock/api/jsonp.php/IO.XSRV2.CallbackList/US_CategoryService.getList?page=1&num=3&sort=chg&asc=0&market=&id=" "GB18030" "https://finance.sina.com.cn/"
 fetch "rank: tencent HK (hk)" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/hk/getRankList?_appver=11.17.0&board_code=hk_all&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
 fetch "rank: tencent pt board" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/pt/getRank?board_type=hy&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
+# 场外基金候选：腾讯 jj 代码、天天基金估值。
+fields "tencent quote fields: funds" "https://qt.gtimg.cn/utf8/q=jj161725,jj000001,jj007005,jj110022"
+fetch "tencent quote: funds raw" "https://qt.gtimg.cn/q=jj161725,jj110022" "GB18030"
+fetch "fundgz estimate 161725" "https://fundgz.1234567.com.cn/js/161725.js" "UTF-8"
+fetch "fundgz estimate 110022" "https://fundgz.1234567.com.cn/js/110022.js" "UTF-8"
+fetch "tencent smartbox: fund" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=161725" "UTF-8"
