@@ -100,6 +100,7 @@ final class StatusItemController: NSObject {
         }
         guard let panel else { return }
         router.route = route
+        router.isOpen = true
         router.listMaxHeight = WatchlistView.defaultMaxHeight
         router.cardsMaxHeight = nil
         router.pageMaxHeight = max(240, (availableHeight() ?? 760) - Self.pageChrome)
@@ -138,7 +139,7 @@ final class StatusItemController: NSObject {
                     if let self {
                         print("STOX_DIAG late \(self.extendedHoursDiagnostics)")
                         self.panelDiagnostics().forEach { print("STOX_DIAG late " + $0) }
-                        print("STOX_DIAG late flow=\(self.fundFlowDiagnostics)")
+                        print("STOX_DIAG late flow=\(self.fundFlowDiagnostics) sparklines=\(self.store.sparklines.count)")
                         fflush(stdout)
                     }
                 }
@@ -620,6 +621,8 @@ enum PanelRoute: Equatable {
 final class PanelRouter: ObservableObject {
     @Published var route: PanelRoute = .list
     @Published var searchText = ""
+    /// 面板开着：列表里的迷你分时只在这时去取。
+    @Published var isOpen = false
     /// 自选列表的最大高度。屏幕矮、放不下整个面板时由 StatusItemController 调低，每次打开面板时恢复。
     @Published var listMaxHeight = WatchlistView.defaultMaxHeight
     /// 列表上方的卡片（更新提示、小技巧、持仓合计）加起来本来有多高。
@@ -669,6 +672,7 @@ final class PanelRouter: ObservableObject {
 
     /// 每次关闭都回到干净的列表页，下次一键打开看到的就是行情。
     func panelDidClose() {
+        isOpen = false
         expanded = nil
         highlighted = nil
         route = .list

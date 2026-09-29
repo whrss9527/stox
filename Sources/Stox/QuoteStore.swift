@@ -19,6 +19,10 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var fiveDay: [Symbol: MultiDaySeries] = [:]
     /// 看过的资金流向（A 股个股和 ETF）。
     @Published private(set) var fundFlows: [Symbol: FundFlow] = [:]
+    /// 列表里每一行的迷你分时，面板打开时取（见 trackSparklines）。
+    @Published private(set) var sparklines: [Symbol: Sparkline] = [:]
+    /// 每只的迷你分时上次是什么时候取的。
+    private var sparklineFetched: [Symbol: Date] = [:]
     /// 取过资金流向的证券，取到了没有都算，用来区分“正在加载”和“没有数据”。
     @Published private(set) var fundFlowLoaded: Set<Symbol> = []
     /// 每个交易日收盘后记下的持仓盈亏，只在这台 Mac 上。
@@ -251,6 +255,8 @@ final class QuoteStore: ObservableObject {
             do {
                 if let series = try await provider.fetchIntraday(for: symbol) {
                     intraday[symbol] = series
+                    // 列表里的迷你分时也顺便更新，不用再取一次。
+                    updateSparkline(symbol, from: series)
                 }
             } catch {
                 // 分时只是锦上添花，失败时保留上一次的，下一轮再试。
@@ -278,6 +284,35 @@ final class QuoteStore: ObservableObject {
             }
             let live = phase(for: symbol.market.region).isLive
             try? await Task.sleep(nanoseconds: (live ? 60 : 1800) * 1_000_000_000)
+        }
+    }
+
+    /// 面板打开、列表显示着的时候调用：给列表里的这些证券取当天的分时，抽成迷你分时。一次取一只，隔一会儿再取下一只，
+    /// 不一下子发一堆请求；交易时段内两分钟一轮，休市时十分钟一轮。场外基金没有分时，不取。面板关上、列表换了就停（任务被取消）。
+    func trackSparklines(_ symbols: [Symbol]) async {
+        while !Task.isCancelled {
+            for symbol in symbols where !symbol.isFund {
+                guard !Task.isCancelled else { return }
+                let maxAge: TimeInterval = phase(for: symbol.market.region).isLive ? 110 : 600
+                if let fetched = sparklineFetched[symbol], Date().timeIntervalSince(fetched) < maxAge { continue }
+                do {
+                    if let series = try await provider.fetchIntraday(for: symbol), !Task.isCancelled {
+                        updateSparkline(symbol, from: series)
+                    }
+                } catch {
+                    // 取不到就先不画，下一轮再试。
+                }
+                sparklineFetched[symbol] = Date()
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+            try? await Task.sleep(nanoseconds: 15 * 1_000_000_000)
+        }
+    }
+
+    private func updateSparkline(_ symbol: Symbol, from series: IntradaySeries) {
+        sparklineFetched[symbol] = Date()
+        if let sparkline = Sparkline(series: series, region: symbol.market.region), sparklines[symbol] != sparkline {
+            sparklines[symbol] = sparkline
         }
     }
 
@@ -458,6 +493,8 @@ final class QuoteStore: ObservableObject {
         fiveDay[symbol] = nil
         fundFlows[symbol] = nil
         fundFlowLoaded.remove(symbol)
+        sparklines[symbol] = nil
+        sparklineFetched[symbol] = nil
         extendedHours[symbol] = nil
         rapidMoves.forget(symbol)
         alertLog.forget(symbol)
