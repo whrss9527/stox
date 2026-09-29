@@ -104,6 +104,9 @@ PY
   fi
 }
 fields "tencent quote fields: US" "https://qt.gtimg.cn/utf8/q=usAAPL,usTSLA,usNVDA"
+# 五档盘口和内外盘：A 股、港股、ETF 逐个字段打印，看买卖五档在哪几位、港股有没有五档。
+fields "tencent quote fields: CN" "https://qt.gtimg.cn/utf8/q=sh600519,sz000001,sh510300,sh000001"
+fields "tencent quote fields: HK" "https://qt.gtimg.cn/utf8/q=hk00700,hk09988"
 fields "tencent quote fields: FX guesses" "https://qt.gtimg.cn/utf8/q=whUSDCNY,whHKDCNY,whUSDHKD,fxUSDCNY,USDCNY"
 fetch "tencent smartbox: usdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=usdcny" "UTF-8"
 fetch "tencent smartbox: hkdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=hkdcny" "UTF-8"
