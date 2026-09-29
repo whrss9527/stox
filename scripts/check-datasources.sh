@@ -73,7 +73,7 @@ PY
 }
 
 M="https://web.ifzq.gtimg.cn/appstock/app/minute/query?code="
-for c in sh600519 sz000001 bj920819 sh000001 hk00700 hkHSI; do
+for c in sh600519 sz000001 bj920819 sh688981 sh000001 hk00700 hkHSI; do
   minute "tencent minute: ${c}" "${M}${c}"
 done
 U="https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code="
@@ -104,6 +104,9 @@ PY
   fi
 }
 fields "tencent quote fields: US" "https://qt.gtimg.cn/utf8/q=usAAPL,usTSLA,usNVDA"
+# 五档盘口和内外盘：A 股（含科创板、北交所、ETF）和港股逐个字段打印，看买卖五档、成交量的单位有没有变。
+fields "tencent quote fields: CN" "https://qt.gtimg.cn/utf8/q=sh600519,sz000001,sh510300,sh688981,bj920819,sh000001"
+fields "tencent quote fields: HK" "https://qt.gtimg.cn/utf8/q=hk00700,hk09988"
 fields "tencent quote fields: FX guesses" "https://qt.gtimg.cn/utf8/q=whUSDCNY,whHKDCNY,whUSDHKD,fxUSDCNY,USDCNY"
 fetch "tencent smartbox: usdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=usdcny" "UTF-8"
 fetch "tencent smartbox: hkdcny" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=hkdcny" "UTF-8"
@@ -237,7 +240,7 @@ PY
 }
 
 K="https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param="
-for p in sh600519,day,,,5,qfq sz000001,day,,,5,qfq sh000001,day,,,5,qfq bj920819,day,,,5,qfq sh510300,day,,,5,qfq \
+for p in sh600519,day,,,5,qfq sz000001,day,,,5,qfq sh000001,day,,,5,qfq bj920819,day,,,5,qfq sh510300,day,,,5,qfq sh688981,day,,,5,qfq \
          sh600519,week,,,3,qfq sh600519,month,,,3,qfq sh600519,day,,,320,qfq \
          hk00700,day,,,5,qfq hkHSI,day,,,5,qfq \
          usAAPL,day,,,5,qfq usAAPL.OQ,day,,,5,qfq us.IXIC,day,,,5,qfq usBRK.B,day,,,5,qfq; do

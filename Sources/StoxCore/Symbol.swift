@@ -34,6 +34,11 @@ public struct Symbol: Hashable, Sendable {
         }
     }
 
+    /// 科创板（上交所 688、689 开头）：腾讯接口里它的成交量、K 线的量是股，别的 A 股是手。
+    public var isStarMarket: Bool {
+        market == .sh && (code.hasPrefix("688") || code.hasPrefix("689"))
+    }
+
     /// 界面上展示的代码：美股指数去掉前导的点。
     public var displayCode: String {
         if market == .us, code.hasPrefix(".") { return String(code.dropFirst()) }

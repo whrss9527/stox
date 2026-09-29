@@ -95,6 +95,14 @@ smoke() {
   # 多取了 20 根历史，取到了的话图上 60 根都有 MA20。
   grep -Eq "ma20=60 " shots/kline.log || echo "::warning::日 K 上的均线没有从最左边开始"
 
+  # 五档：A 股个股有买卖五档，开盘前、停牌、涨跌停时不满，只提示。港股没有五档，选着五档时看分时，也不列五档。
+  run_case orderbook --show-panel --expand sh600519 --chart orderBook
+  run_case orderbook-hk --show-panel --expand hk00700 --chart orderBook
+  defaults delete "$DOMAIN" chart.period
+  grep -Eq "chart=orderBook book=[0-5]/[0-5] " shots/orderbook.log || fail "茅台应该有五档"
+  grep -q "chart=orderBook book=5/5 " shots/orderbook.log || echo "::warning::茅台的五档不满（开盘前、停牌或者涨跌停）"
+  grep -q "chart=orderBook book=none " shots/orderbook-hk.log || fail "港股不应该有五档"
+
   # 五日分时：美股要带交易所后缀才取得到。
   run_case fiveday --show-panel --expand usAAPL --chart fiveDay
   defaults delete "$DOMAIN" chart.period
