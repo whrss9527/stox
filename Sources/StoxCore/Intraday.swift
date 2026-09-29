@@ -23,11 +23,15 @@ public struct IntradaySeries: Equatable, Sendable {
     /// 交易日，例如 `20260928`；接口没给时为 nil。
     public var date: String?
     public var points: [IntradayPoint]
+    /// 国际期货的交易日跨过半夜、各个品种开盘的时刻也不一样，这时点的 minute 是离这个时刻多少分钟，
+    /// 横轴从它开始画 24 小时（见 IntradayAxis）。股票是 nil，minute 是交易所当地时间。
+    public var start: Date?
 
-    public init(symbol: Symbol, date: String?, points: [IntradayPoint]) {
+    public init(symbol: Symbol, date: String?, points: [IntradayPoint], start: Date? = nil) {
         self.symbol = symbol
         self.date = date
         self.points = points
+        self.start = start
     }
 
     public var high: Double? { points.map(\.price).max() }
@@ -163,7 +167,7 @@ public enum IntradayAxis {
         case .cn: return [(9 * 60 + 30)...(11 * 60 + 30), (13 * 60)...(15 * 60)]
         case .hk: return [(9 * 60 + 30)...(12 * 60), (13 * 60)...(16 * 60)]
         case .us: return [(9 * 60 + 30)...(16 * 60)]
-        // 期货外汇没有分时图，全天算一段。
+        // 期货的分时从开盘那一刻算起（见 IntradaySeries.start），一天 24 小时算一段。
         case .global: return [0...(24 * 60)]
         }
     }
@@ -174,11 +178,16 @@ public enum IntradayAxis {
     }
 
     /// 横轴下面标的时刻：开盘、午休（美股是中间）、收盘，位置是 0 到 1。
-    public static func ticks(for region: MarketRegion) -> [AxisTick] {
+    /// 期货从 start（北京时间）起标开头、12 小时后和 24 小时后；没有 start 时不标。
+    public static func ticks(for region: MarketRegion, start: Date? = nil) -> [AxisTick] {
+        if region == .global {
+            guard let start else { return [] }
+            let origin = clockMinute(of: 0, start: start, region: region)
+            return [0, 0.5, 1].map { AxisTick(position: $0, label: time((origin + Int($0 * 1440)) % 1440)) }
+        }
         let length = Double(length(for: region))
         let sessions = sessions(for: region)
         guard let first = sessions.first, let last = sessions.last, length > 0 else { return [] }
-        func time(_ minute: Int) -> String { String(format: "%02d:%02d", minute / 60, minute % 60) }
         var ticks = [AxisTick(position: 0, label: time(first.lowerBound))]
         if sessions.count > 1 {
             // 上午收盘和下午开盘在横轴上是同一个位置。
@@ -193,6 +202,21 @@ public enum IntradayAxis {
         }
         ticks.append(AxisTick(position: 1, label: time(last.upperBound)))
         return ticks
+    }
+
+    /// `09:30` 这样的时刻。
+    static func time(_ minute: Int) -> String { String(format: "%02d:%02d", minute / 60, minute % 60) }
+
+    /// 分时点的时刻（自零点起的分钟数）：股票就是 minute；期货的 minute 是离 start 多少分钟，换算成北京时间。
+    public static func clockMinute(of minute: Int, start: Date?, region: MarketRegion) -> Int {
+        guard region == .global, let start else { return minute }
+        let c = region.calendar.dateComponents([.hour, .minute], from: start.addingTimeInterval(TimeInterval(minute * 60)))
+        return (c.hour ?? 0) * 60 + (c.minute ?? 0)
+    }
+
+    /// 读数里写的时刻：`09:31`，期货换算成北京时间。
+    public static func timeLabel(of minute: Int, start: Date?, region: MarketRegion) -> String {
+        time(clockMinute(of: minute, start: start, region: region))
     }
 
     /// 某个时刻在横轴上的位置（0 到 length）。开盘前的点放在最左边，午休归到上午收盘处，

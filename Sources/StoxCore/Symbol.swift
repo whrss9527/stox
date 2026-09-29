@@ -45,8 +45,11 @@ public struct Symbol: Hashable, Sendable {
     /// 能不能填持仓、记买卖：指数和期货外汇不能。
     public var canHold: Bool { !isIndex && !isGlobal }
 
-    /// 有没有分时、五日和 K 线：场外基金和期货外汇没有（数据源不提供）。
-    public var hasCharts: Bool { !isFund && !isGlobal }
+    /// 有没有分时（和列表里的迷你分时）：场外基金、外汇没有；国际期货的分时来自新浪。
+    public var hasIntraday: Bool { !isFund && market != .wh }
+
+    /// 有没有五日和 K 线：场外基金和期货外汇没有（数据源不提供）。
+    public var hasKline: Bool { !isFund && !isGlobal }
 
     /// 科创板（上交所 688、689 开头）：腾讯接口里它的成交量、K 线的量是股，别的 A 股是手。
     public var isStarMarket: Bool {

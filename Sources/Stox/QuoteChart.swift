@@ -165,7 +165,8 @@ struct QuoteChartSection: View {
     private var axisTicks: [AxisTick] {
         switch period {
         case .intraday:
-            return IntradayAxis.ticks(for: region)
+            // 期货从开盘那一刻标起，要等分时取回来才知道。
+            return IntradayAxis.ticks(for: region, start: intradaySeries?.start)
         case .fiveDay:
             guard let days = fiveDaySeries?.days, !days.isEmpty else { return [] }
             return days.indices.compactMap { index in
@@ -338,7 +339,7 @@ struct QuoteChartSection: View {
         }
         if period.klinePeriod == nil {
             guard let point = hoveredPoint else { return nil }
-            var text = String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60) + price(point.price)
+            var text = IntradayAxis.timeLabel(of: point.minute, start: intradaySeries?.start, region: region) + "  " + price(point.price)
             if quote.previousClose > 0 {
                 text += "  " + QuoteFormatter.percent((point.price - quote.previousClose) / quote.previousClose * 100)
             }

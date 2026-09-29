@@ -172,7 +172,13 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? {
-        guard symbol.hasCharts else { return nil }
+        guard symbol.hasIntraday else { return nil }
+        // 腾讯的分时接口不认期货（code param error），用新浪的。
+        if symbol.market == .hf {
+            guard let url = SinaFuturesMinuteParser.url(for: symbol) else { throw URLError(.badURL) }
+            let data = try await HTTP.get(url, session: session, timeout: timeout, headers: ["Referer": SinaProvider.referer])
+            return SinaFuturesMinuteParser.parse(data, symbol: symbol)
+        }
         guard let url = Self.minuteURL(for: symbol) else { throw URLError(.badURL) }
         return TencentMinuteParser.parse(try await get(url), symbol: symbol)
     }
@@ -193,7 +199,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? {
-        guard symbol.hasCharts else { return nil }
+        guard symbol.hasKline else { return nil }
         var code = exchangeCode
         // 美股个股不带交易所后缀时取不到正确的 K 线，调用方没给就先查一次行情。
         if code == nil, symbol.market.region == .us, !symbol.isIndex {
@@ -204,7 +210,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchFiveDay(for symbol: Symbol, exchangeCode: String?) async throws -> MultiDaySeries? {
-        guard symbol.hasCharts else { return nil }
+        guard symbol.hasKline else { return nil }
         var code = exchangeCode
         if code == nil, symbol.market.region == .us, !symbol.isIndex {
             code = try await fetchQuotes(for: [symbol])[symbol]?.exchangeCode

@@ -100,7 +100,8 @@ final class GlobalMarketsTests: XCTestCase {
         XCTAssertTrue(gold.isGlobal)
         XCTAssertFalse(gold.isIndex)
         XCTAssertFalse(gold.canHold)
-        XCTAssertFalse(gold.hasCharts)
+        XCTAssertTrue(gold.hasIntraday, "期货的分时来自新浪")
+        XCTAssertFalse(gold.hasKline)
         XCTAssertEqual(Symbol("hfXAU"), gold)
         XCTAssertEqual(Symbol(market: .hf, code: "xau"), gold)
 
@@ -114,7 +115,10 @@ final class GlobalMarketsTests: XCTestCase {
 
         XCTAssertTrue(Symbol("sh600519")!.canHold)
         XCTAssertFalse(Symbol("sh000001")!.canHold, "指数")
-        XCTAssertFalse(Symbol("jj161725")!.hasCharts)
+        XCTAssertFalse(Symbol("jj161725")!.hasIntraday)
+        XCTAssertFalse(Symbol("jj161725")!.hasKline)
+        XCTAssertFalse(usd.hasIntraday, "外汇没有分时")
+        XCTAssertTrue(Symbol("usAAPL")!.hasIntraday && Symbol("usAAPL")!.hasKline)
 
         // 编码成腾讯的写法，旧版本认不出的会在同步时跳过（见 LossyWatchItem）。
         let data = try JSONEncoder().encode([gold, usd])
@@ -220,8 +224,8 @@ final class GlobalMarketsTests: XCTestCase {
     func testNoChartsRequested() async throws {
         let provider = TencentProvider(quoteEndpoint: "http://127.0.0.1:9/")
         let gold = Symbol("hf_XAU")!
-        let intraday = try await provider.fetchIntraday(for: gold)
-        XCTAssertNil(intraday)
+        let intraday = try await provider.fetchIntraday(for: Symbol("whUSDCNY")!)
+        XCTAssertNil(intraday, "外汇没有分时")
         let kline = try await provider.fetchKline(for: gold, period: .day, count: 5, exchangeCode: nil)
         XCTAssertNil(kline)
         let fiveDay = try await provider.fetchFiveDay(for: gold, exchangeCode: nil)
