@@ -468,3 +468,56 @@ final class AllocationTests: XCTestCase {
         XCTAssertEqual(Portfolio.allocation(items: [], quotes: prices, rates: nil), [])
     }
 }
+
+final class ProfitHistoryTests: XCTestCase {
+    private func summary(_ region: MarketRegion, day: Double, value: Double = 100_000) -> PortfolioSummary {
+        PortfolioSummary(region: region, marketValue: value, costValue: 90_000, dayProfit: day, count: 2)
+    }
+
+    func testRecordsOnePerDayAndMarket() {
+        var history = ProfitHistory()
+        history.record(summary(.cn, day: 100), day: "2026-09-28")
+        history.record(summary(.hk, day: -50), day: "2026-09-28")
+        history.record(summary(.cn, day: 120), day: "2026-09-28")
+        history.record(summary(.cn, day: -30), day: "2026-09-25")
+        XCTAssertEqual(history.records.map(\.day), ["2026-09-25", "2026-09-28", "2026-09-28"], "同一天同一个市场再记就换成新的")
+        XCTAssertEqual(history.recent(.cn, limit: 5).map(\.dayProfit), [-30, 120])
+        XCTAssertEqual(history.recent(.cn, limit: 1).map(\.day), ["2026-09-28"])
+        XCTAssertEqual(history.regions, [.cn, .hk])
+        XCTAssertEqual(history.dayProfitTotal(.cn, since: "2026-09-28"), 120)
+        XCTAssertEqual(history.dayProfitTotal(.cn, since: "2026-09-01"), 90)
+        XCTAssertEqual(history.recent(.us, limit: 5), [])
+    }
+
+    func testKeepsAboutAYear() {
+        var history = ProfitHistory()
+        let start = KlineCalendar.date(from: "2025-01-01", region: .cn)!
+        for offset in 0..<(ProfitHistory.keepDays + 10) {
+            let day = KlineCalendar.dayString(start.addingTimeInterval(Double(offset) * 86400), region: .cn)
+            history.record(summary(.cn, day: Double(offset)), day: day)
+        }
+        XCTAssertEqual(history.records.count, ProfitHistory.keepDays)
+        XCTAssertEqual(history.records.first?.dayProfit, 10, "最早的十天丢掉了")
+    }
+
+    func testWeekAndMonthStarts() {
+        XCTAssertEqual(ProfitHistory.weekStart(of: "2026-09-30", region: .cn), "2026-09-28", "周三所在的那一周从周一开始")
+        XCTAssertEqual(ProfitHistory.weekStart(of: "2026-09-28", region: .us), "2026-09-28")
+        XCTAssertEqual(ProfitHistory.monthStart(of: "2026-09-30"), "2026-09-01")
+    }
+
+    func testClosedDay() {
+        let quoteTime = TencentQuoteParser.parseTimestamp("20260928150003", timeZone: MarketRegion.cn.timeZone)!
+        let evening = TencentQuoteParser.parseTimestamp("20260928200000", timeZone: MarketRegion.cn.timeZone)!
+        XCTAssertEqual(CloseSummary.closedDay(region: .cn, phase: .closed, latestQuoteTime: quoteTime, now: evening), "2026-09-28")
+        XCTAssertNil(CloseSummary.closedDay(region: .cn, phase: .trading, latestQuoteTime: quoteTime, now: evening))
+        XCTAssertNil(CloseSummary.closedDay(region: .cn, phase: .closed, latestQuoteTime: nil, now: evening))
+    }
+
+    func testCodable() throws {
+        var history = ProfitHistory()
+        history.record(summary(.us, day: 12.5), day: "2026-09-28")
+        let data = try JSONEncoder().encode(history)
+        XCTAssertEqual(try JSONDecoder().decode(ProfitHistory.self, from: data), history)
+    }
+}

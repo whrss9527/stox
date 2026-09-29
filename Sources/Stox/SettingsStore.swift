@@ -221,6 +221,10 @@ final class SettingsStore: ObservableObject {
     @Published var flashOnChange: Bool {
         didSet { defaults.set(flashOnChange, forKey: Keys.flashOnChange) }
     }
+    /// 持仓合计下面展开了盈亏记录。
+    @Published var showProfitHistory: Bool {
+        didSet { defaults.set(showProfitHistory, forKey: Keys.showProfitHistory) }
+    }
     /// 持仓合计下面展开了持仓分布。
     @Published var showAllocation: Bool {
         didSet { defaults.set(showAllocation, forKey: Keys.showAllocation) }
@@ -304,6 +308,7 @@ final class SettingsStore: ObservableObject {
         showMovingAverages = defaults.object(forKey: Keys.showMovingAverages) as? Bool ?? true
         compactRows = defaults.object(forKey: Keys.compactRows) as? Bool ?? false
         showAllocation = defaults.object(forKey: Keys.showAllocation) as? Bool ?? false
+        showProfitHistory = defaults.object(forKey: Keys.showProfitHistory) as? Bool ?? false
         showExtendedHours = defaults.object(forKey: Keys.showExtendedHours) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
@@ -380,6 +385,7 @@ final class SettingsStore: ObservableObject {
         static let showMovingAverages = "chart.movingAverages"
         static let compactRows = "list.compact"
         static let showAllocation = "holdings.allocation"
+        static let showProfitHistory = "holdings.history"
         static let showExtendedHours = "list.extendedHours"
         static let showDayProfit = "ticker.dayProfit"
         static let panelPinned = "panel.pinned"

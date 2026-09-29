@@ -632,6 +632,10 @@ struct HoldingsSummaryView: View {
                 if summaries.reduce(0, { $0 + $1.count }) > 1 {
                     allocation
                 }
+                // 盈亏记录是全部持仓的，筛选着的时候不显示。
+                if !filtered, !store.profitHistory.records.isEmpty {
+                    history
+                }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
@@ -644,22 +648,7 @@ struct HoldingsSummaryView: View {
     /// 持仓分布：点一下展开或收起，展开后每只一行，横条是占总市值的比例。
     @ViewBuilder
     private var allocation: some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.15)) {
-                settings.showAllocation.toggle()
-            }
-        } label: {
-            HStack(spacing: 3) {
-                Text("持仓分布")
-                Image(systemName: settings.showAllocation ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 7.5, weight: .semibold))
-            }
-            .font(.system(size: 10))
-            .foregroundStyle(.secondary)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help(settings.showAllocation ? "收起持仓分布" : "看每只持仓占总市值多少")
+        disclosure("持仓分布", expanded: $settings.showAllocation, help: "看每只持仓占总市值多少")
         if settings.showAllocation {
             let entries = Self.allocation(store: store, settings: settings)
             if entries.isEmpty {
@@ -691,6 +680,65 @@ struct HoldingsSummaryView: View {
                     + (entry.profitPercent.map { "，持仓盈亏 \(QuoteFormatter.percent($0))" } ?? ""))
             }
         }
+    }
+
+    /// 盈亏记录：点一下展开或收起，展开后每种货币一行，柱子是最近 20 个交易日的今日盈亏，右边是本周、本月合计。
+    @ViewBuilder
+    private var history: some View {
+        disclosure("盈亏记录", expanded: $settings.showProfitHistory, help: "看最近每个交易日赚了多少")
+        if settings.showProfitHistory {
+            ForEach(store.profitHistory.regions, id: \.self) { region in
+                historyRow(region)
+            }
+            Text("每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。")
+                .font(.system(size: 9.5))
+                .foregroundStyle(.tertiary)
+        }
+    }
+
+    private func historyRow(_ region: MarketRegion) -> some View {
+        let records = store.profitHistory.recent(region, limit: 20)
+        let today = ProfitHistory.day(of: Date(), region: region)
+        let week = store.profitHistory.dayProfitTotal(region, since: ProfitHistory.weekStart(of: today, region: region))
+        let month = store.profitHistory.dayProfitTotal(region, since: ProfitHistory.monthStart(of: today))
+        return HStack(spacing: 6) {
+            Text(region.currencyName)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.secondary)
+                .frame(width: 34, alignment: .leading)
+            ProfitBars(values: records.map(\.dayProfit), convention: settings.colorConvention)
+                .frame(height: 18)
+                .help(records.last.map { "最近一天 \($0.day) \(QuoteFormatter.signedMoney($0.dayProfit))" } ?? "")
+            VStack(alignment: .trailing, spacing: 0) {
+                Text("本周 " + QuoteFormatter.signedMoney(week))
+                    .foregroundStyle(Theme.priceColor(for: PriceDirection(week), convention: settings.colorConvention))
+                Text("本月 " + QuoteFormatter.signedMoney(month))
+                    .foregroundStyle(Theme.priceColor(for: PriceDirection(month), convention: settings.colorConvention))
+            }
+            .font(.system(size: 10).monospacedDigit())
+            .lineLimit(1)
+            .frame(width: 96, alignment: .trailing)
+        }
+    }
+
+    /// 可以点开的小标题：持仓分布、盈亏记录。
+    private func disclosure(_ title: String, expanded: Binding<Bool>, help: String) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.15)) {
+                expanded.wrappedValue.toggle()
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Text(title)
+                Image(systemName: expanded.wrappedValue ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 7.5, weight: .semibold))
+            }
+            .font(.system(size: 10))
+            .foregroundStyle(.secondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(expanded.wrappedValue ? "收起\(title)" : help)
     }
 
     /// 列表上方筛选出来的那些持仓，各占总市值多少。
@@ -953,5 +1001,32 @@ struct MarketBadge: View {
             .foregroundStyle(tint)
             .frame(width: 15, height: 13)
             .background(RoundedRectangle(cornerRadius: 3).fill(tint.opacity(0.14)))
+    }
+}
+
+/// 盈亏记录里的小柱子：每个交易日一根，赚了往上、亏了往下，按最大的一根缩放。
+struct ProfitBars: View {
+    let values: [Double]
+    let convention: ColorConvention
+
+    var body: some View {
+        Canvas { context, size in
+            let biggest = values.map(abs).max() ?? 0
+            guard !values.isEmpty, biggest > 0, size.width > 0 else { return }
+            let middle = size.height / 2
+            let slot = size.width / CGFloat(max(values.count, 20))
+            let width = max(1, min(slot - 1, 6))
+            var baseline = Path()
+            baseline.move(to: CGPoint(x: 0, y: middle))
+            baseline.addLine(to: CGPoint(x: size.width, y: middle))
+            context.stroke(baseline, with: .color(.secondary.opacity(0.25)), lineWidth: 0.5)
+            for (index, value) in values.enumerated() {
+                let height = max(CGFloat(abs(value) / biggest) * (middle - 1), 0.5)
+                let x = CGFloat(index) * slot + (slot - width) / 2
+                let rect = CGRect(x: x, y: value >= 0 ? middle - height : middle, width: width, height: height)
+                context.fill(Path(rect), with: .color(Theme.priceColor(for: PriceDirection(value), convention: convention).opacity(0.8)))
+            }
+        }
+        .accessibilityHidden(true)
     }
 }

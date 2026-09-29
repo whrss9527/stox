@@ -218,6 +218,15 @@ public enum CloseSummary {
     /// 收盘后多久以内还补发：晚上才打开 Mac 也能收到，但第二天早上开盘前就不再发前一天的了。
     public static let window: TimeInterval = 16 * 3600
 
+    /// 已经收盘（休市，或者美股进入盘后）、最近一个交易日的收盘还不到 16 小时时，返回那个交易日；
+    /// 开盘前、交易中、午休，或者节假日最新行情是好几天前的，返回 nil。收盘小结和盈亏记录都用它。
+    public static func closedDay(region: MarketRegion, phase: MarketPhase, latestQuoteTime: Date?, now: Date) -> String? {
+        guard phase == .closed || phase == .afterHours, let latestQuoteTime,
+              now.timeIntervalSince(latestQuoteTime) < window
+        else { return nil }
+        return AlertEngine.dayKey(latestQuoteTime, region: region)
+    }
+
     /// 一只持仓今天的涨跌幅，小结里写涨得最多、跌得最多的是哪只。
     public struct Mover: Equatable, Sendable {
         public var name: String
@@ -261,11 +270,9 @@ public enum CloseSummary {
         lastSentDay: String?,
         movers: [Mover] = []
     ) -> CloseSummaryNote? {
-        guard phase == .closed || phase == .afterHours, let summary, let latestQuoteTime,
-              now.timeIntervalSince(latestQuoteTime) < window
+        guard let summary, let today = closedDay(region: region, phase: phase, latestQuoteTime: latestQuoteTime, now: now),
+              lastSentDay != today
         else { return nil }
-        let today = AlertEngine.dayKey(latestQuoteTime, region: region)
-        guard lastSentDay != today else { return nil }
         let title = "\(region.displayName)收盘 今日盈亏 \(QuoteFormatter.signedMoney(summary.dayProfit))"
         var body = ""
         if let percent = summary.dayProfitPercent {
