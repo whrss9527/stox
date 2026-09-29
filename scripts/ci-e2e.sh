@@ -241,6 +241,12 @@ smoke() {
   # 编辑页：持仓、记一笔买卖、止盈止损。
   run_case editor --show-panel --edit sh600519
   grep -q "panel_frame=" shots/editor.log || fail "编辑页没有打开"
+  # 编辑页放得下：内容比屏幕高时在滚动区里滚，面板不超出屏幕，底下的保存按钮总看得见。
+  local fitting available
+  read -r fitting available < <(sed -nE 's/.*fitting=([0-9]+) list_max=[0-9]+ available=([0-9]+).*/\1 \2/p' shots/editor.log | head -1) || true
+  if [[ -n "${fitting:-}" && -n "${available:-}" && "$fitting" -gt "$available" ]]; then
+    fail "编辑页比屏幕能放的还高（$fitting > $available），保存按钮会看不到"
+  fi
   grep -Eq "items=5 quotes=[0-9]+ holdings=4 summary=cn,hk,us " shots/holdings.log || fail "持仓没有读出来"
   # 列表上方只看港股时，持仓合计也只算港股。
   defaults write "$DOMAIN" list.filter -string hk

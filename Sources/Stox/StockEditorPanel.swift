@@ -32,109 +32,121 @@ struct StockEditorPanel: View {
     /// 这只的买卖记录（最早的在前），记一笔、删一条都先改这里，保存时一起写回。
     @State private var trades: [Trade] = []
     @State private var loaded = false
+    /// 滚动区里三块内容的高度，量出来以后滚动区就这么高（屏幕放不下时再矮一些）。
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 10) {
             header
             if let item {
-                VStack(spacing: 0) {
-                    Toggle("显示在菜单栏", isOn: $pinned)
-                        .toggleStyle(.switch)
-                        .padding(.vertical, 8)
-                    Divider()
-                    HStack {
-                        Text("菜单栏简称")
-                        Spacer()
-                        TextField("", text: $alias, prompt: Text(NameAbbreviator.abbreviate(item.displayName)))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 150)
-                    }
-                    .padding(.vertical, 8)
-                    Divider()
-                    HStack {
-                        Text("分组")
-                        Spacer()
-                        TextField("", text: $group, prompt: Text("不分组"))
-                            .textFieldStyle(.roundedBorder)
-                            .frame(width: 150)
-                        Menu {
-                            ForEach(existingGroups, id: \.self) { name in
-                                Button(name) { group = name }
+                // 三块内容放在一个滚动区里：屏幕矮、放不下时在里面滚动，底下的按钮总在。
+                ScrollView {
+                    VStack(spacing: 10) {
+                        VStack(spacing: 0) {
+                            Toggle("显示在菜单栏", isOn: $pinned)
+                                .toggleStyle(.switch)
+                                .padding(.vertical, 8)
+                            Divider()
+                            HStack {
+                                Text("菜单栏简称")
+                                Spacer()
+                                TextField("", text: $alias, prompt: Text(NameAbbreviator.abbreviate(item.displayName)))
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 150)
                             }
-                            if !existingGroups.isEmpty {
-                                Divider()
+                            .padding(.vertical, 8)
+                            Divider()
+                            HStack {
+                                Text("分组")
+                                Spacer()
+                                TextField("", text: $group, prompt: Text("不分组"))
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 150)
+                                Menu {
+                                    ForEach(existingGroups, id: \.self) { name in
+                                        Button(name) { group = name }
+                                    }
+                                    if !existingGroups.isEmpty {
+                                        Divider()
+                                    }
+                                    Button("不分组") { group = "" }
+                                } label: {
+                                    Image(systemName: "chevron.down")
+                                }
+                                .menuStyle(.button)
+                                .buttonStyle(.borderless)
+                                .menuIndicator(.hidden)
+                                .fixedSize()
+                                .help("选一个已有的分组")
                             }
-                            Button("不分组") { group = "" }
-                        } label: {
-                            Image(systemName: "chevron.down")
+                            .padding(.vertical, 8)
+                            Divider()
+                            HStack(alignment: .firstTextBaseline) {
+                                Text("备注")
+                                Spacer()
+                                TextField("", text: $note, prompt: Text("比如关注的理由"), axis: .vertical)
+                                    .textFieldStyle(.roundedBorder)
+                                    .lineLimit(1...3)
+                                    .frame(width: 220)
+                            }
+                            .padding(.vertical, 8)
                         }
-                        .menuStyle(.button)
-                        .buttonStyle(.borderless)
-                        .menuIndicator(.hidden)
-                        .fixedSize()
-                        .help("选一个已有的分组")
-                    }
-                    .padding(.vertical, 8)
-                    Divider()
-                    HStack(alignment: .firstTextBaseline) {
-                        Text("备注")
-                        Spacer()
-                        TextField("", text: $note, prompt: Text("比如关注的理由"), axis: .vertical)
-                            .textFieldStyle(.roundedBorder)
-                            .lineLimit(1...3)
-                            .frame(width: 220)
-                    }
-                    .padding(.vertical, 8)
-                }
-                .font(.system(size: 12.5))
-                .padding(.horizontal, 12)
-                .glassCard()
+                        .font(.system(size: 12.5))
+                        .padding(.horizontal, 12)
+                        .glassCard()
 
-                if !symbol.isIndex {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("持仓")
-                            .font(.system(size: 12.5, weight: .semibold))
-                        numberField("持有数量", text: $shares, unit: "股", placeholder: "没有持仓")
-                        numberField("成本价", text: $cost, unit: currency, placeholder: "每股成本", allowZero: true)
-                        tradeRow
-                        dividendRow
-                        Text(holdingFooter)
-                            .font(.system(size: 11))
-                            .foregroundStyle(holdingState == .invalid ? Color.orange : Color.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        if let tradeMessage {
-                            Text(tradeMessage)
+                        if !symbol.isIndex {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("持仓")
+                                    .font(.system(size: 12.5, weight: .semibold))
+                                numberField("持有数量", text: $shares, unit: "股", placeholder: "没有持仓")
+                                numberField("成本价", text: $cost, unit: currency, placeholder: "每股成本", allowZero: true)
+                                tradeRow
+                                dividendRow
+                                Text(holdingFooter)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(holdingState == .invalid ? Color.orange : Color.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if let tradeMessage {
+                                    Text(tradeMessage)
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(Color.accentColor)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                                if !trades.isEmpty {
+                                    tradeList
+                                }
+                            }
+                            .padding(12)
+                            .glassCard()
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("价格提醒")
+                                .font(.system(size: 12.5, weight: .semibold))
+                            numberField("价格高于", text: $priceAbove, unit: currency)
+                            numberField("价格低于", text: $priceBelow, unit: currency)
+                            numberField("涨幅达到", text: $riseAbove, unit: "%")
+                            numberField("跌幅达到", text: $fallBelow, unit: "%")
+                            // 止盈止损按持仓成本算，填了持仓才有。
+                            if case .valid(let holding) = holdingState, holding.cost > 0 {
+                                numberField("持仓盈利达到", text: $profitAbove, unit: "%")
+                                numberField("持仓亏损达到", text: $lossBelow, unit: "%")
+                            }
+                            Text(alertFooter)
                                 .font(.system(size: 11))
-                                .foregroundStyle(Color.accentColor)
+                                .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        if !trades.isEmpty {
-                            tradeList
-                        }
+                        .padding(12)
+                        .glassCard()
                     }
-                    .padding(12)
-                    .glassCard()
+                    .background(GeometryReader { proxy in
+                        Color.clear.preference(key: EditorContentHeightKey.self, value: proxy.size.height)
+                    })
                 }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("价格提醒")
-                        .font(.system(size: 12.5, weight: .semibold))
-                    numberField("价格高于", text: $priceAbove, unit: currency)
-                    numberField("价格低于", text: $priceBelow, unit: currency)
-                    numberField("涨幅达到", text: $riseAbove, unit: "%")
-                    numberField("跌幅达到", text: $fallBelow, unit: "%")
-                    // 止盈止损按持仓成本算，填了持仓才有。
-                    if case .valid(let holding) = holdingState, holding.cost > 0 {
-                        numberField("持仓盈利达到", text: $profitAbove, unit: "%")
-                        numberField("持仓亏损达到", text: $lossBelow, unit: "%")
-                    }
-                    Text(alertFooter)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(12)
-                .glassCard()
+                .frame(height: contentHeight > 0 ? min(contentHeight, router.pageMaxHeight) : nil)
+                .onPreferenceChange(EditorContentHeightKey.self) { contentHeight = $0 }
 
                 HStack {
                     Button("删除自选", role: .destructive) {
@@ -555,5 +567,14 @@ struct StockEditorPanel: View {
         }
         store.update(updated)
         router.route = .list
+    }
+}
+
+/// 编辑页滚动区里内容的高度。
+private struct EditorContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }

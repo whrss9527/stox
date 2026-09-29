@@ -437,17 +437,49 @@ struct KlineChart: View {
             }
         }
 
-        // 成本线：落在图的范围里才画，右边写着成本价。
+        // 均线画在 K 线上面；前面根数不够算的地方空着。
+        if showAverages {
+            for (line, values) in data.averages.enumerated() {
+                var path = Path()
+                var drawing = false
+                for (index, value) in values.enumerated() {
+                    guard let value else {
+                        drawing = false
+                        continue
+                    }
+                    let point = CGPoint(x: CGFloat(layout.centerX(of: index)), y: y(value))
+                    if drawing {
+                        path.addLine(to: point)
+                    } else {
+                        path.move(to: point)
+                        drawing = true
+                    }
+                }
+                context.stroke(
+                    path, with: .color(Self.color(ofAverage: line).opacity(0.9)),
+                    style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round)
+                )
+            }
+        }
+
+        // 成本线：落在图的范围里才画，右边写着成本价，垫一块底色，压在均线和成交量柱上也看得清。
         if let cost, cost > bottom, cost < top {
             let costY = y(cost)
             var line = Path()
             line.move(to: CGPoint(x: 0, y: costY))
             line.addLine(to: CGPoint(x: size.width, y: costY))
-            context.stroke(line, with: .color(Self.costColor), style: StrokeStyle(lineWidth: 0.8, dash: [3, 2]))
-            let label = Text("成本 " + QuoteFormatter.price(cost, decimals: decimals))
-                .font(.system(size: 8).monospacedDigit())
-                .foregroundColor(Self.costColor)
-            context.draw(context.resolve(label), at: CGPoint(x: size.width - 1, y: costY - 1), anchor: .bottomTrailing)
+            context.stroke(line, with: .color(Self.costColor), style: StrokeStyle(lineWidth: 1, dash: [4, 2]))
+            let label = context.resolve(
+                Text("成本 " + QuoteFormatter.price(cost, decimals: decimals))
+                    .font(.system(size: 8, weight: .medium).monospacedDigit())
+                    .foregroundColor(Self.costColor)
+            )
+            let textSize = label.measure(in: size)
+            // 放在线的上面，贴着顶边时放到下面。
+            let labelY = costY - textSize.height - 2 >= 0 ? costY - textSize.height - 2 : costY + 2
+            let box = CGRect(x: size.width - textSize.width - 5, y: labelY, width: textSize.width + 4, height: textSize.height)
+            context.fill(Path(roundedRect: box, cornerRadius: 2), with: .color(Self.labelBackground))
+            context.draw(label, in: box.insetBy(dx: 2, dy: 0))
         }
 
         // 买卖点：买入在那一根的最低价下面标 B，卖出在最高价上面标 S，不出图的边。
@@ -461,30 +493,6 @@ struct KlineChart: View {
                 Self.badge("S", color: color(for: .down), center: CGPoint(x: x, y: max(y(candle.high) - 6, 5)), in: &context)
             }
         }
-
-        guard showAverages else { return }
-        // 均线画在 K 线上面；前面根数不够算的地方空着。
-        for (line, values) in data.averages.enumerated() {
-            var path = Path()
-            var drawing = false
-            for (index, value) in values.enumerated() {
-                guard let value else {
-                    drawing = false
-                    continue
-                }
-                let point = CGPoint(x: CGFloat(layout.centerX(of: index)), y: y(value))
-                if drawing {
-                    path.addLine(to: point)
-                } else {
-                    path.move(to: point)
-                    drawing = true
-                }
-            }
-            context.stroke(
-                path, with: .color(Self.color(ofAverage: line).opacity(0.9)),
-                style: StrokeStyle(lineWidth: 0.8, lineCap: .round, lineJoin: .round)
-            )
-        }
     }
 
     private func color(for direction: PriceDirection) -> Color {
@@ -496,6 +504,8 @@ struct KlineChart: View {
 
     /// 成本线的颜色，分时图上也用它。
     static let costColor = Color.teal
+    /// 图上文字下面垫的底色。
+    static let labelBackground = Color(nsColor: .windowBackgroundColor).opacity(0.85)
 
     /// 一个小圆点里写一个字母。
     static func badge(_ letter: String, color: Color, center: CGPoint, in context: inout GraphicsContext) {

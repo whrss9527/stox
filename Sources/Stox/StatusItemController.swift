@@ -87,6 +87,9 @@ final class StatusItemController: NSObject {
         }
     }
 
+    /// 编辑页上除了滚动区以外占的高度：面板的边距、标题和底下一排按钮。
+    static let pageChrome: CGFloat = 150
+
     /// 打开面板。后几个参数用于调试和 CI 截图：展开某一行、预填搜索词、模拟按键、打印诊断信息。
     func openPanel(
         route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil, keys: [PanelKey] = [],
@@ -98,6 +101,7 @@ final class StatusItemController: NSObject {
         guard let panel else { return }
         router.route = route
         router.listMaxHeight = WatchlistView.defaultMaxHeight
+        router.pageMaxHeight = max(240, (availableHeight() ?? 760) - Self.pageChrome)
         if let expand { router.expanded = expand }
         if let search { router.searchText = search }
         store.panelWillOpen()
@@ -552,6 +556,8 @@ final class PanelRouter: ObservableObject {
     @Published var searchText = ""
     /// 自选列表的最大高度。屏幕矮、放不下整个面板时由 StatusItemController 调低，每次打开面板时恢复。
     @Published var listMaxHeight = WatchlistView.defaultMaxHeight
+    /// 编辑页滚动区最高多少：按屏幕上能放多高算，每次打开面板时更新。
+    @Published var pageMaxHeight: CGFloat = 560
     @Published var expanded: Symbol?
     /// 键盘上下方向键选中的那一只：搜索时是搜索结果里的，否则是自选列表里的。
     @Published var highlighted: Symbol?

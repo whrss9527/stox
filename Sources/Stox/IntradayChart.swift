@@ -37,12 +37,14 @@ struct IntradayChart: View {
                             path.move(to: CGPoint(x: 0, y: costY))
                             path.addLine(to: CGPoint(x: proxy.size.width, y: costY))
                         }
-                        .stroke(KlineChart.costColor, style: StrokeStyle(lineWidth: 0.8, dash: [3, 2]))
+                        .stroke(KlineChart.costColor, style: StrokeStyle(lineWidth: 1, dash: [4, 2]))
                         Text("成本 " + QuoteFormatter.price(cost, decimals: decimals))
-                            .font(.system(size: 8).monospacedDigit())
+                            .font(.system(size: 8, weight: .medium).monospacedDigit())
                             .foregroundStyle(KlineChart.costColor)
+                            .padding(.horizontal, 2)
+                            .background(RoundedRectangle(cornerRadius: 2).fill(KlineChart.labelBackground))
                             .fixedSize()
-                            .position(x: proxy.size.width / 2, y: max(costY - 6, 5))
+                            .position(x: proxy.size.width / 2, y: max(costY - 7, 6))
                     }
                     if showAverage {
                         paths.average
