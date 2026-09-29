@@ -220,8 +220,13 @@ smoke() {
   run_case holdings-hk --show-panel
   defaults delete "$DOMAIN" list.filter
   grep -q "summary=hk " shots/holdings-hk.log || fail "只看港股时持仓合计应该只算港币"
-  # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来。
-  grep -Eq "alerts=[1-9]" shots/holdings.log || fail "持仓盈利达到阈值时没有提醒"
+  # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来。A 股开盘前（北京时间 9 点多）行情清零、茅台今天还没成交，
+  # 这时按规则不提醒，只提示一下。
+  if grep -Eq "untraded=[^ ]*sh600519" shots/holdings.log; then
+    echo "::warning::茅台今天还没有成交（开盘前），这次不检查止盈提醒"
+  else
+    grep -Eq "alerts=[1-9]" shots/holdings.log || fail "持仓盈利达到阈值时没有提醒"
+  fi
   # 打开了收盘小结：收盘不到 16 小时的市场各发一条。CI 运行的时间不固定，发没发取决于这时哪个市场刚收盘，只提示不判失败。
   grep -Eq "summaries=[1-9]" shots/holdings.log || echo "::warning::这次没有发收盘小结（可能没有刚收盘的市场）"
   grep -q 'status_title="上证 .* 今日 ' shots/holdings.log || fail "菜单栏没有显示今日盈亏"
