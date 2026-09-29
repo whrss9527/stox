@@ -314,3 +314,11 @@ peek "commodity: sina futures minute XAU" "https://stock2.finance.sina.com.cn/fu
 peek "commodity: sina futures 5-day GC" "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t5hf_GC=/GlobalFuturesService.getGlobalFutures5MLine?symbol=GC" "https://finance.sina.com.cn/"
 peek "commodity: sina fx minute usdcny full" "https://vip.stock.finance.sina.com.cn/forex/api/jsonp.php/var%20_fx_susdcny=/NewForexService.getMinKline?symbol=fx_susdcny&scale=1&datalen=3" "https://finance.sina.com.cn/"
 fetch "commodity: sina fx quotes" 'https://hq.sinajs.cn/list=fx_susdcny,fx_seurcny,fx_sgbpcny,fx_shkdcny,fx_seurusd,fx_susdjpy,DINIW,fx_sjpycny,fx_scnyjpy' "GB18030" "https://finance.sina.com.cn/"
+# 第三轮：新浪外汇分时每个代码能不能取到，期货分时的列是什么意思。
+for c in fx_susdcny fx_seurcny fx_sgbpcny fx_shkdcny fx_scnyjpy fx_saudcny fx_scadcny fx_schfcny fx_ssgdcny fx_seurusd fx_sgbpusd fx_susdjpy fx_saudusd fx_snzdusd fx_susdcad fx_susdchf fx_susdhkd fx_susdsgd fx_seurgbp DINIW; do
+  peek "commodity: sina fx minute ${c}" "https://vip.stock.finance.sina.com.cn/forex/api/jsonp.php/var%20_${c}=/NewForexService.getMinKline?symbol=${c}&scale=1&datalen=2" "https://finance.sina.com.cn/"
+done
+for c in CL OIL NG HG SI XAG XPT ES HSI S C W; do
+  peek "commodity: sina futures minute ${c}" "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1hf_${c}=/GlobalFuturesService.getGlobalFuturesMinLine?symbol=${c}" "https://finance.sina.com.cn/"
+done
+peek "commodity: sina fx minute usdcny day" "https://vip.stock.finance.sina.com.cn/forex/api/jsonp.php/var%20_fx_susdcny=/NewForexService.getMinKline?symbol=fx_susdcny&scale=1&datalen=1440" "https://finance.sina.com.cn/"
