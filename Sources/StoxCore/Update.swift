@@ -354,7 +354,20 @@ public enum ReleaseNotesText {
         return parts.joined(separator: "\n\n")
     }
 
-    /// 每个版本只取更新内容的第一条，“已更新到 x.y.z”里一行一个版本：`0.38.0 五日图最下面也画上成交量柱……`。
+    /// 一条更新内容的开头一句：到第一个冒号为止（写在冒号前的一般是功能的名字，比如“盈亏日历：……”），
+    /// 没有冒号就到第一个逗号、句号或分号；这样也超过 maxLength 个字时截断，加上省略号。
+    public static func headline(_ text: String, maxLength: Int = 36) -> String {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        for stops in [["：", ":"], ["，", "。", "；"]] as [[Character]] {
+            if let index = text.firstIndex(where: { stops.contains($0) }), index > text.startIndex,
+               text.distance(from: text.startIndex, to: index) <= maxLength {
+                return String(text[..<index])
+            }
+        }
+        return text.count > maxLength ? String(text.prefix(maxLength)) + "…" : text
+    }
+
+    /// 每个版本只取更新内容第一条的开头一句，“已更新到 x.y.z”里一行一个版本：`0.37.0 盈亏日历`。
     /// 最多 limit 个版本（从新到旧），更早的合成一行“还有 N 个版本”。
     public static func firstLines(_ releases: [ReleaseInfo], limit: Int) -> [String] {
         let shown = releases.prefix(max(limit, 1))
@@ -368,7 +381,7 @@ public enum ReleaseNotesText {
                     if text.hasPrefix("- ") || text.hasPrefix("* ") { text.removeFirst(2) }
                     return text
                 } ?? ""
-            return "- **\(release.version)** " + (first.isEmpty ? "这个版本没有写更新内容" : first)
+            return "- **\(release.version)** " + (first.isEmpty ? "这个版本没有写更新内容" : headline(first))
         }
         if releases.count > shown.count {
             lines.append("- 还有 \(releases.count - shown.count) 个更早的版本")

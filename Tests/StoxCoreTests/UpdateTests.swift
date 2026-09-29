@@ -176,4 +176,16 @@ final class ReleaseRangeTests: XCTestCase {
         ])
         XCTAssertEqual(ReleaseNotesText.firstLines(Array(range.suffix(1)), limit: 3), ["- **0.35.0** 资金流向"], "* 开头的也认")
     }
+
+    func testHeadlines() {
+        // 真实的更新内容：冒号前是功能名，没有冒号时到第一个逗号。
+        XCTAssertEqual(ReleaseNotesText.headline("盈亏日历：排序菜单里的“盈亏日历…”按月列出每个交易日的今日盈亏"), "盈亏日历")
+        XCTAssertEqual(ReleaseNotesText.headline("A 股个股和 ETF 展开后多了“资金”：左边是主力净流入"), "A 股个股和 ETF 展开后多了“资金”")
+        XCTAssertEqual(ReleaseNotesText.headline("列表里每一行在现价左边画一条当天的迷你分时，虚线是昨收，一眼看出今天是怎么走的。"),
+                       "列表里每一行在现价左边画一条当天的迷你分时")
+        XCTAssertEqual(ReleaseNotesText.headline("命令行工具多了 `stox-cli flow`，打印当天的资金流向。"), "命令行工具多了 `stox-cli flow`")
+        XCTAssertEqual(ReleaseNotesText.headline("修复了一些问题"), "修复了一些问题")
+        XCTAssertEqual(ReleaseNotesText.headline(String(repeating: "长", count: 50)), String(repeating: "长", count: 36) + "…")
+        XCTAssertEqual(ReleaseNotesText.headline("：开头就是冒号的不算"), "：开头就是冒号的不算")
+    }
 }
