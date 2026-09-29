@@ -1,8 +1,8 @@
 import SwiftUI
 import StoxCore
 
-/// 展开详情里的走势图：上面一排“分时 日K 周K 月K”，中间是图，下面是时间或日期。鼠标移到图上时，
-/// 上面那一排换成指着的那一点的价格（分时）或开高低收（K 线）。
+/// 展开详情里的走势图：上面一排“分时 五日 日K 周K 月K”（A 股还有“五档”），中间是图，下面是时间或日期。
+/// 鼠标移到图上时，上面那一排换成指着的那一点的价格（分时）或开高低收（K 线）。
 @MainActor
 struct QuoteChartSection: View {
     static let headerHeight: CGFloat = 16
@@ -24,6 +24,9 @@ struct QuoteChartSection: View {
         var period: ChartPeriod
     }
 
+    /// 实际显示的一项：选了五档而这只没有五档时看分时。
+    private var period: ChartPeriod { settings.chartPeriod.effective(for: quote) }
+
     var body: some View {
         VStack(spacing: Self.spacing) {
             header
@@ -43,23 +46,31 @@ struct QuoteChartSection: View {
                         case .ended: hoverX = nil
                         }
                     }
-                ChartAxis(ticks: axisTicks)
-                    .frame(height: Self.axisHeight, alignment: .bottom)
+                Group {
+                    if period == .orderBook {
+                        OrderBookFooter(book: quote.orderBook, market: item.symbol.market)
+                    } else {
+                        ChartAxis(ticks: axisTicks)
+                    }
+                }
+                .frame(height: Self.axisHeight, alignment: .bottom)
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("\(settings.chartPeriod.title)走势")
+        .accessibilityLabel(period == .orderBook ? "买卖五档" : "\(period.title)走势")
         .accessibilityValue(summary ?? "")
-        .task(id: TrackID(symbol: item.symbol, period: settings.chartPeriod)) {
-            switch settings.chartPeriod {
+        .task(id: TrackID(symbol: item.symbol, period: period)) {
+            switch period {
             case .intraday:
                 await store.trackIntraday(item.symbol)
             case .fiveDay:
                 await store.trackFiveDay(item.symbol)
             case .day, .week, .month:
-                if let period = settings.chartPeriod.klinePeriod {
-                    await store.trackKline(item.symbol, period: period)
+                if let kline = period.klinePeriod {
+                    await store.trackKline(item.symbol, period: kline)
                 }
+            case .orderBook:
+                break  // 五档跟着行情一起刷新
             }
         }
     }
@@ -72,8 +83,8 @@ struct QuoteChartSection: View {
 
     /// K 线图上画的：接口的数据，最后一根用实时行情更新过，只留最后 60 根，带着均线。
     private var klineData: KlineChartData? {
-        guard let period = settings.chartPeriod.klinePeriod,
-              let series = store.klines[KlineKey(symbol: item.symbol, period: period)]
+        guard let kline = period.klinePeriod,
+              let series = store.klines[KlineKey(symbol: item.symbol, period: kline)]
         else { return nil }
         return KlineChartData(series: series.merging(quote))
     }
@@ -82,7 +93,7 @@ struct QuoteChartSection: View {
 
     @ViewBuilder
     private var chart: some View {
-        switch settings.chartPeriod {
+        switch period {
         case .intraday:
             IntradayChart(
                 series: intradaySeries,
@@ -111,12 +122,20 @@ struct QuoteChartSection: View {
                 showAverages: settings.showMovingAverages,
                 decimals: quote.priceDecimals
             )
+        case .orderBook:
+            OrderBookView(
+                book: quote.orderBook ?? OrderBook(bids: [], asks: []),
+                previousClose: quote.previousClose,
+                decimals: quote.priceDecimals,
+                market: item.symbol.market,
+                convention: settings.colorConvention
+            )
         }
     }
 
     /// 图下面的横轴：分时是开盘、午休、收盘的时刻，五日是每天的日期，K 线是头、中、尾三根的日期。
     private var axisTicks: [AxisTick] {
-        switch settings.chartPeriod {
+        switch period {
         case .intraday:
             return IntradayAxis.ticks(for: region)
         case .fiveDay:
@@ -136,6 +155,8 @@ struct QuoteChartSection: View {
                 let date = data.candles[index].date
                 return AxisTick(position: layout.centerX(of: index), label: data.period == .month ? String(date.prefix(7)) : date)
             }
+        case .orderBook:
+            return []  // 五档下面写内外盘，见 OrderBookFooter
         }
     }
 
@@ -178,7 +199,7 @@ struct QuoteChartSection: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         } else {
             HStack(spacing: 2) {
-                ForEach(ChartPeriod.allCases) { period in
+                ForEach(ChartPeriod.available(for: quote)) { period in
                     tab(period)
                 }
                 Spacer(minLength: 4)
@@ -193,7 +214,7 @@ struct QuoteChartSection: View {
     }
 
     private func tab(_ period: ChartPeriod) -> some View {
-        let selected = settings.chartPeriod == period
+        let selected = self.period == period
         return Button {
             settings.chartPeriod = period
         } label: {
@@ -206,17 +227,21 @@ struct QuoteChartSection: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help("\(period.title)走势（展开时也可以用 ← → 切换）")
+        .help(period == .orderBook ? "买卖五档和内外盘（展开时也可以用 ← → 切换）" : "\(period.title)走势（展开时也可以用 ← → 切换）")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”；分时图上是最新的成交均价。
+    /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”；分时图上是最新的成交均价，五档是委比。
     private var summary: String? {
-        if settings.chartPeriod == .intraday {
+        if period == .orderBook {
+            guard let imbalance = quote.orderBook?.imbalance else { return nil }
+            return "委比 " + QuoteFormatter.percent(imbalance)
+        }
+        if period == .intraday {
             guard settings.showMovingAverages, let average = intradaySeries?.latestAverage else { return nil }
             return "均价 \(QuoteFormatter.price(average, decimals: quote.priceDecimals))"
         }
-        if settings.chartPeriod == .fiveDay {
+        if period == .fiveDay {
             guard let series = fiveDaySeries, let last = fiveDayLast, let base = series.previousClose, base > 0 else { return nil }
             return "近 \(series.days.count) 日 \(QuoteFormatter.percent((last - base) / base * 100))"
         }
@@ -234,7 +259,8 @@ struct QuoteChartSection: View {
     private var readout: String? {
         let decimals = quote.priceDecimals
         func price(_ value: Double) -> String { QuoteFormatter.price(value, decimals: decimals) }
-        if settings.chartPeriod == .fiveDay {
+        if period == .orderBook { return nil }
+        if period == .fiveDay {
             guard let series = fiveDaySeries, let hovered = hoveredFiveDay else { return nil }
             let day = hovered.day
             let point = hovered.point
@@ -251,7 +277,7 @@ struct QuoteChartSection: View {
             }
             return text
         }
-        if settings.chartPeriod.klinePeriod == nil {
+        if period.klinePeriod == nil {
             guard let point = hoveredPoint else { return nil }
             var text = String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60) + price(point.price)
             if quote.previousClose > 0 {
@@ -269,9 +295,9 @@ struct QuoteChartSection: View {
         if let change = data.changes[index] {
             text += " " + QuoteFormatter.percent(change)
         }
-        // K 线接口里 A 股的成交量是手，港股、美股是股。
+        // K 线接口里 A 股的成交量是手，科创板和港股、美股是股。
         if let volume = candle.volume, volume > 0 {
-            text += " 量" + QuoteFormatter.largeNumber(volume) + (region == .cn ? "手" : "股")
+            text += " 量" + QuoteFormatter.largeNumber(volume) + (region == .cn && !item.symbol.isStarMarket ? "手" : "股")
         }
         return text
     }

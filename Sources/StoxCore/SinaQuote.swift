@@ -56,7 +56,8 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
 
 /// 解析新浪行情。三地的字段不同（下标从 0 开始）：
 ///
-/// - 沪深北：0 名称、1 今开、2 昨收、3 现价、4 最高、5 最低、8 成交量（股；上证的指数是手）、9 成交额（元）、30 日期、31 时间
+/// - 沪深北：0 名称、1 今开、2 昨收、3 现价、4 最高、5 最低、8 成交量（股；上证的指数是手）、9 成交额（元）、
+///   10–19 / 20–29 买一到买五 / 卖一到卖五（每档“量（股）、价”）、30 日期、31 时间
 /// - 港股：1 名称、2 今开、3 昨收、4 最高、5 最低、6 现价、11 成交额、12 成交量、13 市盈率、15 / 16 52 周最高 / 最低、
 ///   17 日期（`2026/09/28`）、18 时间（`16:08`）。指数的 11 是千港元，没有成交量
 /// - 美股：0 名称、1 现价、3 北京时间、5 今开、6 最高、7 最低、8 / 9 52 周最高 / 最低、10 成交量、12 总市值、14 市盈率、
@@ -125,7 +126,8 @@ public enum SinaQuoteParser {
                 volume: volume,
                 amount: number(9) ?? 0,
                 timestamp: timestamp("\(fields[30]) \(fields[31])", region: region),
-                priceDecimals: symbol.isIndex ? 2 : decimals(fields[1...5], range: 2...3)
+                priceDecimals: symbol.isIndex ? 2 : decimals(fields[1...5], range: 2...3),
+                orderBook: symbol.isIndex ? nil : orderBook(number)
             )
         case .hk:
             guard fields.count > 18, !fields[1].isEmpty, let previousClose = positive(3) else { return nil }
@@ -170,6 +172,17 @@ public enum SinaQuoteParser {
                 priceDecimals: price < 1 ? 4 : 2
             )
         }
+    }
+
+    /// A 股的五档：10–19 是买一到买五，20–29 是卖一到卖五，每档先量（股）后价。新浪没有内外盘。
+    static func orderBook(_ number: (Int) -> Double?) -> OrderBook {
+        func side(from start: Int) -> [OrderBook.Level] {
+            OrderBook.levels(
+                (0..<OrderBook.depth).map { (price: number(start + $0 * 2 + 1), volume: number(start + $0 * 2)) },
+                volumeScale: 1
+            )
+        }
+        return OrderBook(bids: side(from: 10), asks: side(from: 20))
     }
 
     /// `2026-09-28 15:34:59`、`2026/09/28 16:08`，按所在市场的时区。

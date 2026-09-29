@@ -130,7 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 调试和 CI 用的启动参数：
     ///   Stox --show-panel [--expand sh600519] [--search 腾讯]   打开面板并打印诊断信息
-    ///        [--chart intraday|fiveDay|day|week|month] [--keys down,down,enter]   走势图的周期、依次模拟的按键
+    ///        [--chart intraday|fiveDay|day|week|month|orderBook] [--keys down,down,enter]   走势图的周期、依次模拟的按键
     ///        [--edit sh600519]                                  直接打开这只的持仓、提醒与简称页
     ///        [--group 科技]                                      直接打开这个分组的编辑页
     ///        [--alerts]                                         直接打开最近的提醒

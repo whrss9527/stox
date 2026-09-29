@@ -225,8 +225,8 @@ final class StatusItemController: NSObject {
             }
             return true
         case .left, .right:
-            guard router.expanded != nil else { return false }
-            settings.chartPeriod = settings.chartPeriod.moved(by: key == .right ? 1 : -1)
+            guard let expanded = router.expanded else { return false }
+            settings.chartPeriod = settings.chartPeriod.moved(by: key == .right ? 1 : -1, for: store.quotes[expanded])
             return true
         }
     }
@@ -504,7 +504,9 @@ final class StatusItemController: NSObject {
             .map { KlineChartData(series: $0).averages.last?.compactMap { $0 }.count ?? 0 } ?? 0
         // 展开的那只分时图上有几分钟有均价。
         let averages = router.expanded.flatMap { store.intraday[$0] }?.points.filter { $0.average != nil }.count ?? 0
-        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
+        // 展开的那只的五档：买盘、卖盘各有几档，没有五档的是 none。
+        let book = router.expanded.flatMap { store.quotes[$0]?.orderBook }.map { "\($0.bids.count)/\($0.asks.count)" } ?? "none"
+        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) book=\(book) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
     }
 

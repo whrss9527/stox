@@ -70,6 +70,8 @@ enum ChangeDisplay: String, CaseIterable, Identifiable {
 /// 展开详情里走势图的周期。
 enum ChartPeriod: String, CaseIterable, Identifiable {
     case intraday, fiveDay, day, week, month
+    /// 买卖五档，只有 A 股有。
+    case orderBook
 
     var id: String { rawValue }
 
@@ -80,23 +82,34 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
         case .day: return "日K"
         case .week: return "周K"
         case .month: return "月K"
+        case .orderBook: return "五档"
         }
     }
 
-    /// K 线的周期；分时图为 nil。
+    /// K 线的周期；分时图、五档为 nil。
     var klinePeriod: KlinePeriod? {
         switch self {
-        case .intraday, .fiveDay: return nil
+        case .intraday, .fiveDay, .orderBook: return nil
         case .day: return .day
         case .week: return .week
         case .month: return .month
         }
     }
 
-    /// 左右方向键切换：到头了不循环。
-    func moved(by step: Int) -> ChartPeriod {
-        let all = Self.allCases
-        let index = all.firstIndex(of: self) ?? 0
+    /// 这只能看的几项：没有五档的（港股、美股、指数）不列五档。
+    static func available(for quote: Quote?) -> [ChartPeriod] {
+        allCases.filter { $0 != .orderBook || quote?.orderBook != nil }
+    }
+
+    /// 实际显示的一项：选了五档而这只没有五档时看分时。
+    func effective(for quote: Quote?) -> ChartPeriod {
+        Self.available(for: quote).contains(self) ? self : .intraday
+    }
+
+    /// 左右方向键切换：到头了不循环，跳过这只没有的。
+    func moved(by step: Int, for quote: Quote?) -> ChartPeriod {
+        let all = Self.available(for: quote)
+        let index = all.firstIndex(of: effective(for: quote)) ?? 0
         return all[min(max(index + step, 0), all.count - 1)]
     }
 }

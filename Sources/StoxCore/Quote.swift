@@ -46,6 +46,8 @@ public struct Quote: Sendable, Equatable {
     public var priceDecimals: Int
     /// 数据源里的交易所代码，例如 `600519`、`AAPL.OQ`、`.IXIC`。美股查 K 线时要用到后缀。
     public var exchangeCode: String?
+    /// 买卖五档，只有 A 股（不含指数）有；开盘前、停牌时是空的盘口。
+    public var orderBook: OrderBook?
 
     public init(
         symbol: Symbol,
@@ -68,7 +70,8 @@ public struct Quote: Sendable, Equatable {
         low52Week: Double? = nil,
         timestamp: Date? = nil,
         priceDecimals: Int = 2,
-        exchangeCode: String? = nil
+        exchangeCode: String? = nil,
+        orderBook: OrderBook? = nil
     ) {
         self.symbol = symbol
         self.name = name
@@ -92,6 +95,7 @@ public struct Quote: Sendable, Equatable {
         self.timestamp = timestamp
         self.priceDecimals = priceDecimals
         self.exchangeCode = exchangeCode
+        self.orderBook = orderBook
     }
 
     public var direction: PriceDirection { PriceDirection(change) }

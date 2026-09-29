@@ -10,7 +10,9 @@ import Foundation
 /// | 1 | 名称 |
 /// | 2 | 交易所代码（`600519`、`00700`、`AAPL.OQ`、`.IXIC`） |
 /// | 3 / 4 / 5 | 现价 / 昨收 / 今开 |
-/// | 6 | 成交量（A 股单位为手，港美股为股） |
+/// | 6 | 成交量（A 股单位为手，科创板和港美股为股） |
+/// | 7 / 8 | A 股：外盘 / 内盘（单位同成交量） |
+/// | 9–18 / 19–28 | A 股：买一到买五 / 卖一到卖五，每档“价、量（手）”（港股这里只是现价，美股只有第一档） |
 /// | 30 | 时间（`20260928141019`、`2026/09/28 13:55:11`、`2026-09-25 16:00:01`） |
 /// | 31 / 32 | 涨跌额 / 涨跌幅% |
 /// | 33 / 34 | 最高 / 最低 |
@@ -19,6 +21,7 @@ import Foundation
 /// | 38 / 39 | 换手率%（港股在第 59 位） / 市盈率 |
 /// | 45 | 总市值（亿；指数为成分股总市值，不展示） |
 /// | 47 / 48 | A 股：涨停价 / 跌停价；港美股：52 周最高 / 最低 |
+/// | 61 | A 股的类别：`GP-A`、`GP-A-CYB`（创业板）、`GP-A-KCB`（科创板）、`ETF`、`ZS`（指数） |
 /// | 67 / 68 | A 股：52 周最高 / 最低（美股的 67 是当天的成交均价，即成交额除以成交量，没有用） |
 ///
 /// 无效代码不会出现在返回里。
@@ -73,9 +76,11 @@ public enum TencentQuoteParser {
 
         var volume = number(6) ?? 0
         var amount: Double = 0
+        // 科创板的成交量和内外盘本来就是股（五档的挂单量仍然是手）。
+        let lot: Double = isCN && !isStar(symbol, fields: fields) ? 100 : 1
         switch region {
         case .cn:
-            volume *= 100  // 手 → 股
+            volume *= lot  // 手 → 股
             let parts = fields[35].split(separator: "/")
             if parts.count == 3, let yuan = Double(parts[2]) {
                 amount = yuan
@@ -117,7 +122,30 @@ public enum TencentQuoteParser {
             low52Week: positive(isCN ? 68 : 49),
             timestamp: parseTimestamp(fields[30], timeZone: region.timeZone),
             priceDecimals: isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4]),
-            exchangeCode: fields[2].isEmpty ? nil : fields[2]
+            exchangeCode: fields[2].isEmpty ? nil : fields[2],
+            orderBook: isCN && !isIndex ? orderBook(number, lot: lot) : nil
+        )
+    }
+
+    /// 科创板：看第 61 位的类别，没有这一位时看代码。
+    static func isStar(_ symbol: Symbol, fields: [String]) -> Bool {
+        if fields.count > 61, !fields[61].isEmpty { return fields[61].hasSuffix("KCB") }
+        return symbol.isStarMarket
+    }
+
+    /// A 股的五档和内外盘，量换算成股：挂单量总是手，内外盘和成交量一样（lot 是每单位多少股）。
+    static func orderBook(_ number: (Int) -> Double?, lot: Double) -> OrderBook {
+        func side(from start: Int) -> [OrderBook.Level] {
+            OrderBook.levels(
+                (0..<OrderBook.depth).map { (price: number(start + $0 * 2), volume: number(start + $0 * 2 + 1)) },
+                volumeScale: 100
+            )
+        }
+        return OrderBook(
+            bids: side(from: 9),
+            asks: side(from: 19),
+            outerVolume: number(7).map { $0 * lot },
+            innerVolume: number(8).map { $0 * lot }
         )
     }
 
