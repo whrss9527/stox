@@ -101,6 +101,7 @@ final class StatusItemController: NSObject {
         guard let panel else { return }
         router.route = route
         router.listMaxHeight = WatchlistView.defaultMaxHeight
+        router.cardsMaxHeight = nil
         router.pageMaxHeight = max(240, (availableHeight() ?? 760) - Self.pageChrome)
         if let expand { router.expanded = expand }
         if let search { router.searchText = search }
@@ -132,10 +133,11 @@ final class StatusItemController: NSObject {
                 }
                 if printDiagnostics {
                     self?.printDiagnostics()
-                    // 盘前盘后价在行情之后才取，过几秒再报一次。
+                    // 盘前盘后价在行情之后才取，过几秒再报一次；面板尺寸也再报一次，那时更新内容这些慢的都到了，布局也调整完了。
                     try? await Task.sleep(nanoseconds: 6_000_000_000)
                     if let self {
                         print("STOX_DIAG late \(self.extendedHoursDiagnostics)")
+                        self.panelDiagnostics().forEach { print("STOX_DIAG late " + $0) }
                         fflush(stdout)
                     }
                 }
@@ -185,7 +187,7 @@ final class StatusItemController: NSObject {
         panel.appearance = settings.appearance.nsAppearance
         panel.pinned = settings.panelPinned
         resizeObserver = NotificationCenter.default.addObserver(forName: NSWindow.didResizeNotification, object: panel, queue: .main) { [weak self] _ in
-            Task { @MainActor in self?.keepBelowMenuBar() }
+            Task { @MainActor in self?.panelDidResize() }
         }
         moveObserver = NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.panelMoved() }
@@ -285,7 +287,19 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// 顶边不动，按内容尺寸调整窗口。屏幕放不下时先把列表压矮，面板永远不盖住菜单栏。
+    /// 列表上方的卡片放进滚动区时，至少留这么高。
+    static let minimumCardsHeight: CGFloat = 120
+
+    /// 列表压到最矮还差 short 放不下时，列表上方的卡片最多能占多高；不用限制（或者已经限制到这么矮了）时是 nil。
+    private func cardsMaxHeight(short: CGFloat) -> CGFloat? {
+        guard short > 0.5, router.route == .list, router.trimmedQuery.isEmpty, router.cardsHeight > Self.minimumCardsHeight
+        else { return nil }
+        let cards = min(router.cardsMaxHeight ?? router.cardsHeight, router.cardsHeight)
+        let target = max(Self.minimumCardsHeight, floor(cards - short))
+        return target < cards - 0.5 ? target : nil
+    }
+
+    /// 顶边不动，按内容尺寸调整窗口。屏幕放不下时先把列表压矮，还放不下再让列表上方的卡片滚动，面板永远不盖住菜单栏。
     private func resizePanel(to size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         // 先记下来：第一次量到尺寸时面板窗口可能还没建好，打开面板时要用到。
@@ -293,17 +307,26 @@ final class StatusItemController: NSObject {
         guard let panel else { return }
         var height = ceil(size.height)
         if let available = availableHeight(), height > available {
-            // 超出多少，列表就矮多少，一步算到位。列表是面板里唯一能伸缩的部分。
+            // 超出多少，列表就矮多少，一步算到位；列表最矮留两行。
+            let overflow = height - available
             let minimum = QuoteRow.rowHeight(compact: settings.compactRows) * 2
             let current = min(
                 WatchlistView.naturalHeight(store: store, settings: settings, expanded: router.expanded), router.listMaxHeight
             )
-            let limit = max(minimum, floor(current - (height - available)))
-            if limit < router.listMaxHeight {
+            let limit = max(minimum, floor(current - overflow))
+            // 列表压到最矮还差的，由列表上方的卡片（更新提示、小技巧、持仓合计）让出来：放进能滚动的区域。
+            let cardsLimit = cardsMaxHeight(short: overflow - max(0, current - limit))
+            if limit < router.listMaxHeight || cardsLimit != nil {
                 // 在 SwiftUI 量尺寸的回调里，放到下一轮再改，避免在视图更新期间发布变化；
                 // 改完再等一轮让 SwiftUI 重新布局，然后主动量一次，不指望它再回调。
                 DispatchQueue.main.async { [weak self] in
-                    self?.router.listMaxHeight = limit
+                    guard let self else { return }
+                    if limit < self.router.listMaxHeight {
+                        self.router.listMaxHeight = limit
+                    }
+                    if let cardsLimit {
+                        self.router.cardsMaxHeight = cardsLimit
+                    }
                     DispatchQueue.main.async { [weak self] in
                         guard let self, let hostingView = self.hostingView else { return }
                         hostingView.layoutSubtreeIfNeeded()
@@ -318,6 +341,18 @@ final class StatusItemController: NSObject {
         let origin = NSPoint(x: panel.frame.origin.x, y: panel.frame.maxY - rounded.height)
         panel.setFrame(NSRect(origin: origin, size: rounded), display: true)
         keepBelowMenuBar()
+    }
+
+    /// 窗口尺寸变了：可能是 NSHostingView 按内容自己把窗口撑高了（内容变高时，这比 SwiftUI 报尺寸的回调还早）。
+    /// 顶边挪回菜单栏下面；内容的实际高度和上次量的不一样时，再按实际高度调整一次，放不下就压矮列表。
+    /// 实际高度没变时不再调整，免得放不下又压不动的时候来回改窗口。
+    private func panelDidResize() {
+        keepBelowMenuBar()
+        guard let panel, panel.isVisible, let hostingView else { return }
+        let fitting = hostingView.fittingSize
+        if fitting.height > 0, abs(fitting.height - contentSize.height) > 0.5 {
+            resizePanel(to: fitting)
+        }
     }
 
     /// SwiftUI 的最小尺寸可能让窗口比我们设的高，这时它会往上长。把顶边挪回菜单栏下面。
@@ -473,6 +508,26 @@ final class StatusItemController: NSObject {
 
     // MARK: - 诊断
 
+    /// 面板的位置和尺寸（CI 检查放不放得下），以及截图要裁的范围（菜单栏图标加面板）。
+    private func panelDiagnostics() -> [String] {
+        let screenHeight = NSScreen.screens.first?.frame.height ?? 0
+        func topLeft(_ rect: NSRect) -> String {
+            "\(Int(rect.minX)) \(Int(screenHeight - rect.maxY)) \(Int(rect.width)) \(Int(rect.height))"
+        }
+        var lines: [String] = []
+        let statusFrame = statusItem.button?.window?.frame
+        let panelFrame = panel?.isVisible == true ? panel?.frame : nil
+        if let panelFrame {
+            let fitting = hostingView?.fittingSize ?? .zero
+            lines.append("panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) fitting=\(Int(fitting.height)) list_max=\(Int(router.listMaxHeight)) available=\(Int(availableHeight() ?? -1)) cards=\(Int(router.cardsHeight)) cards_max=\(router.cardsMaxHeight.map { String(Int($0)) } ?? "none")")
+        }
+        let frames = [statusFrame, panelFrame].compactMap { $0 }
+        if let first = frames.first {
+            lines.append("capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
+        }
+        return lines
+    }
+
     /// CI 用：打印菜单栏文字和面板位置，方便检查和截图裁剪。
     func printDiagnostics() {
         let screenHeight = NSScreen.screens.first?.frame.height ?? 0
@@ -486,15 +541,7 @@ final class StatusItemController: NSObject {
         if let statusFrame {
             print("STOX_DIAG status_frame=\(topLeft(statusFrame))")
         }
-        let panelFrame = panel?.isVisible == true ? panel?.frame : nil
-        if let panelFrame {
-            let fitting = hostingView?.fittingSize ?? .zero
-            print("STOX_DIAG panel_frame=\(topLeft(panelFrame)) content=\(Int(contentSize.width))x\(Int(contentSize.height)) fitting=\(Int(fitting.height)) list_max=\(Int(router.listMaxHeight)) available=\(Int(availableHeight() ?? -1))")
-        }
-        let frames = [statusFrame, panelFrame].compactMap { $0 }
-        if let first = frames.first {
-            print("STOX_DIAG capture_frame=\(topLeft(frames.dropFirst().reduce(first) { $0.union($1) }))")
-        }
+        panelDiagnostics().forEach { print("STOX_DIAG " + $0) }
         let holdings = store.items.filter { $0.holding != nil }.count
         let intraday = store.intraday.values.map(\.points.count).max() ?? 0
         let kline = store.klines.values.map(\.candles.count).max() ?? 0
@@ -568,6 +615,10 @@ final class PanelRouter: ObservableObject {
     @Published var searchText = ""
     /// 自选列表的最大高度。屏幕矮、放不下整个面板时由 StatusItemController 调低，每次打开面板时恢复。
     @Published var listMaxHeight = WatchlistView.defaultMaxHeight
+    /// 列表上方的卡片（更新提示、小技巧、持仓合计）加起来本来有多高。
+    @Published var cardsHeight: CGFloat = 0
+    /// 列表压到最矮还放不下时，这些卡片放进能滚动的区域，最多这么高；nil 是不限制。每次打开面板时恢复。
+    @Published var cardsMaxHeight: CGFloat?
     /// 编辑页滚动区最高多少：按屏幕上能放多高算，每次打开面板时更新。
     @Published var pageMaxHeight: CGFloat = 560
     @Published var expanded: Symbol?
