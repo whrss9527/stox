@@ -566,7 +566,7 @@ final class StatusItemController: NSObject {
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
-        print("STOX_DIAG filter=\(filter.id) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count) route=\(router.route.name) rank=\(RankPanel.count(store: store, settings: settings)) groups=\(Watchlist.groups(in: store.items).joined(separator: ",")) compact=\(settings.compactRows)")
+        print("STOX_DIAG filter=\(filter.id) visible=\(WatchlistView.visibleItems(store: store, settings: settings).count) route=\(router.route.name) rank=\(RankPanel.count(store: store, settings: settings)) calendar=\(ProfitCalendarPanel.recordedDaysThisMonth(store: store)) groups=\(Watchlist.groups(in: store.items).joined(separator: ",")) compact=\(settings.compactRows)")
         // 展开的那只在 K 线图上有几根有 MA20。
         let ma20 = router.expanded
             .flatMap { symbol in settings.chartPeriod.klinePeriod.flatMap { store.klines[KlineKey(symbol: symbol, period: $0)] } }
@@ -603,6 +603,8 @@ enum PanelRoute: Equatable {
     case alerts
     /// A 股涨跌榜。
     case rank
+    /// 盈亏日历。
+    case calendar
 
     /// 诊断信息里的写法。
     var name: String {
@@ -612,6 +614,7 @@ enum PanelRoute: Equatable {
         case .group(let group, _): return "group:" + (group ?? "new")
         case .alerts: return "alerts"
         case .rank: return "rank"
+        case .calendar: return "calendar"
         }
     }
 }
