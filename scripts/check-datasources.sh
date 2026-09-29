@@ -262,3 +262,45 @@ fetch "tencent rank: gainers" "${R}&sort_type=priceRatio&direct=down" "UTF-8"
 fetch "tencent rank: losers" "${R}&sort_type=priceRatio&direct=up" "UTF-8"
 fetch "tencent rank: turnover" "${R}&sort_type=turnover&direct=down" "UTF-8"
 fetch "tencent rank: industries" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/pt/getRank?board_type=hy&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
+
+# 贵金属、原油、外汇（还没接进 App，先看哪些接口有、格式是什么）。
+# 返回很长的接口只打印开头和结尾。
+peek() {
+  local title="$1" url="$2" referer="${3:-}"
+  wanted "$title" || return 0
+  echo "=================================================================="
+  echo "## ${title}"
+  echo "## ${url}"
+  local args=(-sS -m 15 -A "$UA")
+  [[ -n "$referer" ]] && args+=(-H "Referer: ${referer}")
+  if curl "${args[@]}" "$url" -o /tmp/stox-body.bin; then
+    python3 - /tmp/stox-body.bin <<'PY'
+import sys
+raw = open(sys.argv[1], "rb").read()
+text = raw.decode("utf-8", "replace")
+print(f"{len(raw)} bytes")
+print(text[:1200])
+if len(text) > 1600:
+    print("……")
+    print(text[-400:])
+PY
+  else
+    echo "!! request failed"
+  fi
+}
+fields "commodity: tencent futures guesses" "https://qt.gtimg.cn/utf8/q=hf_GC,hf_CL,hf_SI,hf_XAU,hf_XAG,hf_OIL,hf_HG,hf_NG"
+fields "commodity: tencent fx guesses" "https://qt.gtimg.cn/utf8/q=whUSDCNH,whEURCNY,whJPYCNY,whGBPCNY,whEURUSD,whUSDJPY,whUSDX,whDINIW"
+fields "commodity: tencent domestic guesses" "https://qt.gtimg.cn/utf8/q=nf_AU0,fuAU0,qhAU0,sgeAU9999,AUTD,s_sgeAUTD"
+for q in gold "%E9%BB%84%E9%87%91" "%E5%8E%9F%E6%B2%B9" "%E7%99%BD%E9%93%B6" "%E7%BE%8E%E5%85%83%E6%8C%87%E6%95%B0" "%E4%BC%A6%E6%95%A6%E9%87%91" xau usdcnh; do
+  fetch "commodity: tencent smartbox ${q}" "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q=${q}" "UTF-8"
+done
+minute "commodity: tencent minute hf_GC" "https://web.ifzq.gtimg.cn/appstock/app/minute/query?code=hf_GC"
+kline "commodity: tencent fqkline hf_GC" "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=hf_GC,day,,,5,qfq"
+fetch "commodity: sina quotes" 'https://hq.sinajs.cn/list=hf_GC,hf_CL,hf_XAU,hf_XAG,hf_SI,hf_OIL,hf_NG,hf_HG,fx_susdcnh,fx_susdcny,fx_seurusd,DINIW,nf_AU0,nf_AG0,nf_SC0,gds_AUTD,SGE_AUTD,hf_AUTD' "GB18030" "https://finance.sina.com.cn/"
+for q in "%E9%BB%84%E9%87%91" "%E5%8E%9F%E6%B2%B9" gold usdcnh; do
+  fetch "commodity: sina suggest ${q}" "https://suggest3.sinajs.cn/suggest/type=&key=${q}&name=suggestdata" "GB18030" "https://finance.sina.com.cn/"
+done
+peek "commodity: sina futures minute GC" "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1hf_GC=/GlobalFuturesService.getGlobalFuturesMinLine?symbol=GC" "https://finance.sina.com.cn/"
+peek "commodity: sina futures daily GC" "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20_GC=/GlobalFuturesService.getGlobalFuturesDailyKLine?symbol=GC" "https://finance.sina.com.cn/"
+peek "commodity: sina inner futures minute AU0" "https://stock2.finance.sina.com.cn/futures/api/jsonp.php/var%20t1nf_AU0=/InnerFuturesNewService.getMinLine?symbol=AU0" "https://finance.sina.com.cn/"
+peek "commodity: sina fx minute usdcnh" "https://vip.stock.finance.sina.com.cn/forex/api/jsonp.php/var%20_fx_susdcnh=/NewForexService.getMinKline?symbol=fx_susdcnh&scale=1&datalen=5" "https://finance.sina.com.cn/"
