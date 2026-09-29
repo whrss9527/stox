@@ -243,6 +243,7 @@ struct QuoteChartSection: View {
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }
         }
@@ -253,10 +254,11 @@ struct QuoteChartSection: View {
         return Button {
             settings.chartPeriod = period
         } label: {
+            // A 股个股有七项，留白小一点，右边的均价、委比、主力净流入才放得下。
             Text(period.title)
                 .font(.system(size: 10, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 4)
                 .frame(height: Self.headerHeight)
                 .background(Capsule().fill(Color.primary.opacity(selected ? 0.1 : 0)))
                 .contentShape(Capsule())
