@@ -196,7 +196,7 @@ struct IntradayChart: View {
 }
 
 /// 五日图：最近五个交易日的分时连在一起，每天占一样宽，竖线分开各天，虚线是第一天的昨收，
-/// 橙色的线是每天各自的成交均价（个股才有）。
+/// 橙色的线是每天各自的成交均价（个股才有），最下面淡淡的是成交量柱。
 struct FiveDayChart: View {
     let series: MultiDaySeries?
     let region: MarketRegion
@@ -209,7 +209,13 @@ struct FiveDayChart: View {
     var body: some View {
         GeometryReader { proxy in
             if let series, let scale = Scale(series: series, region: region, size: proxy.size, includingAverages: showAverage) {
+                // 成交量柱：每 2 个点宽一根，在最下面四分之一，淡淡的，价格线压在上面。
+                let volumes = series.volumeBuckets(count: max(Int(proxy.size.width / 2), 1), region: region)
                 ZStack {
+                    if let cap = MultiDaySeries.volumeCap(volumes) {
+                        VolumeBars(values: volumes, cap: cap)
+                            .fill(Color.primary.opacity(0.16))
+                    }
                     scale.separators
                         .stroke(Color.secondary.opacity(0.3), lineWidth: 0.5)
                     scale.area
@@ -409,6 +415,24 @@ struct ChartAxis: View {
             .frame(width: proxy.size.width, alignment: .topLeading)
         }
         .accessibilityHidden(true)
+    }
+}
+
+/// 五日图下面的成交量柱：values 平均排满横轴，cap 对应最下面四分之一的高度，更高的顶到头。
+struct VolumeBars: Shape {
+    let values: [Double]
+    let cap: Double
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard !values.isEmpty, cap > 0 else { return path }
+        let step = rect.width / CGFloat(values.count)
+        let full = rect.height / 4
+        for (index, value) in values.enumerated() where value > 0 {
+            let height = max(full * CGFloat(min(value / cap, 1)), 0.5)
+            path.addRect(CGRect(x: rect.minX + CGFloat(index) * step + step * 0.15, y: rect.maxY - height, width: max(step * 0.7, 0.5), height: height))
+        }
+        return path
     }
 }
 
