@@ -73,7 +73,7 @@ PY
 }
 
 M="https://web.ifzq.gtimg.cn/appstock/app/minute/query?code="
-for c in sh600519 sz000001 bj920819 sh000001 hk00700 hkHSI; do
+for c in sh600519 sz000001 bj920819 sh688981 sh000001 hk00700 hkHSI; do
   minute "tencent minute: ${c}" "${M}${c}"
 done
 U="https://web.ifzq.gtimg.cn/appstock/app/UsMinute/query?code="
@@ -240,7 +240,7 @@ PY
 }
 
 K="https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param="
-for p in sh600519,day,,,5,qfq sz000001,day,,,5,qfq sh000001,day,,,5,qfq bj920819,day,,,5,qfq sh510300,day,,,5,qfq \
+for p in sh600519,day,,,5,qfq sz000001,day,,,5,qfq sh000001,day,,,5,qfq bj920819,day,,,5,qfq sh510300,day,,,5,qfq sh688981,day,,,5,qfq \
          sh600519,week,,,3,qfq sh600519,month,,,3,qfq sh600519,day,,,320,qfq \
          hk00700,day,,,5,qfq hkHSI,day,,,5,qfq \
          usAAPL,day,,,5,qfq usAAPL.OQ,day,,,5,qfq us.IXIC,day,,,5,qfq usBRK.B,day,,,5,qfq; do
