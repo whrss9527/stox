@@ -492,7 +492,7 @@ final class StatusItemController: NSObject {
         let untraded = store.items
             .filter { $0.holding != nil && store.quotes[$0.symbol]?.hasTraded == false }
             .map(\.symbol.rawValue)
-        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) history=\(store.profitHistory.records.count) untraded=\(untraded.isEmpty ? "none" : untraded.joined(separator: ",")) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
+        print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) history=\(store.profitHistory.records.count) alert_log=\(store.alertLog.entries.count) untraded=\(untraded.isEmpty ? "none" : untraded.joined(separator: ",")) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")
@@ -522,6 +522,8 @@ enum PanelRoute: Equatable {
     case edit(Symbol)
     /// 编辑分组；新建时名字为 nil，member 是先勾上的那一只。
     case group(String?, member: Symbol?)
+    /// 最近的提醒。
+    case alerts
 
     /// 诊断信息里的写法。
     var name: String {
@@ -529,6 +531,7 @@ enum PanelRoute: Equatable {
         case .list: return "list"
         case .edit(let symbol): return "edit:" + symbol.rawValue
         case .group(let group, _): return "group:" + (group ?? "new")
+        case .alerts: return "alerts"
         }
     }
 }
