@@ -13,7 +13,7 @@ PNG or JPEG, no transparency. The first three show up on the product page, so pu
 
 The `App Store edition (sandbox)` job in the `build` workflow launches the sandboxed build, opens the panel, and turns the capture into 1440 × 900 images with `scripts/app-store-screenshot.swift`: a menu bar across the top whose right end is the real one (Stox's ticker and the clock), and the real panel below it, clipped to its rounded corners, on a gradient desktop. Download the `app-store-screenshots` artifact from the run; the images are in `shots/app-store/`.
 
-The CI runner's screen is 1× and its system language is English, so the screenshots are in whatever language the UI shows on an English system. Until the English UI lands on `main` the panel is Chinese; after that, the same job produces English screenshots with no changes. To add a caption on the left:
+The CI runner's screen is 1× and its system language is English, so the screenshots show the English UI. To add a caption on the left:
 
 ```bash
 swift scripts/app-store-screenshot.swift shots/appstore-panel-full.png out.png $frame 1440 900 "Your watchlist,\none click away"

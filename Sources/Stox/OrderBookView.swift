@@ -10,26 +10,27 @@ struct OrderBookView: View {
     let market: Market
     let convention: ColorConvention
 
-    private static let numerals = ["一", "二", "三", "四", "五"]
+    private static let bidLabels = [L("买一"), L("买二"), L("买三"), L("买四"), L("买五")]
+    private static let askLabels = [L("卖一"), L("卖二"), L("卖三"), L("卖四"), L("卖五")]
 
     var body: some View {
         if book.isEmpty {
-            Text("暂无挂单（开盘前或停牌）")
+            Text(L("暂无挂单（开盘前或停牌）"))
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             HStack(spacing: 8) {
-                side("买", book.bids, barColor: Theme.priceColor(for: .up, convention: convention), barEdge: .trailing)
-                side("卖", book.asks, barColor: Theme.priceColor(for: .down, convention: convention), barEdge: .leading)
+                side(Self.bidLabels, book.bids, barColor: Theme.priceColor(for: .up, convention: convention), barEdge: .trailing)
+                side(Self.askLabels, book.asks, barColor: Theme.priceColor(for: .down, convention: convention), barEdge: .leading)
             }
         }
     }
 
-    private func side(_ name: String, _ levels: [OrderBook.Level], barColor: Color, barEdge: Alignment) -> some View {
+    private func side(_ labels: [String], _ levels: [OrderBook.Level], barColor: Color, barEdge: Alignment) -> some View {
         VStack(spacing: 0) {
             ForEach(0..<OrderBook.depth, id: \.self) { index in
-                row(name + Self.numerals[index], index < levels.count ? levels[index] : nil, barColor: barColor, barEdge: barEdge)
+                row(labels[index], index < levels.count ? levels[index] : nil, barColor: barColor, barEdge: barEdge)
                     .frame(maxHeight: .infinity)
             }
         }
@@ -60,7 +61,7 @@ struct OrderBookView: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
-        .accessibilityValue(level.map { "\(QuoteFormatter.price($0.price, decimals: decimals))，\(lots($0.volume))手" } ?? "没有挂单")
+        .accessibilityValue(level.map { L("%@，%@手", QuoteFormatter.price($0.price, decimals: decimals), lots($0.volume)) } ?? L("没有挂单"))
     }
 
     /// 这一档的量占最多那一档的几成。
@@ -88,12 +89,12 @@ struct OrderBookFooter: View {
     var body: some View {
         HStack(spacing: 8) {
             if let outer = book?.outerVolume, let inner = book?.innerVolume, outer + inner > 0 {
-                Text("外盘 " + QuoteFormatter.volume(outer, market: market))
-                Text("内盘 " + QuoteFormatter.volume(inner, market: market))
+                Text(L("外盘 ") + QuoteFormatter.volume(outer, market: market))
+                Text(L("内盘 ") + QuoteFormatter.volume(inner, market: market))
             }
             Spacer(minLength: 0)
             if let book, !book.isEmpty {
-                Text("委差 " + difference(book))
+                Text(L("委差 ") + difference(book))
             }
         }
         .font(.system(size: 8.5).monospacedDigit())

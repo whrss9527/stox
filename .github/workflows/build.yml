@@ -22,6 +22,11 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
+      - name: Localization
+        # 英文和简体中文的翻译表键一致，代码里用到的键都有翻译，没有漏掉 L() 的中文。
+        run: |
+          command -v python3 > /dev/null || (apt-get update -qq && apt-get install -y -qq python3 > /dev/null)
+          python3 scripts/check-localization.py
       - name: Unit tests
         run: swift test
       - name: Live data smoke test
@@ -68,9 +73,10 @@ jobs:
         run: |
           plutil -p dist/Stox.app/Contents/Info.plist
           ls -la dist/Stox.app/Contents/MacOS dist/Stox.app/Contents/Resources
+          plutil -lint dist/Stox.app/Contents/Resources/*.lproj/*.strings
           codesign --verify --deep --strict --verbose=2 dist/Stox.app
       - name: Launch smoke test
-        # 真正启动打包好的 App：面板、详情、搜索、设置窗口，以及右键切换的“只显示图标”。
+        # 真正启动打包好的 App：面板、详情、搜索、设置窗口，以及右键切换的“只显示图标”；最后用英文界面再截几张（shots/en-*）。
         run: scripts/ci-e2e.sh smoke
       - name: iCloud sync test
         # 用一个假的 iCloud 云盘文件夹走一遍同步：启动时拉取、运行中收到改动、文件被删后写回。

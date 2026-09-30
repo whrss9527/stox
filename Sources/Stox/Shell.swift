@@ -1,4 +1,5 @@
 import Foundation
+import StoxCore
 
 // 运行系统命令（只有一键更新用到）只在 GitHub 版里有，App Store 版不编译（见 Updater.swift 的 AppInfo.flavor）。
 #if !APP_STORE
@@ -17,8 +18,8 @@ enum ShellError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .timeout(let name): return "\(name) 执行超时"
-        case .launchFailed(let name, let reason): return "无法运行 \(name)：\(reason)"
+        case .timeout(let name): return L("%@ 执行超时", name)
+        case .launchFailed(let name, let reason): return L("无法运行 %@：%@", name, reason)
         }
     }
 }

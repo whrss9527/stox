@@ -23,7 +23,7 @@ struct FundFlowView: View {
             }
             .help(flow.note ?? "")
         } else {
-            Text(loaded ? "暂无资金流向（开盘后才有）" : "正在加载资金流向…")
+            Text(loaded ? L("暂无资金流向（开盘后才有）") : L("正在加载资金流向…"))
                 .font(.system(size: 10))
                 .foregroundStyle(.tertiary)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -32,10 +32,10 @@ struct FundFlowView: View {
 
     private func breakdown(_ flow: FundFlow) -> some View {
         VStack(spacing: 0) {
-            row("超大单", flow.superNet)
-            row("大单", flow.bigNet)
-            row("中单", flow.mediumNet)
-            row("小单", flow.smallNet)
+            row(L("超大单"), flow.superNet)
+            row(L("大单"), flow.bigNet)
+            row(L("中单"), flow.mediumNet)
+            row(L("小单"), flow.smallNet)
         }
         .accessibilityElement(children: .combine)
     }
@@ -90,14 +90,14 @@ struct FundFlowChart: View {
                     }
                 }
             } else {
-                Text("还没有资金流向的分时")
+                Text(L("还没有资金流向的分时"))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .accessibilityLabel("主力净流入走势")
-        .accessibilityValue("主力净流入 " + QuoteFormatter.signedLargeNumber(flow.mainNetInflow))
+        .accessibilityLabel(L("主力净流入走势"))
+        .accessibilityValue(L("主力净流入 ") + QuoteFormatter.signedLargeNumber(flow.mainNetInflow))
     }
 
     private func label(_ text: String) -> some View {
@@ -160,11 +160,11 @@ struct FundFlowFooter: View {
     var body: some View {
         HStack(spacing: 8) {
             if let flow {
-                Text("主力流入 " + QuoteFormatter.largeNumber(flow.mainInflow))
-                Text("流出 " + QuoteFormatter.largeNumber(flow.mainOutflow))
+                Text(L("主力流入 ") + QuoteFormatter.largeNumber(flow.mainInflow))
+                Text(L("流出 ") + QuoteFormatter.largeNumber(flow.mainOutflow))
                 Spacer(minLength: 0)
                 if let total = flow.daysTotal {
-                    Text("前 \(flow.days.count) 日 " + QuoteFormatter.signedLargeNumber(total))
+                    Text(L("前 %@ 日 ", flow.days.count) + QuoteFormatter.signedLargeNumber(total))
                 }
             }
         }

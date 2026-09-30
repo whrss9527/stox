@@ -42,8 +42,8 @@ public enum ProviderError: Error, LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .badStatus(let code): return "服务器返回 HTTP \(code)"
-        case .emptyResponse: return "服务器没有返回数据"
+        case .badStatus(let code): return L("服务器返回 HTTP %@", code)
+        case .emptyResponse: return L("服务器没有返回数据")
         }
     }
 }

@@ -198,9 +198,9 @@ extension MarketRegion {
     /// 界面上显示的货币名称。
     public var currencyName: String {
         switch self {
-        case .cn: return "人民币"
-        case .hk: return "港币"
-        case .us, .global: return "美元"
+        case .cn: return L("人民币")
+        case .hk: return L("港币")
+        case .us, .global: return L("美元")
         }
     }
 
@@ -217,7 +217,7 @@ extension MarketRegion {
 extension Portfolio {
     /// 持仓表格，制表符分隔，粘贴到 Numbers、Excel 就是一张表。金额不用万、亿，保留两位小数，方便再计算。
     public static func tableText(items: [WatchItem], quotes: [Symbol: Quote]) -> String {
-        var lines = ["名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组"]
+        var lines = [L("名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组")]
         for item in items {
             guard let holding = item.holding, let quote = quotes[item.symbol],
                   let position = position(holding, quote: quote, trades: item.trades)
@@ -290,9 +290,9 @@ public enum CloseSummary {
               let worst = movers.min(by: { $0.changePercent < $1.changePercent })
         else { return nil }
         var parts: [String] = []
-        if best.changePercent > 0 { parts.append("涨得最多的是\(best.name) \(QuoteFormatter.percent(best.changePercent))") }
-        if worst.changePercent < 0 { parts.append("跌得最多的是\(worst.name) \(QuoteFormatter.percent(worst.changePercent))") }
-        return parts.isEmpty ? nil : parts.joined(separator: "，")
+        if best.changePercent > 0 { parts.append(L("涨得最多的是%@ %@", best.name, QuoteFormatter.percent(best.changePercent))) }
+        if worst.changePercent < 0 { parts.append(L("跌得最多的是%@ %@", worst.name, QuoteFormatter.percent(worst.changePercent))) }
+        return parts.isEmpty ? nil : parts.joined(separator: L("，"))
     }
 
     /// 这个市场已经收盘（休市，或者美股进入盘后）、有持仓，最近一个交易日的收盘还不到 16 小时，
@@ -315,21 +315,21 @@ public enum CloseSummary {
         let title: String
         if hidingAmounts {
             let percent = summary.dayProfitPercent.map(QuoteFormatter.percent) ?? QuoteFormatter.hiddenAmount
-            title = "\(region.displayName)收盘 今日盈亏 \(percent)"
-            body = "持仓盈亏 \(summary.totalProfitPercent.map(QuoteFormatter.percent) ?? QuoteFormatter.hiddenAmount)"
+            title = L("%@收盘 今日盈亏 %@", region.displayName, percent)
+            body = L("持仓盈亏 %@", summary.totalProfitPercent.map(QuoteFormatter.percent) ?? QuoteFormatter.hiddenAmount)
         } else {
-            title = "\(region.displayName)收盘 今日盈亏 \(QuoteFormatter.signedMoney(summary.dayProfit))"
+            title = L("%@收盘 今日盈亏 %@", region.displayName, QuoteFormatter.signedMoney(summary.dayProfit))
             if let percent = summary.dayProfitPercent {
-                body += "今日 \(QuoteFormatter.percent(percent))，"
+                body += L("今日 %@，", QuoteFormatter.percent(percent))
             }
-            body += "持仓盈亏 \(QuoteFormatter.signedMoney(summary.totalProfit))"
+            body += L("持仓盈亏 %@", QuoteFormatter.signedMoney(summary.totalProfit))
             if let percent = summary.totalProfitPercent {
-                body += "（\(QuoteFormatter.percent(percent))）"
+                body += L("（%@）", QuoteFormatter.percent(percent))
             }
-            body += "，市值 \(QuoteFormatter.money(summary.marketValue))\(region.currencyName)"
+            body += L("，市值 %@%@", QuoteFormatter.money(summary.marketValue), region.currencyName)
         }
         if let text = moversText(movers) {
-            body += "。" + text
+            body += L("。") + text
         }
         return CloseSummaryNote(region: region, day: today, title: title, body: body)
     }

@@ -100,58 +100,58 @@ public struct AlertTrigger: Sendable, Equatable {
     public var title: String {
         switch condition {
         case .priceAbove:
-            return "\(name) 价格涨到 \(QuoteFormatter.price(threshold, decimals: quote.priceDecimals))"
+            return L("%@ 价格涨到 %@", name, QuoteFormatter.price(threshold, decimals: quote.priceDecimals))
         case .priceBelow:
-            return "\(name) 价格跌到 \(QuoteFormatter.price(threshold, decimals: quote.priceDecimals))"
+            return L("%@ 价格跌到 %@", name, QuoteFormatter.price(threshold, decimals: quote.priceDecimals))
         case .riseAbove:
-            return "\(name) 涨幅达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+            return L("%@ 涨幅达到 %@%", name, QuoteFormatter.fixed(abs(threshold), decimals: 2))
         case .fallBelow:
-            return "\(name) 跌幅达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+            return L("%@ 跌幅达到 %@%", name, QuoteFormatter.fixed(abs(threshold), decimals: 2))
         case .profitAbove:
-            return "\(name) 持仓盈利达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+            return L("%@ 持仓盈利达到 %@%", name, QuoteFormatter.fixed(abs(threshold), decimals: 2))
         case .lossBelow:
-            return "\(name) 持仓亏损达到 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+            return L("%@ 持仓亏损达到 %@%", name, QuoteFormatter.fixed(abs(threshold), decimals: 2))
         case .limitUp:
-            return "\(name) 涨停"
+            return L("%@ 涨停", name)
         case .limitDown:
-            return "\(name) 跌停"
+            return L("%@ 跌停", name)
         case .yearHigh:
-            return "\(name) 创 52 周新高"
+            return L("%@ 创 52 周新高", name)
         case .yearLow:
-            return "\(name) 创 52 周新低"
+            return L("%@ 创 52 周新低", name)
         case .rapidRise:
-            return "\(name) \(Int(RapidMoveDetector.window / 60)) 分钟内拉升 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+            return L("%@ %@ 分钟内拉升 %@%", name, Int(RapidMoveDetector.window / 60), QuoteFormatter.fixed(abs(threshold), decimals: 2))
         case .rapidFall:
-            return "\(name) \(Int(RapidMoveDetector.window / 60)) 分钟内下跌 \(QuoteFormatter.fixed(abs(threshold), decimals: 2))%"
+            return L("%@ %@ 分钟内下跌 %@%", name, Int(RapidMoveDetector.window / 60), QuoteFormatter.fixed(abs(threshold), decimals: 2))
         }
     }
 
     public var body: String {
-        let price = "现价 \(QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))，"
+        let price = L("现价 %@，", QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))
         if condition == .profitAbove || condition == .lossBelow, let holding,
            let position = Portfolio.position(holding, quote: quote) {
-            var text = price + "成本 \(QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))，"
+            var text = price + L("成本 %@，", QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))
             if hidesAmounts {
-                return text + "持仓盈亏 \(position.totalProfitPercent.map(QuoteFormatter.percent) ?? QuoteFormatter.hiddenAmount)"
+                return text + L("持仓盈亏 %@", position.totalProfitPercent.map(QuoteFormatter.percent) ?? QuoteFormatter.hiddenAmount)
             }
-            text += "持仓盈亏 \(QuoteFormatter.signedMoney(position.totalProfit))"
+            text += L("持仓盈亏 %@", QuoteFormatter.signedMoney(position.totalProfit))
             if let percent = position.totalProfitPercent {
-                text += "（\(QuoteFormatter.percent(percent))）"
+                text += L("（%@）", QuoteFormatter.percent(percent))
             }
             return text
         }
         var text = price
         switch condition {
         case .yearHigh:
-            text += "今天最高 \(QuoteFormatter.price(quote.high, decimals: quote.priceDecimals))，"
+            text += L("今天最高 %@，", QuoteFormatter.price(quote.high, decimals: quote.priceDecimals))
         case .yearLow:
-            text += "今天最低 \(QuoteFormatter.price(quote.low, decimals: quote.priceDecimals))，"
+            text += L("今天最低 %@，", QuoteFormatter.price(quote.low, decimals: quote.priceDecimals))
         default:
             break
         }
         return text
-            + "涨跌 \(QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))"
-            + "（\(QuoteFormatter.percent(quote.changePercent))）"
+            + L("涨跌 %@", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
+            + L("（%@）", QuoteFormatter.percent(quote.changePercent))
     }
 }
 

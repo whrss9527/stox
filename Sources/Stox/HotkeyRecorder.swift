@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import StoxCore
 
 /// 快捷键录制框：点一下，再按下新的组合键；按 Esc 取消。
 struct HotkeyRecorder: NSViewRepresentable {
@@ -70,7 +71,7 @@ struct HotkeyRecorder: NSViewRepresentable {
             (recording ? NSColor.controlAccentColor : NSColor.separatorColor).setStroke()
             path.lineWidth = recording ? 1.5 : 1
             path.stroke()
-            let text = recording ? "按下组合键…" : (binding?.display ?? "点击设置")
+            let text = recording ? L("按下组合键…") : (binding?.display ?? L("点击设置"))
             let paragraph = NSMutableParagraphStyle()
             paragraph.alignment = .center
             let attributes: [NSAttributedString.Key: Any] = [

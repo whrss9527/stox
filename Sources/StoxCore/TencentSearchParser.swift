@@ -16,15 +16,22 @@ public struct SearchResult: Sendable, Hashable, Identifiable {
 
     public var typeLabel: String {
         let type = typeCode.uppercased()
-        if type.hasPrefix("ZS") { return "指数" }
+        if type.hasPrefix("ZS") { return L("指数") }
         if type.contains("ETF") { return "ETF" }
         if type.contains("LOF") { return "LOF" }
-        if type.hasPrefix("GP-A-KCB") { return "科创板" }
-        if type.hasPrefix("GP-A-CYB") { return "创业板" }
-        if type.hasPrefix("GP") { return "股票" }
-        if type.hasPrefix("JJ") || type.hasPrefix("KJ") { return "基金" }
-        if type.hasPrefix("ZQ") { return "债券" }
-        return typeCode
+        if type.hasPrefix("GP-A-KCB") { return L("科创板") }
+        if type.hasPrefix("GP-A-CYB") { return L("创业板") }
+        if type.hasPrefix("GP") { return L("股票") }
+        if type.hasPrefix("JJ") || type.hasPrefix("KJ") { return L("基金") }
+        if type.hasPrefix("ZQ") { return L("债券") }
+        // 期货外汇的品种表里直接写的是中文类型。
+        switch typeCode {
+        case "贵金属": return L("贵金属")  // l10n-ignore
+        case "能源": return L("能源")  // l10n-ignore
+        case "期货": return L("期货")  // l10n-ignore
+        case "外汇": return L("外汇")  // l10n-ignore
+        default: return typeCode
+        }
     }
 }
 

@@ -58,7 +58,7 @@ public struct ProfitHistory: Codable, Equatable, Sendable {
                 QuoteFormatter.fixed(record.marketValue, decimals: 2),
             ].joined(separator: "\t")
         }
-        return (["日期\t币种\t今日盈亏\t持仓盈亏\t市值"] + lines).joined(separator: "\n")
+        return ([L("日期\t币种\t今日盈亏\t持仓盈亏\t市值")] + lines).joined(separator: "\n")
     }
 
     /// 有记录的市场，按 A 股、港股、美股排。

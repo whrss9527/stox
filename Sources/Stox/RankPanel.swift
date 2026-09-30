@@ -21,7 +21,7 @@ struct RankPanel: View {
     var body: some View {
         VStack(spacing: 10) {
             header
-            Picker("榜单", selection: $settings.rankKind) {
+            Picker(L("榜单"), selection: $settings.rankKind) {
                 ForEach(RankKind.allCases) { kind in
                     Text(kind.title).tag(kind)
                 }
@@ -31,12 +31,12 @@ struct RankPanel: View {
             content
             HStack {
                 if settings.rankKind != .industries {
-                    Toggle("不看新股", isOn: $settings.rankHidesNewListings)
+                    Toggle(L("不看新股"), isOn: $settings.rankHidesNewListings)
                         .toggleStyle(.checkbox)
-                        .help("新股上市首日（名字前面有 N）和注册制新股上市后前 5 天（有 C）没有涨跌幅限制，常常挤满涨幅榜")
+                        .help(L("新股上市首日（名字前面有 N）和注册制新股上市后前 5 天（有 C）没有涨跌幅限制，常常挤满涨幅榜"))
                 }
                 Spacer()
-                Button("返回") { router.route = .list }
+                Button(L("返回")) { router.route = .list }
                     .keyboardShortcut(.defaultAction)
             }
             .controlSize(.regular)
@@ -74,9 +74,9 @@ struct RankPanel: View {
                 Image(systemName: "chevron.left")
             }
             .buttonStyle(IconButtonStyle())
-            .help("返回（Esc）")
+            .help(L("返回（Esc）"))
             VStack(alignment: .leading, spacing: 2) {
-                Text("A 股涨跌榜")
+                Text(L("A 股涨跌榜"))
                     .font(.system(size: 14, weight: .semibold))
                 Text(subtitle)
                     .font(.system(size: 11))
@@ -90,9 +90,9 @@ struct RankPanel: View {
     }
 
     private var subtitle: String {
-        var text = settings.rankKind == .industries ? "申万一级行业" : "沪深京全部 A 股"
+        var text = settings.rankKind == .industries ? L("申万一级行业") : L("沪深京全部 A 股")
         if let updated = store.rankUpdated[settings.rankKind] {
-            text += " · " + String(QuoteFormatter.time(updated).prefix(5)) + " 更新"
+            text += " · " + L("%@ 更新", String(QuoteFormatter.time(updated).prefix(5)))
         }
         return text
     }
@@ -101,7 +101,7 @@ struct RankPanel: View {
     private var content: some View {
         let count = Self.count(store: store, settings: settings)
         if count == 0 {
-            Text(!loaded ? (store.rankError.map { "取不到榜单：\($0)" } ?? "正在加载…") : "榜上暂时没有")
+            Text(!loaded ? (store.rankError.map { L("取不到榜单：%@", $0) } ?? L("正在加载…")) : L("榜上暂时没有"))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity)
@@ -158,7 +158,7 @@ struct RankPanel: View {
                         .font(.system(size: 12.5, weight: .medium))
                         .lineLimit(1)
                     if let leader {
-                        Text("领涨 \(leader.name) \(QuoteFormatter.percent(leader.changePercent))")
+                        Text(L("领涨 %@ %@", leader.name, QuoteFormatter.percent(leader.changePercent)))
                             .font(.system(size: 10).monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -176,7 +176,7 @@ struct RankPanel: View {
         }
         .buttonStyle(.plain)
         .disabled(leader == nil)
-        .help(leader.map { added ? "\($0.name)已在自选里，点一下回到列表并展开" : "把领涨的\($0.name)加到自选" } ?? "")
+        .help(leader.map { added ? L("%@已在自选里，点一下回到列表并展开", $0.name) : L("把领涨的%@加到自选", $0.name) } ?? "")
         .accessibilityLabel("\(index + 1) \(industry.name) \(QuoteFormatter.percent(industry.changePercent))")
     }
 
@@ -228,7 +228,7 @@ struct RankPanel: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(added ? "已在自选里，点一下回到列表并展开" : "加到自选")
+        .help(added ? L("已在自选里，点一下回到列表并展开") : L("加到自选"))
         .accessibilityLabel("\(index + 1) \(entry.name) \(QuoteFormatter.percent(entry.changePercent))")
     }
 
@@ -236,9 +236,9 @@ struct RankPanel: View {
     private func detail(_ entry: RankEntry) -> String {
         var text = entry.symbol.displayCode
         if settings.rankKind == .turnover {
-            text += " · 成交 " + QuoteFormatter.largeNumber(entry.amount)
+            text += L(" · 成交 ") + QuoteFormatter.largeNumber(entry.amount)
         } else if let rate = entry.turnoverRate {
-            text += " · 换手 " + QuoteFormatter.fixed(rate, decimals: 2) + "%"
+            text += L(" · 换手 ") + QuoteFormatter.fixed(rate, decimals: 2) + "%"
         }
         return text
     }

@@ -165,7 +165,7 @@ final class QuoteStore: ObservableObject {
             merged.merge(result) { _, new in new }
             quotes = merged
             lastUpdated = Date()
-            lastError = result.isEmpty ? "没有取到行情数据" : nil
+            lastError = result.isEmpty ? L("没有取到行情数据") : nil
             // 名称只从主数据源记：两家的叫法有细微差别，来回改会让 iCloud 同步个不停。
             if source == .primary {
                 cacheNames(from: result)

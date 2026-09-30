@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import StoxCore
 
 /// 全局快捷键的组合：Carbon 键码、修饰键和显示用的文字。
 struct HotkeyBinding: Codable, Equatable {
@@ -34,7 +35,7 @@ enum KeyNames {
     ]
 
     static func name(forKeyCode keyCode: UInt32) -> String {
-        names[keyCode] ?? "键 \(keyCode)"
+        names[keyCode] ?? L("键 %@", keyCode)
     }
 
     /// AppKit 的修饰键转成 Carbon 的位。

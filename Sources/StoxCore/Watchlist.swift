@@ -99,14 +99,14 @@ extension WatchItem: Codable {
 public enum Watchlist {
     /// 首次启动时的默认自选：三大市场的主要指数加几只常见股票。
     public static let defaults: [WatchItem] = [
-        item("sh000001", "上证指数", alias: "上证", pinned: true),
-        item("sz399001", "深证成指"),
-        item("sz399006", "创业板指"),
-        item("hkHSI", "恒生指数"),
-        item("us.IXIC", "纳斯达克"),
-        item("sh600519", "贵州茅台"),
-        item("hk00700", "腾讯控股"),
-        item("usAAPL", "苹果"),
+        item("sh000001", "上证指数", alias: "上证", pinned: true),  // l10n-ignore
+        item("sz399001", "深证成指"),  // l10n-ignore
+        item("sz399006", "创业板指"),  // l10n-ignore
+        item("hkHSI", "恒生指数"),  // l10n-ignore
+        item("us.IXIC", "纳斯达克"),  // l10n-ignore
+        item("sh600519", "贵州茅台"),  // l10n-ignore
+        item("hk00700", "腾讯控股"),  // l10n-ignore
+        item("usAAPL", "苹果"),  // l10n-ignore
     ]
 
     /// 常用指数：默认自选里的几个指数，自选删空以后一键加回来。
@@ -228,8 +228,8 @@ public enum TickerLayout: String, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .inline: return "一行"
-        case .stacked: return "上下两行"
+        case .inline: return L("一行")
+        case .stacked: return L("上下两行")
         }
     }
 }
@@ -262,16 +262,16 @@ public enum MenuBarProfit: String, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .day: return "今日盈亏"
-        case .total: return "持仓盈亏"
+        case .day: return L("今日盈亏")
+        case .total: return L("持仓盈亏")
         }
     }
 
     /// 菜单栏上数字前面的字。
     public var label: String {
         switch self {
-        case .day: return "今日"
-        case .total: return "持仓"
+        case .day: return L("今日")
+        case .total: return L("持仓")
         }
     }
 
@@ -390,14 +390,14 @@ public enum QuoteLinks {
     public static func web(_ symbol: Symbol) -> (title: String, url: URL)? {
         switch symbol.market {
         case .jj:
-            return URL(string: "https://fund.eastmoney.com/\(symbol.code).html").map { ("天天基金", $0) }
+            return URL(string: "https://fund.eastmoney.com/\(symbol.code).html").map { (L("天天基金"), $0) }
         case .hf:
-            return URL(string: "https://finance.sina.com.cn/futures/quotes/\(symbol.code).shtml").map { ("新浪财经", $0) }
+            return URL(string: "https://finance.sina.com.cn/futures/quotes/\(symbol.code).shtml").map { (L("新浪财经"), $0) }
         case .wh:
             let code = symbol.code == "USDX" ? "DINIW" : symbol.code
-            return URL(string: "https://finance.sina.com.cn/money/forex/hq/\(code).shtml").map { ("新浪财经", $0) }
+            return URL(string: "https://finance.sina.com.cn/money/forex/hq/\(code).shtml").map { (L("新浪财经"), $0) }
         default:
-            return xueqiu(symbol).map { ("雪球", $0) }
+            return xueqiu(symbol).map { (L("雪球"), $0) }
         }
     }
 }
