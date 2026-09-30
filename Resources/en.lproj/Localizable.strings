@@ -114,7 +114,7 @@
 "搜索中…" = "Searching…";
 "搜索失败：%@" = "Search failed: %@";
 "没有找到相关证券" = "No matching securities";
-"认出 %@ 个代码" = "Recognized %@ symbols";
+"认出 %@ 个代码" = "Symbols recognized: %@";
 "都已处理" = "All Done";
 "全部添加（%@）" = "Add All (%@)";
 "认不出：" = "Not recognized: ";
@@ -122,8 +122,8 @@
 "已添加" = "Added";
 "没有这个代码" = "Not found";
 "已更新到 %@" = "Updated to %@";
-"从 %@ 更新上来，自选和设置都还在" = "Updated from %@. Your watchlist and settings are kept";
-"自选和设置都还在" = "Your watchlist and settings are kept";
+"从 %@ 更新上来，自选和设置都还在" = "Updated from %@. Watchlist and settings kept";
+"自选和设置都还在" = "Watchlist and settings kept";
 "看看更新了什么" = "See What’s New";
 "几个小技巧" = "Tips";
 "右键单击菜单栏图标，在显示行情和只显示图标之间切换" = "Right-click the menu bar icon to switch between quotes and icon only";
@@ -146,7 +146,7 @@
 "几种货币都有时，要等取到汇率才能放在一起比。" = "With several currencies, allocation needs exchange rates to compare.";
 "%@：市值 %@" = "%@: value %@";
 "，持仓盈亏 %@" = ", total P&L %@";
-"其余 %@ 只" = "%@ others";
+"其余 %@ 只" = "Others (%@)";
 "盈亏记录" = "P&L History";
 "看最近每个交易日赚了多少" = "See the P&L of recent trading days";
 "每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。" = "Recorded on this Mac after each close; days the Mac was off are missing.";
@@ -207,18 +207,18 @@
 "上一年" = "Previous Year";
 "下一年" = "Next Year";
 "，点一下看这个月每天的" = ". Click to see each day of this month";
-"记了 %@ 天，合计 " = "%@ days recorded, total ";
+"记了 %@ 天，合计 " = "%@ day(s) recorded, total ";
 "没有记录" = "No records";
 "%@没有记录" = "No records in %@";
-"%@记了 %@ 天，合计 " = "%@: %@ days recorded, total ";
+"%@记了 %@ 天，合计 " = "%@: %@ day(s) recorded, total ";
 "全年 " = "Full year ";
-"赚 %@ 个月 · 亏 %@ 个月" = "%@ up months · %@ down months";
+"赚 %@ 个月 · 亏 %@ 个月" = "%@ up · %@ down";
 "这一年没有记录" = "No records this year";
 "%@ 今日盈亏 " = "%@ P&L ";
 "%@ 没有记录" = "%@: no record";
 "%@ 日" = "Day %@";
 "今日盈亏 " = "Today’s P&L ";
-"赚 %@ 天 · 亏 %@ 天" = "%@ up days · %@ down days";
+"赚 %@ 天 · 亏 %@ 天" = "%@ up · %@ down";
 "这个月没有记录" = "No records this month";
 
 /* Stox/QuoteChart.swift */
@@ -718,8 +718,8 @@
 "macOS 不允许 Stox 替换自己。到“系统设置 → 隐私与安全性 → App 管理”里允许 Stox，再点重试" = "macOS doesn’t allow Stox to replace itself. Allow Stox in “System Settings → Privacy & Security → App Management”, then click Retry";
 "新版本不是同一个开发者签名的（应该是 %@），为了安全没有安装。可以到发布页确认后手动下载" = "The new version isn’t signed by the same developer (expected %@), so it wasn’t installed. You can verify and download it from the release page";
 "这个版本没有写更新内容" = "No release notes for this version";
-"还有 %@ 个更早的版本，见发布页" = "%@ earlier versions, see the release page";
-"- 还有 %@ 个更早的版本" = "- %@ earlier versions";
+"还有 %@ 个更早的版本，见发布页" = "And %@ more on the release page";
+"- 还有 %@ 个更早的版本" = "- And %@ more";
 
 /* StoxCore/Watchlist.swift */
 "一行" = "One Line";
