@@ -55,7 +55,7 @@ jobs:
             fi
           done
           if [ -n "$missing" ]; then
-            echo "::error title=缺少 Secrets::仓库的 Actions Secrets 里没有:$missing。怎么准备见 docs/app-store.md 的“添加 Secrets”。"
+            echo "::error title=缺少 Secrets::仓库的 Actions Secrets 里没有:${missing}。怎么准备见 docs/app-store.md 的“添加 Secrets”。"
             exit 1
           fi
 
@@ -146,7 +146,7 @@ jobs:
             --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" --output-format normal
           version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" dist/appstore/Stox.app/Contents/Info.plist)
           build=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" dist/appstore/Stox.app/Contents/Info.plist)
-          echo "::notice title=已上传::Stox $version（构建 $build）已上传。App Store Connect 处理完（通常 10～30 分钟）后，在 App 的版本页选这个构建版本、提交审核。"
+          echo "::notice title=已上传::Stox ${version}（构建 ${build}）已上传。App Store Connect 处理完（通常 10～30 分钟）后，在 App 的版本页选这个构建版本、提交审核。"
 
       - uses: actions/upload-artifact@v5
         if: always()

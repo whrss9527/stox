@@ -605,8 +605,9 @@ appstore_test() {
   local found
   found=$(grep -E '4Stox(7Updater|15UpdateInstaller|12UpdateBanner|13UpdateSection|13Translocation|11AppLocation|5Shell)[A-Z]' "$WORK/symbols.txt" | head -5 || true)
   [[ -z "$found" ]] || fail "App Store 版里还有一键更新的代码：$found"
-  # 界面文字直接在程序文件里找（strings 只列 ASCII）；不超过 15 字节的短字符串会编进指令里，所以找长一点的。
-  if LC_ALL=C grep -aEq '自动检查更新|Check for Updates' "$binary"; then
+  # 界面文字直接在程序文件里找（strings 只列 ASCII）：“自动检查更新”开关下面的说明、更新条的提示。
+  # 不超过 15 字节的短字符串会编进指令里找不到，所以找长一点的、只有更新界面才用的。
+  if LC_ALL=C grep -aFq -e '6 小时检查一次 GitHub' -e '查看更新内容' "$binary"; then
     fail "App Store 版里还有“检查更新”的界面文字"
   fi
 

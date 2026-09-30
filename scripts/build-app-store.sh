@@ -19,6 +19,7 @@
 # 产物: dist/appstore/Stox.app，dist/Stox-AppStore.pkg
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# 注意：变量后面紧跟中文标点时要写成 ${VAR}，macOS 的 bash 会把中文字符的字节当成变量名的一部分。
 
 APP="dist/appstore/Stox.app"
 PKG="dist/Stox-AppStore.pkg"
@@ -63,16 +64,16 @@ else
   TEAM_ID="$(plist_value "$WORK/profile.plist" TeamIdentifier:0)"
   APP_ID="$(plist_value "$WORK/profile.plist" Entitlements:com.apple.application-identifier)"
   echo "    名称: $(plist_value "$WORK/profile.plist" Name)"
-  echo "    团队: $TEAM_ID，App ID: $APP_ID，到期: $(plist_value "$WORK/profile.plist" ExpirationDate)"
+  echo "    团队: ${TEAM_ID}，App ID: ${APP_ID}，到期: $(plist_value "$WORK/profile.plist" ExpirationDate)"
   [[ -n "$TEAM_ID" ]] || fail "描述文件里没有团队 ID"
-  [[ "$APP_ID" == "$TEAM_ID.$BUNDLE_ID" ]] || fail "描述文件的 App ID 是 $APP_ID，应该是 $TEAM_ID.$BUNDLE_ID"
+  [[ "$APP_ID" == "$TEAM_ID.$BUNDLE_ID" ]] || fail "描述文件的 App ID 是 ${APP_ID}，应该是 $TEAM_ID.$BUNDLE_ID"
   # 开发用的描述文件列着测试设备；App Store 的没有。
   if /usr/libexec/PlistBuddy -c "Print :ProvisionedDevices" "$WORK/profile.plist" > /dev/null 2>&1; then
     fail "这是开发用的描述文件（列着测试设备），上传要用“Mac App Store Connect”类型的描述文件"
   fi
   PROFILE_CONTAINERS="$(plist_value "$WORK/profile.plist" Entitlements:com.apple.developer.icloud-container-identifiers)"
   [[ "$PROFILE_CONTAINERS" == *"$CONTAINER"* ]] \
-    || fail "描述文件里没有 iCloud 容器 $CONTAINER：在开发者网站给 App ID 打开 iCloud 并添加这个容器，再重新生成描述文件"
+    || fail "描述文件里没有 iCloud 容器 ${CONTAINER}：在开发者网站给 App ID 打开 iCloud 并添加这个容器，再重新生成描述文件"
 
   sed "s/__TEAM_ID__/$TEAM_ID/g" "$TEMPLATE" > "$ENTITLEMENTS"
 fi
@@ -107,4 +108,4 @@ if [[ -n "$INSTALLER" ]]; then
   pkgutil --check-signature "$PKG"
 fi
 ls -la "$PKG"
-echo "==> 完成: $PKG（$(plist_value "$APP/Contents/Info.plist" CFBundleShortVersionString) 构建 $(plist_value "$APP/Contents/Info.plist" CFBundleVersion)）"
+echo "==> 完成: ${PKG}（$(plist_value "$APP/Contents/Info.plist" CFBundleShortVersionString) 构建 $(plist_value "$APP/Contents/Info.plist" CFBundleVersion)）"

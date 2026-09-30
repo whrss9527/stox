@@ -27,7 +27,7 @@ case "$FLAVOR" in
     SWIFT_FLAGS="-Xswiftc -DAPP_STORE --scratch-path .build/appstore"
     ;;
   *)
-    echo "error: STOX_FLAVOR 只能是 github 或 appstore（现在是 $FLAVOR）" >&2
+    echo "error: STOX_FLAVOR 只能是 github 或 appstore（现在是 ${FLAVOR}）" >&2
     exit 2
     ;;
 esac
