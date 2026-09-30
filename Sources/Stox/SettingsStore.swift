@@ -41,6 +41,7 @@ extension WatchlistFilter {
         case .cn: return "A股"
         case .hk: return "港股"
         case .us: return "美股"
+        case .global: return "期货外汇"
         case .holdings: return "持仓"
         case .group(let name): return name
         }
@@ -72,6 +73,8 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
     case intraday, fiveDay, day, week, month
     /// 买卖五档，只有 A 股有。
     case orderBook
+    /// 资金流向，只有 A 股个股和 ETF 有。
+    case fundFlow
 
     var id: String { rawValue }
 
@@ -83,25 +86,33 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
         case .week: return "周K"
         case .month: return "月K"
         case .orderBook: return "五档"
+        case .fundFlow: return "资金"
         }
     }
 
-    /// K 线的周期；分时图、五档为 nil。
+    /// K 线的周期；分时图、五档、资金为 nil。
     var klinePeriod: KlinePeriod? {
         switch self {
-        case .intraday, .fiveDay, .orderBook: return nil
+        case .intraday, .fiveDay, .orderBook, .fundFlow: return nil
         case .day: return .day
         case .week: return .week
         case .month: return .month
         }
     }
 
-    /// 这只能看的几项：没有五档的（港股、美股、指数）不列五档。
+    /// 这只能看的几项：没有五档的（港股、美股、指数）不列五档，只有 A 股个股和 ETF 列资金，国际期货只有分时。
     static func available(for quote: Quote?) -> [ChartPeriod] {
-        allCases.filter { $0 != .orderBook || quote?.orderBook != nil }
+        allCases.filter { period in
+            switch period {
+            case .orderBook: return quote?.orderBook != nil
+            case .fundFlow: return quote.map { TencentFundFlow.supports($0.symbol) } ?? false
+            case .fiveDay, .day, .week, .month: return quote?.symbol.hasKline ?? true
+            case .intraday: return true
+            }
+        }
     }
 
-    /// 实际显示的一项：选了五档而这只没有五档时看分时。
+    /// 实际显示的一项：选了五档、资金而这只没有时看分时。
     func effective(for quote: Quote?) -> ChartPeriod {
         Self.available(for: quote).contains(self) ? self : .intraday
     }
@@ -254,6 +265,10 @@ final class SettingsStore: ObservableObject {
     @Published var compactRows: Bool {
         didSet { defaults.set(compactRows, forKey: Keys.compactRows) }
     }
+    /// 列表里每一行画一条当天的迷你分时（紧凑列表不画）。
+    @Published var showSparklines: Bool {
+        didSet { defaults.set(showSparklines, forKey: Keys.showSparklines) }
+    }
     /// K 线上画 5、10、20 根的收盘价均线，分时图上画成交均价。
     @Published var showMovingAverages: Bool {
         didSet { defaults.set(showMovingAverages, forKey: Keys.showMovingAverages) }
@@ -277,6 +292,14 @@ final class SettingsStore: ObservableObject {
     /// 菜单栏里显示今日盈亏（按货币分别显示，只算填了持仓的）。
     @Published var showDayProfit: Bool {
         didSet { defaults.set(showDayProfit, forKey: Keys.showDayProfit) }
+    }
+    /// 菜单栏上显示今日盈亏还是持仓盈亏（打开了 showDayProfit 时）。
+    @Published var menuBarProfit: MenuBarProfit {
+        didSet { defaults.set(menuBarProfit.rawValue, forKey: Keys.menuBarProfit) }
+    }
+    /// 盈亏日历按年看（每个月一格），否则按月看（每天一格）。只在本机，不同步。
+    @Published var profitCalendarByYear: Bool {
+        didSet { defaults.set(profitCalendarByYear, forKey: Keys.profitCalendarByYear) }
     }
     /// 面板钉住：点别处时不关闭，可以拖到任何位置。
     @Published var panelPinned: Bool {
@@ -309,6 +332,10 @@ final class SettingsStore: ObservableObject {
     /// 刚更新到的版本，面板里显示“已更新到 x.y.z”，关掉后清空。
     @Published var whatsNewVersion: String? {
         didSet { defaults.set(whatsNewVersion, forKey: Keys.whatsNewVersion) }
+    }
+    /// 是从哪个版本更新到 whatsNewVersion 的：隔了几个版本时，“已更新”里列出中间每个版本的更新内容。
+    @Published var whatsNewSince: String? {
+        didSet { defaults.set(whatsNewSince, forKey: Keys.whatsNewSince) }
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -344,20 +371,28 @@ final class SettingsStore: ObservableObject {
         rankKind = defaults.string(forKey: Keys.rankKind).flatMap(RankKind.init(rawValue:)) ?? .gainers
         rankHidesNewListings = defaults.object(forKey: Keys.rankHidesNewListings) as? Bool ?? true
         compactRows = defaults.object(forKey: Keys.compactRows) as? Bool ?? false
+        showSparklines = defaults.object(forKey: Keys.showSparklines) as? Bool ?? true
         showAllocation = defaults.object(forKey: Keys.showAllocation) as? Bool ?? false
         hideAmounts = defaults.object(forKey: Keys.hideAmounts) as? Bool ?? false
         showProfitHistory = defaults.object(forKey: Keys.showProfitHistory) as? Bool ?? false
         showExtendedHours = defaults.object(forKey: Keys.showExtendedHours) as? Bool ?? true
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
+        menuBarProfit = defaults.string(forKey: Keys.menuBarProfit).flatMap(MenuBarProfit.init(rawValue:)) ?? .day
+        profitCalendarByYear = defaults.object(forKey: Keys.profitCalendarByYear) as? Bool ?? false
         panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
         chartPeriod = defaults.string(forKey: Keys.chartPeriod).flatMap(ChartPeriod.init(rawValue:)) ?? .intraday
         tipsDismissed = defaults.object(forKey: Keys.tipsDismissed) as? Bool ?? false
         whatsNewVersion = defaults.string(forKey: Keys.whatsNewVersion)
+        whatsNewSince = defaults.string(forKey: Keys.whatsNewSince)
     }
 
     /// 启动时记下这次运行的版本；比上次运行的新，就在面板里提示一次“已更新”。
     func recordLaunch(version: String) {
         if let last = defaults.string(forKey: Keys.lastRunVersion), UpdateCheck.isNewer(version, than: last) {
+            // 上一次的提示还没关就又更新了：从更早的那个版本算起。
+            if whatsNewVersion == nil || whatsNewSince == nil {
+                whatsNewSince = last
+            }
             whatsNewVersion = version
         }
         defaults.set(version, forKey: Keys.lastRunVersion)
@@ -426,17 +461,21 @@ final class SettingsStore: ObservableObject {
         static let rankKind = "rank.kind"
         static let rankHidesNewListings = "rank.hideNew"
         static let compactRows = "list.compact"
+        static let showSparklines = "list.sparklines"
         static let showAllocation = "holdings.allocation"
         static let hideAmounts = "holdings.hideAmounts"
         static let showProfitHistory = "holdings.history"
         static let showExtendedHours = "list.extendedHours"
         static let showDayProfit = "ticker.dayProfit"
+        static let menuBarProfit = "ticker.profitKind"
+        static let profitCalendarByYear = "calendar.byYear"
         static let panelPinned = "panel.pinned"
         static let pinnedX = "panel.pinnedX"
         static let pinnedY = "panel.pinnedY"
         static let chartPeriod = "chart.period"
         static let tipsDismissed = "tips.dismissed"
         static let whatsNewVersion = "update.whatsNew"
+        static let whatsNewSince = "update.whatsNewSince"
         static let lastRunVersion = "app.lastVersion"
     }
 }

@@ -17,6 +17,14 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var klines: [KlineKey: KlineSeries] = [:]
     /// 看过的五日分时。
     @Published private(set) var fiveDay: [Symbol: MultiDaySeries] = [:]
+    /// 看过的资金流向（A 股个股和 ETF）。
+    @Published private(set) var fundFlows: [Symbol: FundFlow] = [:]
+    /// 列表里每一行的迷你分时，面板打开时取（见 trackSparklines）。
+    @Published private(set) var sparklines: [Symbol: Sparkline] = [:]
+    /// 每只的迷你分时上次是什么时候取的。
+    private var sparklineFetched: [Symbol: Date] = [:]
+    /// 取过资金流向的证券，取到了没有都算，用来区分“正在加载”和“没有数据”。
+    @Published private(set) var fundFlowLoaded: Set<Symbol> = []
     /// 每个交易日收盘后记下的持仓盈亏，只在这台 Mac 上。
     @Published private(set) var profitHistory: ProfitHistory
     /// 最近发过的提醒，面板里可以翻看。
@@ -247,6 +255,8 @@ final class QuoteStore: ObservableObject {
             do {
                 if let series = try await provider.fetchIntraday(for: symbol) {
                     intraday[symbol] = series
+                    // 列表里的迷你分时也顺便更新，不用再取一次。
+                    updateSparkline(symbol, from: series)
                 }
             } catch {
                 // 分时只是锦上添花，失败时保留上一次的，下一轮再试。
@@ -274,6 +284,54 @@ final class QuoteStore: ObservableObject {
             }
             let live = phase(for: symbol.market.region).isLive
             try? await Task.sleep(nanoseconds: (live ? 60 : 1800) * 1_000_000_000)
+        }
+    }
+
+    /// 面板打开、列表显示着的时候调用：给列表里的这些证券取当天的分时，抽成迷你分时。一次取一只，隔一会儿再取下一只，
+    /// 不一下子发一堆请求；交易时段内两分钟一轮，休市时十分钟一轮。场外基金、外汇没有分时，不取。面板关上、列表换了就停（任务被取消）。
+    func trackSparklines(_ symbols: [Symbol]) async {
+        while !Task.isCancelled {
+            for symbol in symbols where symbol.hasIntraday {
+                guard !Task.isCancelled else { return }
+                let maxAge: TimeInterval = phase(for: symbol.market.region).isLive ? 110 : 600
+                if let fetched = sparklineFetched[symbol], Date().timeIntervalSince(fetched) < maxAge { continue }
+                do {
+                    if let series = try await provider.fetchIntraday(for: symbol), !Task.isCancelled {
+                        updateSparkline(symbol, from: series)
+                    }
+                } catch {
+                    // 取不到就先不画，下一轮再试。
+                }
+                sparklineFetched[symbol] = Date()
+                try? await Task.sleep(nanoseconds: 150_000_000)
+            }
+            try? await Task.sleep(nanoseconds: 15 * 1_000_000_000)
+        }
+    }
+
+    private func updateSparkline(_ symbol: Symbol, from series: IntradaySeries) {
+        sparklineFetched[symbol] = Date()
+        if let sparkline = Sparkline(series: series, region: symbol.market.region), sparklines[symbol] != sparkline {
+            sparklines[symbol] = sparkline
+        }
+    }
+
+    /// 切到“资金”时调用：先取一次，之后交易时段内每分钟刷新，休市时十分钟一次，直到收起或换页（任务被取消）。
+    func trackFundFlow(_ symbol: Symbol) async {
+        while !Task.isCancelled {
+            do {
+                let flow = try await provider.fetchFundFlow(for: symbol)
+                if !Task.isCancelled {
+                    // 取不到（开盘前、这只没有）时清掉旧的，免得把昨天的当成今天的。
+                    fundFlows[symbol] = flow
+                    fundFlowLoaded.insert(symbol)
+                }
+            } catch {
+                // 和分时一样，失败时保留上一次的，下一轮再试。
+                fundFlowLoaded.insert(symbol)
+            }
+            let live = phase(for: symbol.market.region).isLive
+            try? await Task.sleep(nanoseconds: (live ? 60 : 600) * 1_000_000_000)
         }
     }
 
@@ -321,11 +379,14 @@ final class QuoteStore: ObservableObject {
     }
 
     func phase(for region: MarketRegion, at date: Date = Date()) -> MarketPhase {
-        MarketClock.effectivePhase(for: region, at: date, latestQuoteTime: latestQuoteTime(for: region))
+        // 节假日靠盘中行情的时间认出来。只有场外基金时没有盘中行情，净值日期总是前一个交易日，
+        // 拿它来认会把每个交易日都当成休市，所以这时只按时间表。
+        let live = quotes.values.filter { $0.symbol.market.region == region && !$0.symbol.isFund }.compactMap(\.timestamp).max()
+        return MarketClock.effectivePhase(for: region, at: date, latestQuoteTime: live)
     }
 
-    /// 这个市场所有行情里最新的时间。场外基金的时间是净值日期，比盘中的行情晚一天，不算在里面，
-    /// 免得只加了基金时交易日被当成休市。
+    /// 这个市场所有行情里最新的时间，收盘小结、盈亏记录和记一笔的交易日用它。场外基金的时间是净值日期，
+    /// 比盘中的行情晚一天，有盘中行情时不算基金。
     func latestQuoteTime(for region: MarketRegion) -> Date? {
         let inRegion = quotes.values.filter { $0.symbol.market.region == region }
         let live = inRegion.filter { !$0.symbol.isFund }.compactMap(\.timestamp).max()
@@ -433,6 +494,10 @@ final class QuoteStore: ObservableObject {
         intraday[symbol] = nil
         klines = klines.filter { $0.key.symbol != symbol }
         fiveDay[symbol] = nil
+        fundFlows[symbol] = nil
+        fundFlowLoaded.remove(symbol)
+        sparklines[symbol] = nil
+        sparklineFetched[symbol] = nil
         extendedHours[symbol] = nil
         rapidMoves.forget(symbol)
         alertLog.forget(symbol)

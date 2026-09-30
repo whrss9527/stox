@@ -95,7 +95,8 @@ public enum Portfolio {
     public static func summaries(items: [WatchItem], quotes: [Symbol: Quote]) -> [PortfolioSummary] {
         var totals: [MarketRegion: PortfolioSummary] = [:]
         for item in items {
-            guard let quote = quotes[item.symbol] else { continue }
+            // 指数、期货外汇不能填持仓；同步或备份里带着的也不算。
+            guard item.symbol.canHold, let quote = quotes[item.symbol] else { continue }
             let region = item.symbol.market.region
             var summary = totals[region] ?? PortfolioSummary(region: region, marketValue: 0, costValue: 0, dayProfit: 0, count: 0)
             if let holding = item.holding, let position = position(holding, quote: quote, trades: item.trades) {
@@ -199,7 +200,7 @@ extension MarketRegion {
         switch self {
         case .cn: return "人民币"
         case .hk: return "港币"
-        case .us: return "美元"
+        case .us, .global: return "美元"
         }
     }
 
@@ -208,7 +209,7 @@ extension MarketRegion {
         switch self {
         case .cn: return "¥"
         case .hk: return "HK$"
-        case .us: return "$"
+        case .us, .global: return "$"
         }
     }
 }

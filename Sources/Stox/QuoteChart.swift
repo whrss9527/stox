@@ -47,9 +47,12 @@ struct QuoteChartSection: View {
                         }
                     }
                 Group {
-                    if period == .orderBook {
+                    switch period {
+                    case .orderBook:
                         OrderBookFooter(book: quote.orderBook, market: item.symbol.market)
-                    } else {
+                    case .fundFlow:
+                        FundFlowFooter(flow: store.fundFlows[item.symbol])
+                    default:
                         ChartAxis(ticks: axisTicks)
                     }
                 }
@@ -57,7 +60,7 @@ struct QuoteChartSection: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(period == .orderBook ? "买卖五档" : "\(period.title)走势")
+        .accessibilityLabel(period == .orderBook ? "买卖五档" : (period == .fundFlow ? "资金流向" : "\(period.title)走势"))
         .accessibilityValue(summary ?? "")
         .task(id: TrackID(symbol: item.symbol, period: period)) {
             switch period {
@@ -71,6 +74,8 @@ struct QuoteChartSection: View {
                 }
             case .orderBook:
                 break  // 五档跟着行情一起刷新
+            case .fundFlow:
+                await store.trackFundFlow(item.symbol)
             }
         }
     }
@@ -146,6 +151,13 @@ struct QuoteChartSection: View {
                 market: item.symbol.market,
                 convention: settings.colorConvention
             )
+        case .fundFlow:
+            FundFlowView(
+                flow: store.fundFlows[item.symbol],
+                loaded: store.fundFlowLoaded.contains(item.symbol),
+                convention: settings.colorConvention,
+                hovered: hoveredFlow
+            )
         }
     }
 
@@ -153,7 +165,8 @@ struct QuoteChartSection: View {
     private var axisTicks: [AxisTick] {
         switch period {
         case .intraday:
-            return IntradayAxis.ticks(for: region)
+            // 期货从开盘那一刻标起，要等分时取回来才知道。
+            return IntradayAxis.ticks(for: region, start: intradaySeries?.start)
         case .fiveDay:
             guard let days = fiveDaySeries?.days, !days.isEmpty else { return [] }
             return days.indices.compactMap { index in
@@ -171,8 +184,8 @@ struct QuoteChartSection: View {
                 let date = data.candles[index].date
                 return AxisTick(position: layout.centerX(of: index), label: data.period == .month ? String(date.prefix(7)) : date)
             }
-        case .orderBook:
-            return []  // 五档下面写内外盘，见 OrderBookFooter
+        case .orderBook, .fundFlow:
+            return []  // 五档下面写内外盘，资金下面写主力流入流出，见 OrderBookFooter、FundFlowFooter
         }
     }
 
@@ -189,6 +202,13 @@ struct QuoteChartSection: View {
     private var hoveredFiveDay: (day: Int, point: IntradayPoint)? {
         guard let hoverX, chartWidth > 0, let series = fiveDaySeries, series.pointCount > 1 else { return nil }
         return series.point(nearest: Double(hoverX / chartWidth), region: region)
+    }
+
+    /// 资金页上鼠标指着的那一分钟。右边一栏不算在图里。
+    private var hoveredFlow: FundFlowPoint? {
+        let width = chartWidth - FundFlowView.breakdownWidth - FundFlowView.spacing
+        guard let hoverX, width > 0, hoverX <= width, let flow = store.fundFlows[item.symbol], flow.trend.count > 1 else { return nil }
+        return flow.point(nearest: Double(hoverX / width) * Double(IntradayAxis.length(for: .cn)))
     }
 
     private var hoveredPoint: IntradayPoint? {
@@ -224,6 +244,7 @@ struct QuoteChartSection: View {
                         .font(.system(size: 10).monospacedDigit())
                         .foregroundStyle(.tertiary)
                         .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }
         }
@@ -234,21 +255,35 @@ struct QuoteChartSection: View {
         return Button {
             settings.chartPeriod = period
         } label: {
+            // A 股个股有七项，留白小一点，右边的均价、委比、主力净流入才放得下。
             Text(period.title)
                 .font(.system(size: 10, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
-                .padding(.horizontal, 6)
+                .padding(.horizontal, 4)
                 .frame(height: Self.headerHeight)
                 .background(Capsule().fill(Color.primary.opacity(selected ? 0.1 : 0)))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .help(period == .orderBook ? "买卖五档和内外盘（展开时也可以用 ← → 切换）" : "\(period.title)走势（展开时也可以用 ← → 切换）")
+        .help(tabHelp(period))
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”；分时图上是最新的成交均价，五档是委比。
+    private func tabHelp(_ period: ChartPeriod) -> String {
+        switch period {
+        case .orderBook: return "买卖五档和内外盘（展开时也可以用 ← → 切换）"
+        case .fundFlow: return "资金流向：主力（超大单、大单）当天净流入多少，逐分钟累计（展开时也可以用 ← → 切换）"
+        default: return "\(period.title)走势（展开时也可以用 ← → 切换）"
+        }
+    }
+
+    /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”；分时图上是最新的成交均价，五档是委比，资金是主力净流入。
     private var summary: String? {
+        if period == .fundFlow {
+            // 上面一排放了七项，写短一点：主力净流入。
+            guard let flow = store.fundFlows[item.symbol] else { return nil }
+            return "主力 " + QuoteFormatter.signedLargeNumber(flow.mainNetInflow)
+        }
         if period == .orderBook {
             guard let imbalance = quote.orderBook?.imbalance else { return nil }
             return "委比 " + QuoteFormatter.percent(imbalance)
@@ -276,6 +311,15 @@ struct QuoteChartSection: View {
         let decimals = quote.priceDecimals
         func price(_ value: Double) -> String { QuoteFormatter.price(value, decimals: decimals) }
         if period == .orderBook { return nil }
+        if period == .fundFlow {
+            guard let point = hoveredFlow else { return nil }
+            var text = String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60)
+                + "主力净流入 " + QuoteFormatter.signedLargeNumber(point.mainNetInflow)
+            if let value = point.price {
+                text += "  " + price(value)
+            }
+            return text
+        }
         if period == .fiveDay {
             guard let series = fiveDaySeries, let hovered = hoveredFiveDay else { return nil }
             let day = hovered.day
@@ -295,7 +339,7 @@ struct QuoteChartSection: View {
         }
         if period.klinePeriod == nil {
             guard let point = hoveredPoint else { return nil }
-            var text = String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60) + price(point.price)
+            var text = IntradayAxis.timeLabel(of: point.minute, start: intradaySeries?.start, region: region) + "  " + price(point.price)
             if quote.previousClose > 0 {
                 text += "  " + QuoteFormatter.percent((point.price - quote.previousClose) / quote.previousClose * 100)
             }

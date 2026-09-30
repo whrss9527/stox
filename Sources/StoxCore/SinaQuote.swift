@@ -4,6 +4,7 @@ import FoundationNetworking
 #endif
 
 /// 新浪财经行情，腾讯的行情接口不可用时的备用数据源。只提供实时行情；搜索、分时、K 线仍然用腾讯。
+/// 国际期货（`hf_XAU`）的写法和字段都和腾讯一样；外汇新浪是另一套代码，不请求。
 ///
 /// `https://hq.sinajs.cn/list=sh600519,hk00700,gb_aapl`，必须带 `Referer: https://finance.sina.com.cn/`（否则 403），
 /// 返回 GB18030 编码的 `var hq_str_sh600519="贵州茅台,1236.000,…";`。
@@ -37,8 +38,8 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote] {
-        // 场外基金新浪这里没有，不请求。
-        let symbols = symbols.filter { !$0.isFund }
+        // 场外基金新浪这里没有，外汇的代码不一样，都不请求。
+        let symbols = symbols.filter { !$0.isFund && $0.market != .wh }
         guard !symbols.isEmpty, let url = Self.quoteURL(for: symbols) else { return [:] }
         let data = try await HTTP.get(url, session: session, timeout: timeout, headers: ["Referer": Self.referer])
         return SinaQuoteParser.parse(Self.decodeText(data), symbols: symbols)
@@ -64,6 +65,7 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
 ///   17 日期（`2026/09/28`）、18 时间（`16:08`）。指数的 11 是千港元，没有成交量
 /// - 美股：0 名称、1 现价、3 北京时间、5 今开、6 最高、7 最低、8 / 9 52 周最高 / 最低、10 成交量、12 总市值、14 市盈率、
 ///   26 昨收、30 成交额
+/// - 国际期货：和腾讯的 `hf_` 行情一样，见 GlobalQuoteParser
 ///
 /// 查不到的代码返回空字符串 `var hq_str_sh999999="";`。
 public enum SinaQuoteParser {
@@ -173,6 +175,9 @@ public enum SinaQuoteParser {
                 timestamp: timestamp(fields[3], region: .cn),
                 priceDecimals: price < 1 ? 4 : 2
             )
+        case .global:
+            // 国际期货的字段和腾讯一样；外汇不从新浪取。
+            return symbol.market == .hf ? GlobalQuoteParser.futures(symbol: symbol, fields: fields) : nil
         }
     }
 

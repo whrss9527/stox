@@ -196,7 +196,7 @@ struct IntradayChart: View {
 }
 
 /// 五日图：最近五个交易日的分时连在一起，每天占一样宽，竖线分开各天，虚线是第一天的昨收，
-/// 橙色的线是每天各自的成交均价（个股才有）。
+/// 橙色的线是每天各自的成交均价（个股才有），最下面淡淡的是成交量柱。
 struct FiveDayChart: View {
     let series: MultiDaySeries?
     let region: MarketRegion
@@ -209,7 +209,13 @@ struct FiveDayChart: View {
     var body: some View {
         GeometryReader { proxy in
             if let series, let scale = Scale(series: series, region: region, size: proxy.size, includingAverages: showAverage) {
+                // 成交量柱：每 2 个点宽一根，在最下面四分之一，淡淡的，价格线压在上面。
+                let volumes = series.volumeBuckets(count: max(Int(proxy.size.width / 2), 1), region: region)
                 ZStack {
+                    if let cap = MultiDaySeries.volumeCap(volumes) {
+                        VolumeBars(values: volumes, cap: cap)
+                            .fill(Color.primary.opacity(0.16))
+                    }
                     scale.separators
                         .stroke(Color.secondary.opacity(0.3), lineWidth: 0.5)
                     scale.area
@@ -407,6 +413,65 @@ struct ChartAxis: View {
                 }
             }
             .frame(width: proxy.size.width, alignment: .topLeading)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+/// 五日图下面的成交量柱：values 平均排满横轴，cap 对应最下面四分之一的高度，更高的顶到头。
+struct VolumeBars: Shape {
+    let values: [Double]
+    let cap: Double
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        guard !values.isEmpty, cap > 0 else { return path }
+        let step = rect.width / CGFloat(values.count)
+        let full = rect.height / 4
+        for (index, value) in values.enumerated() where value > 0 {
+            let height = max(full * CGFloat(min(value / cap, 1)), 0.5)
+            path.addRect(CGRect(x: rect.minX + CGFloat(index) * step + step * 0.15, y: rect.maxY - height, width: max(step * 0.7, 0.5), height: height))
+        }
+        return path
+    }
+}
+
+/// 列表里一行的迷你分时：一条细线，虚线是昨收。横轴和分时图一样从开盘到收盘，还没到的时间留空。
+struct SparklineView: View {
+    let sparkline: Sparkline
+    /// 昨收，画成虚线；没有时为 0。
+    let reference: Double
+    let color: Color
+
+    var body: some View {
+        Canvas { context, size in
+            guard let range = sparkline.range(reference: reference) else { return }
+            let count = sparkline.values.count
+            func x(_ index: Int) -> CGFloat {
+                count > 1 ? CGFloat(index) / CGFloat(count - 1) * size.width : 0
+            }
+            func y(_ value: Double) -> CGFloat {
+                size.height * CGFloat((range.upperBound - value) / (range.upperBound - range.lowerBound))
+            }
+            if reference > 0 {
+                var baseline = Path()
+                baseline.move(to: CGPoint(x: 0, y: y(reference)))
+                baseline.addLine(to: CGPoint(x: size.width, y: y(reference)))
+                context.stroke(baseline, with: .color(Color.secondary.opacity(0.45)), style: StrokeStyle(lineWidth: 0.5, dash: [2, 2]))
+            }
+            var line = Path()
+            var started = false
+            for (index, value) in sparkline.values.enumerated() {
+                guard let value else { continue }
+                let point = CGPoint(x: x(index), y: y(value))
+                if started {
+                    line.addLine(to: point)
+                } else {
+                    line.move(to: point)
+                    started = true
+                }
+            }
+            context.stroke(line, with: .color(color), style: StrokeStyle(lineWidth: 1, lineCap: .round, lineJoin: .round))
         }
         .accessibilityHidden(true)
     }

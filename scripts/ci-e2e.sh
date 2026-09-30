@@ -68,16 +68,30 @@ run_case() {
   wait "$pid" 2>/dev/null || true
 }
 
+# 面板放得下：窗口不比屏幕能放的高，内容也不比窗口高，底下的按钮总看得见。
+check_fits() {
+  local name="$1" frame_h fitting available
+  read -r frame_h fitting available < <(sed -nE 's/.*panel_frame=[0-9-]+ [0-9-]+ [0-9]+ ([0-9]+) content=[0-9]+x[0-9]+ fitting=([0-9]+) list_max=[0-9]+ available=([0-9]+).*/\1 \2 \3/p' "shots/$name.log" | tail -1) || true
+  [[ -n "${available:-}" ]] || fail "$name：没有面板尺寸的诊断信息"
+  if (( frame_h > available + 1 || fitting > available + 1 )); then
+    fail "$name：面板比屏幕能放的高（窗口 $frame_h，内容 $fitting，屏幕 $available），底下的按钮会看不到"
+  fi
+}
+
 smoke() {
   # CI 里不去 GitHub 检查更新，也就不会弹出通知挡住截图；使用提示单独截一张，其他截图里不显示。
   defaults write "$DOMAIN" update.autoCheck -bool false
   defaults write "$DOMAIN" tips.dismissed -bool true
   run_case panel --show-panel
+  check_fits panel
   run_case detail --show-panel --expand sh600519
+  check_fits detail
   run_case search --show-panel --search 腾讯
   run_case settings-general --show-settings general
   run_case settings-display --show-settings display
   grep -q "panel_frame=" shots/panel.log || fail "面板没有打开"
+  # 列表里的迷你分时：面板打开后一只一只地取，几秒后应该有了；取不到只提示。
+  grep -Eq "late flow=[^ ]+ sparklines=[1-9]" shots/panel.log || echo "::warning::列表里的迷你分时没有取到"
   grep -q 'image=false color=redUp' shots/panel.log || fail "默认应该在菜单栏显示行情、红涨绿跌"
   # 分时图的数据来自另一个接口，偶尔取不到不算失败，只提醒一下。
   grep -q "intraday=[1-9]" shots/detail.log || echo "::warning::展开详情时没有取到分时数据"
@@ -116,6 +130,14 @@ smoke() {
   grep -Eq "chart=orderBook book=[0-5]/[0-5] " shots/orderbook.log || fail "茅台应该有五档"
   grep -q "chart=orderBook book=5/5 " shots/orderbook.log || echo "::warning::茅台的五档不满（开盘前、停牌或者涨跌停）"
   grep -q "chart=orderBook book=none " shots/orderbook-hk.log || fail "港股不应该有五档"
+
+  # 资金流向：A 股个股有，开盘前（北京时间 9:30 以前）还没有当天的数据，只提示。
+  run_case fundflow --show-panel --expand sh600519 --chart fundFlow
+  run_case fundflow-hk --show-panel --expand hk00700 --chart fundFlow
+  defaults delete "$DOMAIN" chart.period
+  grep -q "chart=fundFlow" shots/fundflow.log || fail "没有切到资金"
+  grep -Eq "flow=[1-9]" shots/fundflow.log || echo "::warning::资金流向没有取到分时（开盘前或者接口取不到）"
+  grep -q "late flow=none" shots/fundflow-hk.log || fail "港股没有资金流向，不应该去取"
 
   # 五日分时：美股要带交易所后缀才取得到。
   run_case fiveday --show-panel --expand usAAPL --chart fiveDay
@@ -159,6 +181,9 @@ smoke() {
   defaults delete "$DOMAIN" tips.dismissed
   defaults write "$DOMAIN" app.lastVersion -string 0.1.0
   run_case tips --show-panel
+  check_fits tips
+  # 从 0.1.0 更新上来隔了很多个版本：“已更新”里每个版本一行，最多 5 个版本再加一行“还有几个”。取 GitHub 的接口偶尔被限流，只提示。
+  grep -Eq "whatsnew=[2-9] lines since=0.1.0" shots/tips.log || echo "::warning::“已更新”里没有列出中间各个版本的更新内容"
   defaults write "$DOMAIN" tips.dismissed -bool true
   defaults delete "$DOMAIN" update.whatsNew 2>/dev/null || true
 
@@ -192,6 +217,7 @@ smoke() {
   run_case compact --show-panel
   defaults delete "$DOMAIN" list.compact
   grep -q "compact=true" shots/compact.log || fail "没有切到紧凑列表"
+  grep -q "late flow=[^ ]* sparklines=0" shots/compact.log || fail "紧凑列表不画迷你分时，不应该去取"
 
   # 分组：腾讯和苹果在“科技”里，列表上方选了这个分组。
   write_watchlist '[{"symbol":"sh600519","name":"贵州茅台"},{"symbol":"hk00700","name":"腾讯控股","group":"科技"},{"symbol":"usAAPL","name":"苹果","group":"科技"}]'
@@ -227,6 +253,7 @@ smoke() {
   defaults write "$DOMAIN" holdings.allocation -bool true
   defaults write "$DOMAIN" holdings.history -bool true
   run_case holdings --show-panel --expand sh600519
+  check_fits holdings
   defaults delete "$DOMAIN" ticker.dayProfit
   defaults delete "$DOMAIN" alerts.closeSummary
   defaults delete "$DOMAIN" holdings.allocation
@@ -249,14 +276,21 @@ smoke() {
   fi
   grep -Eq "items=5 quotes=[0-9]+ holdings=4 summary=cn,hk,us " shots/holdings.log || fail "持仓没有读出来"
   # 列表上方只看港股时，持仓合计也只算港股。
+  # 这次菜单栏显示持仓盈亏。
   defaults write "$DOMAIN" list.filter -string hk
+  defaults write "$DOMAIN" ticker.dayProfit -bool true
+  defaults write "$DOMAIN" ticker.profitKind -string total
   run_case holdings-hk --show-panel
   defaults delete "$DOMAIN" list.filter
+  defaults delete "$DOMAIN" ticker.dayProfit
+  defaults delete "$DOMAIN" ticker.profitKind
   grep -q "summary=hk " shots/holdings-hk.log || fail "只看港股时持仓合计应该只算港币"
+  grep -Eq 'status_title="[^"]* 持仓 [^"]+"' shots/holdings-hk.log || fail "菜单栏选了持仓盈亏，应该显示“持仓”"
   # 隐藏金额：面板里的市值、盈亏金额和持有数量是 ****（看截图），菜单栏的今日盈亏换成比例。
   defaults write "$DOMAIN" holdings.hideAmounts -bool true
   defaults write "$DOMAIN" ticker.dayProfit -bool true
   run_case holdings-hidden --show-panel --expand sh600519
+  check_fits holdings-hidden
   defaults delete "$DOMAIN" holdings.hideAmounts
   defaults delete "$DOMAIN" ticker.dayProfit
   grep -q "hide_amounts=true" shots/holdings-hidden.log || fail "没有读到“隐藏金额”的设置"
@@ -267,6 +301,25 @@ smoke() {
   # 最近的提醒：打开这一页。
   run_case alert-log --show-panel --alerts
   grep -q "route=alerts" shots/alert-log.log || fail "没有打开最近的提醒"
+  # 盈亏日历：这个月的 1 号、2 号记过人民币的今日盈亏，3 号记过港币的，打开日历页能看到人民币那两天；
+  # 今年 1 月 15 号也记过一笔，按年看时 1 月和这个月都有数（这个月就是 1 月时只有一个月）。
+  local this_month this_year
+  this_month=$(TZ=Asia/Shanghai date +%Y-%m)
+  this_year=$(TZ=Asia/Shanghai date +%Y)
+  defaults write "$DOMAIN" holdings.history.v1 -data "$(printf '%s' '{"records":[
+    {"day":"'"$this_year"'-01-15","region":"cn","dayProfit":-2500,"totalProfit":3000,"marketValue":140000},
+    {"day":"'"$this_month"'-01","region":"cn","dayProfit":1200,"totalProfit":5000,"marketValue":150000},
+    {"day":"'"$this_month"'-02","region":"cn","dayProfit":-800,"totalProfit":4200,"marketValue":149000},
+    {"day":"'"$this_month"'-03","region":"hk","dayProfit":300,"totalProfit":900,"marketValue":86000}]}' | xxd -p | tr -d '\n')"
+  run_case calendar --show-panel --calendar
+  defaults write "$DOMAIN" calendar.byYear -bool true
+  run_case calendar-year --show-panel --calendar
+  defaults delete "$DOMAIN" calendar.byYear
+  defaults delete "$DOMAIN" holdings.history.v1
+  grep -q "route=calendar" shots/calendar.log || fail "没有打开盈亏日历"
+  grep -Eq "calendar=[2-9]" shots/calendar.log || fail "盈亏日历里应该有这个月记的两天"
+  grep -q "calendar_by_year=true" shots/calendar-year.log || fail "盈亏日历没有按年看"
+  grep -Eq "calendar_months=[1-9]" shots/calendar-year.log || fail "按年看时应该有记过的月份"
   # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来，也记在最近的提醒里。A 股开盘前（北京时间 9 点多）
   # 行情清零、茅台今天还没成交，这时按规则不提醒，只提示一下。
   if grep -Eq "untraded=[^ ]*sh600519" shots/holdings.log; then
@@ -281,6 +334,19 @@ smoke() {
   defaults delete "$DOMAIN" watchlist.v1
   grep -q "items=1 quotes=1 holdings=1 summary=cn " shots/fund.log || fail "场外基金的净值没有取到，或者没有算进持仓"
   grep -q "expanded=jj161725" shots/fund.log || fail "场外基金没有展开"
+  # 期货外汇：伦敦金、纽约原油、美元人民币、美元指数和上证指数放在一起，伦敦金钉在菜单栏上；展开伦敦金，分时来自新浪。
+  write_watchlist '[{"symbol":"hf_XAU","name":"伦敦金","pinned":true},{"symbol":"hf_CL","name":"纽约原油"},
+    {"symbol":"whUSDCNY","name":"美元人民币"},{"symbol":"whUSDX","name":"美元指数"},{"symbol":"sh000001","name":"上证指数"}]'
+  run_case global --show-panel --expand hf_XAU
+  defaults delete "$DOMAIN" watchlist.v1
+  check_fits global
+  grep -q "items=5 quotes=5 " shots/global.log || fail "期货外汇的行情没有取到"
+  grep -q "expanded=hf_XAU" shots/global.log || fail "伦敦金没有展开"
+  grep -q 'status_title="伦敦金 [0-9]' shots/global.log || fail "菜单栏上没有伦敦金"
+  grep -Eq "intraday=[1-9]" shots/global.log || echo "::warning::伦敦金的分时没有取到（新浪的接口取不到，或者周末休市）"
+  # 搜“黄金”：品种表里的伦敦金、纽约黄金排在股票前面。回车添加的是第一条，按一下方向键从它移到第二条。
+  run_case search-gold --show-panel --search 黄金 --keys down
+  grep -q "highlight=hf_GC" shots/search-gold.log || fail "搜黄金时前两条应该是伦敦金、纽约黄金"
 
   # A 股涨跌榜：打开涨幅榜，取到了就列出来；接口偶尔取不到只提示。
   run_case rank --show-panel --rank

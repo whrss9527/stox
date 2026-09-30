@@ -32,6 +32,9 @@ public struct Quote: Sendable, Equatable {
     /// 换手率（%）。
     public var turnoverRate: Double?
     public var peRatio: Double?
+    /// 市净率、量比（只有 A 股个股和 ETF 有，ETF 没有市净率）。
+    public var pbRatio: Double?
+    public var volumeRatio: Double?
     /// 总市值（本币元）。
     public var marketCap: Double?
     /// 涨停价 / 跌停价（仅 A 股）。
@@ -50,6 +53,9 @@ public struct Quote: Sendable, Equatable {
     public var orderBook: OrderBook?
     /// 场外基金的累计净值；别的是 nil。场外基金的现价是单位净值，时间是净值日期。
     public var cumulativeNAV: Double?
+    /// 期货外汇的买价 / 卖价；别的是 nil（A 股的买一卖一在五档里）。
+    public var bid: Double?
+    public var ask: Double?
 
     public init(
         symbol: Symbol,
@@ -65,6 +71,8 @@ public struct Quote: Sendable, Equatable {
         amount: Double = 0,
         turnoverRate: Double? = nil,
         peRatio: Double? = nil,
+        pbRatio: Double? = nil,
+        volumeRatio: Double? = nil,
         marketCap: Double? = nil,
         limitUp: Double? = nil,
         limitDown: Double? = nil,
@@ -74,7 +82,9 @@ public struct Quote: Sendable, Equatable {
         priceDecimals: Int = 2,
         exchangeCode: String? = nil,
         orderBook: OrderBook? = nil,
-        cumulativeNAV: Double? = nil
+        cumulativeNAV: Double? = nil,
+        bid: Double? = nil,
+        ask: Double? = nil
     ) {
         self.symbol = symbol
         self.name = name
@@ -90,6 +100,8 @@ public struct Quote: Sendable, Equatable {
         self.amount = amount
         self.turnoverRate = turnoverRate
         self.peRatio = peRatio
+        self.pbRatio = pbRatio
+        self.volumeRatio = volumeRatio
         self.marketCap = marketCap
         self.limitUp = limitUp
         self.limitDown = limitDown
@@ -100,12 +112,15 @@ public struct Quote: Sendable, Equatable {
         self.exchangeCode = exchangeCode
         self.orderBook = orderBook
         self.cumulativeNAV = cumulativeNAV
+        self.bid = bid
+        self.ask = ask
     }
 
     public var direction: PriceDirection { PriceDirection(change) }
 
-    /// 今天是否有过成交。交易时段内仍为 false 通常意味着停牌。场外基金没有成交，有净值就算。
-    public var hasTraded: Bool { symbol.isFund ? price > 0 : volume > 0 || open > 0 }
+    /// 今天是否有过成交。交易时段内仍为 false 通常意味着停牌。场外基金没有成交，有净值就算；
+    /// 期货外汇的接口不给成交量，有价格就算。
+    public var hasTraded: Bool { symbol.isFund || symbol.isGlobal ? price > 0 : volume > 0 || open > 0 }
 
     /// 振幅（%）。
     public var amplitude: Double? {

@@ -20,11 +20,13 @@ import Foundation
 /// | 37 | 成交额（A 股单位为万元，港美股为元） |
 /// | 38 / 39 | 换手率%（港股在第 59 位） / 市盈率 |
 /// | 45 | 总市值（亿；指数为成分股总市值，不展示） |
+/// | 46 | A 股：市净率（ETF 是 0） |
 /// | 47 / 48 | A 股：涨停价 / 跌停价；港美股：52 周最高 / 最低 |
+/// | 49 | A 股：量比 |
 /// | 61 | A 股的类别：`GP-A`、`GP-A-CYB`（创业板）、`GP-A-KCB`（科创板）、`ETF`、`ZS`（指数） |
 /// | 67 / 68 | A 股：52 周最高 / 最低（美股的 67 是当天的成交均价，即成交额除以成交量，没有用） |
 ///
-/// 无效代码不会出现在返回里。
+/// 无效代码不会出现在返回里。期货外汇的字段完全不同，见 GlobalQuoteParser。
 public enum TencentQuoteParser {
     public static func parse(_ text: String) -> [Symbol: Quote] {
         var quotes: [Symbol: Quote] = [:]
@@ -53,6 +55,7 @@ public enum TencentQuoteParser {
     }
 
     static func parseRecord(symbol: Symbol, payload: String) -> Quote? {
+        if symbol.isGlobal { return GlobalQuoteParser.parse(symbol: symbol, payload: payload) }
         let fields = payload.split(separator: "~", omittingEmptySubsequences: false).map {
             $0.trimmingCharacters(in: .whitespaces)
         }
@@ -99,6 +102,8 @@ public enum TencentQuoteParser {
         case .us:
             // 美股指数的成交额字段数值不可靠，不展示。
             amount = isIndex ? 0 : (number(37) ?? 0)
+        case .global:
+            return nil  // 上面已经交给 GlobalQuoteParser
         }
 
         return Quote(
@@ -116,6 +121,8 @@ public enum TencentQuoteParser {
             turnoverRate: positive(region == .hk ? 59 : 38),
             // 亏损公司的市盈率是负数，照常显示；指数只在有值时显示（A 股指数有平均市盈率）。
             peRatio: isIndex ? positive(39) : number(39).flatMap { $0 == 0 ? nil : $0 },
+            pbRatio: isCN && !isIndex ? positive(46) : nil,
+            volumeRatio: isCN && !isIndex ? positive(49) : nil,
             marketCap: isIndex ? nil : positive(45).map { $0 * 100_000_000 },
             limitUp: isCN ? positive(47) : nil,
             limitDown: isCN ? positive(48) : nil,

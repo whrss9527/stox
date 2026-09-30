@@ -219,23 +219,65 @@ public struct TickerOptions: Sendable, Equatable {
     public var isEmpty: Bool { !showName && !showPrice && !showPercent }
 }
 
+/// 菜单栏上显示哪一种盈亏。
+public enum MenuBarProfit: String, CaseIterable, Sendable, Identifiable {
+    /// 今日盈亏。
+    case day
+    /// 持仓盈亏（按现价算的浮动盈亏）。
+    case total
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .day: return "今日盈亏"
+        case .total: return "持仓盈亏"
+        }
+    }
+
+    /// 菜单栏上数字前面的字。
+    public var label: String {
+        switch self {
+        case .day: return "今日"
+        case .total: return "持仓"
+        }
+    }
+
+    func value(_ summary: PortfolioSummary) -> Double {
+        self == .day ? summary.dayProfit : summary.totalProfit
+    }
+
+    /// 今日盈亏相对昨日市值，持仓盈亏相对成本。
+    func percent(_ summary: PortfolioSummary) -> Double? {
+        self == .day ? summary.dayProfitPercent : summary.totalProfitPercent
+    }
+}
+
 public enum MenuBarTicker {
     /// 菜单栏上的今日盈亏，例如“今日 +¥688 -HK$120”，每种货币一段；给了汇率时折成人民币合成一段。
     /// 隐藏金额时换成相对昨日市值的比例，例如“今日 +0.62%”。没有持仓时返回空数组。
     public static func dayProfitParts(
         _ summaries: [PortfolioSummary], rates: ExchangeRates? = nil, hidingAmounts: Bool = false
     ) -> [TickerPart] {
+        profitParts(summaries, kind: .day, rates: rates, hidingAmounts: hidingAmounts)
+    }
+
+    /// 菜单栏上的盈亏：今日盈亏（“今日 +¥688”）或者持仓盈亏（“持仓 +¥1.29万”），每种货币一段，给了汇率时折成人民币合成一段。
+    /// 隐藏金额时换成比例（今日盈亏相对昨日市值，持仓盈亏相对成本）。没有持仓时返回空数组。
+    public static func profitParts(
+        _ summaries: [PortfolioSummary], kind: MenuBarProfit, rates: ExchangeRates? = nil, hidingAmounts: Bool = false
+    ) -> [TickerPart] {
         guard !summaries.isEmpty else { return [] }
-        var parts = [TickerPart(role: .name, text: "今日", direction: .flat)]
+        var parts = [TickerPart(role: .name, text: kind.label, direction: .flat)]
         // 有好几种货币并且拿到了汇率时，折成人民币只显示一个数，省地方。
         let shown = Portfolio.combined(summaries, rates: rates).map { [$0] } ?? summaries
         for summary in shown {
-            let value = summary.dayProfit
+            let value = kind.value(summary)
             // 颜色和正负号一致：不到一分钱的算平。
             let direction: PriceDirection = value >= 0.005 ? .up : (value <= -0.005 ? .down : .flat)
             let text: String
             if hidingAmounts {
-                text = summary.dayProfitPercent.map(QuoteFormatter.percent) ?? "--"
+                text = kind.percent(summary).map(QuoteFormatter.percent) ?? "--"
             } else {
                 let sign = direction == .up ? "+" : (direction == .down ? "-" : "")
                 text = sign + summary.region.currencySymbol + QuoteFormatter.compactMoney(abs(value))
@@ -269,24 +311,32 @@ public enum MenuBarTicker {
 }
 
 public enum QuoteLinks {
-    /// 雪球个股页：SH600519、00700、HKHSI、AAPL、.IXIC。场外基金没有，返回 nil。
+    /// 雪球个股页：SH600519、00700、HKHSI、AAPL、.IXIC。场外基金、期货外汇没有，返回 nil。
     public static func xueqiu(_ symbol: Symbol) -> URL? {
         let path: String
         switch symbol.market {
         case .sh, .sz, .bj: path = symbol.market.rawValue.uppercased() + symbol.code
         case .hk: path = symbol.isIndex ? "HK" + symbol.code : symbol.code
         case .us: path = symbol.code
-        case .jj: return nil
+        case .jj, .hf, .wh: return nil
         }
         return URL(string: "https://xueqiu.com/S/" + path)
     }
 
-    /// 在网页上看这一只：股票和指数去雪球，场外基金去天天基金。返回按钮上写的名字和地址。
+    /// 在网页上看这一只：股票和指数去雪球，场外基金去天天基金，期货外汇去新浪财经（美元指数在新浪叫 DINIW）。
+    /// 返回按钮上写的名字和地址。
     public static func web(_ symbol: Symbol) -> (title: String, url: URL)? {
-        if symbol.isFund {
+        switch symbol.market {
+        case .jj:
             return URL(string: "https://fund.eastmoney.com/\(symbol.code).html").map { ("天天基金", $0) }
+        case .hf:
+            return URL(string: "https://finance.sina.com.cn/futures/quotes/\(symbol.code).shtml").map { ("新浪财经", $0) }
+        case .wh:
+            let code = symbol.code == "USDX" ? "DINIW" : symbol.code
+            return URL(string: "https://finance.sina.com.cn/money/forex/hq/\(code).shtml").map { ("新浪财经", $0) }
+        default:
+            return xueqiu(symbol).map { ("雪球", $0) }
         }
-        return xueqiu(symbol).map { ("雪球", $0) }
     }
 }
 
@@ -328,16 +378,17 @@ public enum WatchlistSort: String, CaseIterable, Sendable {
 /// 自选列表的筛选：全部、某个市场、有持仓的。
 /// 列表上方的筛选：全部、某个市场、有持仓的，或者某个分组。
 public enum WatchlistFilter: Hashable, Sendable {
-    case all, cn, hk, us, holdings
+    case all, cn, hk, us, global, holdings
     case group(String)
 
-    /// 存进设置里的写法：`all`、`cn`、`hk`、`us`、`holdings`，分组是 `group:名字`。
+    /// 存进设置里的写法：`all`、`cn`、`hk`、`us`、`global`、`holdings`，分组是 `group:名字`。
     public var id: String {
         switch self {
         case .all: return "all"
         case .cn: return "cn"
         case .hk: return "hk"
         case .us: return "us"
+        case .global: return "global"
         case .holdings: return "holdings"
         case .group(let name): return "group:" + name
         }
@@ -349,6 +400,7 @@ public enum WatchlistFilter: Hashable, Sendable {
         case "cn": self = .cn
         case "hk": self = .hk
         case "us": self = .us
+        case "global": self = .global
         case "holdings": self = .holdings
         default:
             guard id.hasPrefix("group:"), let name = WatchItem.normalizedGroup(String(id.dropFirst(6))) else { return nil }
@@ -362,6 +414,7 @@ public enum WatchlistFilter: Hashable, Sendable {
         case .cn: return items.filter { $0.symbol.market.region == .cn }
         case .hk: return items.filter { $0.symbol.market.region == .hk }
         case .us: return items.filter { $0.symbol.market.region == .us }
+        case .global: return items.filter { $0.symbol.market.region == .global }
         case .holdings: return items.filter { $0.holding != nil }
         case .group(let name): return items.filter { $0.group == name }
         }
@@ -377,6 +430,7 @@ public enum WatchlistFilter: Hashable, Sendable {
             if regions.contains(.cn) { result.append(.cn) }
             if regions.contains(.hk) { result.append(.hk) }
             if regions.contains(.us) { result.append(.us) }
+            if regions.contains(.global) { result.append(.global) }
         }
         let held = items.filter { $0.holding != nil }.count
         if held > 0, held < items.count {

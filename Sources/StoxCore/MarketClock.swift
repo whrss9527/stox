@@ -52,6 +52,9 @@ public enum MarketClock {
                 Session(start: 9 * 60 + 30, end: 16 * 60, phase: .trading),
                 Session(start: 16 * 60, end: 20 * 60, phase: .afterHours),
             ]
+        case .global:
+            // 工作日全天，哪天开哪天收见 globalPhase。
+            return [Session(start: 0, end: 24 * 60, phase: .trading)]
         }
     }
 
@@ -62,6 +65,7 @@ public enum MarketClock {
 
     /// 仅按时间表判断的交易时段。
     public static func phase(for region: MarketRegion, at date: Date) -> MarketPhase {
+        if region == .global { return globalPhase(at: date) }
         let calendar = region.calendar
         let weekday = calendar.component(.weekday, from: date)
         guard weekday != 1, weekday != 7 else { return .closed }  // 周日、周六
@@ -75,6 +79,12 @@ public enum MarketClock {
     /// - Parameter latestQuoteTime: 该市场所有行情里最新的时间戳。
     public static func effectivePhase(for region: MarketRegion, at date: Date, latestQuoteTime: Date?) -> MarketPhase {
         let scheduled = phase(for: region, at: date)
+        if region == .global {
+            // 期货外汇只在圣诞、元旦这样的节日休市：该开着的时候最新的行情已经是几个小时以前的，就是休市
+            // （每天纽约时间 17 点期货有一小时休息，不算）。
+            guard scheduled == .trading, let latest = latestQuoteTime else { return scheduled }
+            return date.timeIntervalSince(latest) > globalStaleInterval ? .closed : scheduled
+        }
         guard scheduled == .trading || scheduled == .lunchBreak, let latest = latestQuoteTime else { return scheduled }
         let calendar = region.calendar
         if calendar.isDate(latest, inSameDayAs: date) { return scheduled }
@@ -83,6 +93,24 @@ public enum MarketClock {
         let c = calendar.dateComponents([.hour, .minute], from: date)
         let minutes = (c.hour ?? 0) * 60 + (c.minute ?? 0)
         return minutes >= regularOpen(for: region) + grace ? .closed : scheduled
+    }
+}
+
+extension MarketClock {
+    /// 期货外汇的行情停了这么久（秒），按时间表该开着也当休市。
+    static let globalStaleInterval: TimeInterval = 3 * 3600
+
+    /// 期货外汇的交易时段：纽约时间周日 18:00 开盘，一直到周五 17:00 收盘，中间不分时段。
+    /// 外汇早一个小时开盘，期货每天 17:00 到 18:00 休息一小时，这些都不细分。
+    static func globalPhase(at date: Date) -> MarketPhase {
+        let calendar = MarketRegion.us.calendar
+        let hour = calendar.component(.hour, from: date)
+        switch calendar.component(.weekday, from: date) {
+        case 7: return .closed  // 周六
+        case 1: return hour >= 18 ? .trading : .closed  // 周日晚上开盘
+        case 6: return hour < 17 ? .trading : .closed  // 周五下午收盘
+        default: return .trading
+        }
     }
 }
 

@@ -40,6 +40,12 @@ public enum QuoteFormatter {
         return (value > 0 ? "+" : "") + money(value)
     }
 
+    /// 带正负号的大数，用于资金流向：`+2.48亿`、`-2675.37万`、`0`。
+    public static func signedLargeNumber(_ value: Double) -> String {
+        guard abs(value) >= 0.5 else { return "0" }
+        return (value > 0 ? "+" : "-") + largeNumber(abs(value))
+    }
+
     /// 打开“隐藏金额”时，市值、盈亏金额和持有数量都换成它；比例照常显示。
     public static let hiddenAmount = "****"
 

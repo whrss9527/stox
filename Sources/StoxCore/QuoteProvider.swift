@@ -21,6 +21,8 @@ public protocol QuoteProvider: Sendable {
     func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]?
     /// A 股行业按涨跌幅排的前 count 个；数据源不支持时返回 nil。
     func fetchIndustries(count: Int) async throws -> [IndustryEntry]?
+    /// A 股个股、ETF 当天的资金流向；没有资金流向的证券、数据源不支持时返回 nil。
+    func fetchFundFlow(for symbol: Symbol) async throws -> FundFlow?
 }
 
 extension QuoteProvider {
@@ -31,6 +33,7 @@ extension QuoteProvider {
     public func fetchExtendedHours(for symbol: Symbol, exchangeCode: String?) async throws -> ExtendedHoursQuote? { nil }
     public func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]? { nil }
     public func fetchIndustries(count: Int) async throws -> [IndustryEntry]? { nil }
+    public func fetchFundFlow(for symbol: Symbol) async throws -> FundFlow? { nil }
 }
 
 public enum ProviderError: Error, LocalizedError, Equatable {
@@ -45,7 +48,7 @@ public enum ProviderError: Error, LocalizedError, Equatable {
     }
 }
 
-/// 腾讯财经行情源：免费、无需密钥，覆盖沪深北 A 股、港股（延时约 15 分钟）和美股。
+/// 腾讯财经行情源：免费、无需密钥，覆盖沪深北 A 股、港股（延时约 15 分钟）、美股，以及国际期货、贵金属和外汇。
 public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     public static let quoteEndpoint = "https://qt.gtimg.cn/utf8/q="
     public static let searchEndpoint = "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q="
@@ -153,14 +156,29 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
         return Self.decodeText(try await get(url))
     }
 
+    /// 搜索接口搜不到期货外汇，先在内置的品种表里找，排在前面；搜索接口出错时只要品种表里有就先给这些。
     public func search(_ query: String) async throws -> [SearchResult] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
+        let local = GlobalCatalog.search(trimmed)
         guard let url = Self.searchURL(for: trimmed) else { throw URLError(.badURL) }
-        return TencentSearchParser.parse(Self.decodeText(try await get(url)))
+        do {
+            let remote = TencentSearchParser.parse(Self.decodeText(try await get(url)))
+            return local + remote.filter { result in !local.contains { $0.symbol == result.symbol } }
+        } catch {
+            if local.isEmpty { throw error }
+            return local
+        }
     }
 
     public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? {
+        guard symbol.hasIntraday else { return nil }
+        // 腾讯的分时接口不认期货（code param error），用新浪的。
+        if symbol.market == .hf {
+            guard let url = SinaFuturesMinuteParser.url(for: symbol) else { throw URLError(.badURL) }
+            let data = try await HTTP.get(url, session: session, timeout: timeout, headers: ["Referer": SinaProvider.referer])
+            return SinaFuturesMinuteParser.parse(data, symbol: symbol)
+        }
         guard let url = Self.minuteURL(for: symbol) else { throw URLError(.badURL) }
         return TencentMinuteParser.parse(try await get(url), symbol: symbol)
     }
@@ -175,7 +193,13 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
         return TencentRank.parseIndustries(try await get(url))
     }
 
+    public func fetchFundFlow(for symbol: Symbol) async throws -> FundFlow? {
+        guard let url = TencentFundFlow.url(for: symbol) else { return nil }
+        return TencentFundFlow.parse(try await get(url))
+    }
+
     public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? {
+        guard symbol.hasKline else { return nil }
         var code = exchangeCode
         // 美股个股不带交易所后缀时取不到正确的 K 线，调用方没给就先查一次行情。
         if code == nil, symbol.market.region == .us, !symbol.isIndex {
@@ -186,6 +210,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchFiveDay(for symbol: Symbol, exchangeCode: String?) async throws -> MultiDaySeries? {
+        guard symbol.hasKline else { return nil }
         var code = exchangeCode
         if code == nil, symbol.market.region == .us, !symbol.isIndex {
             code = try await fetchQuotes(for: [symbol])[symbol]?.exchangeCode

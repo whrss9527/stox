@@ -13,13 +13,22 @@ struct QuoteRow: View {
         compact ? compactRowHeight : standardRowHeight
     }
 
-    /// 展开后详情的高度：走势图、三行行情数据，有持仓时再加一行。场外基金没有走势图，只有一行净值。
+    /// 迷你分时的宽度：地方够时这么宽，名称、代码那一列长的时候（比如美股带着盘后涨跌）让它，最窄到 minimum。
+    static let sparklineWidth: CGFloat = 40
+    static let sparklineMinimumWidth: CGFloat = 24
+
+    /// 展开后详情的高度：走势图、三行行情数据，A 股个股和 ETF 多一行涨停跌停，有持仓时再加一行。
+    /// 场外基金没有走势图，只有一行净值；期货外汇是两行行情数据，国际期货上面还有分时图。
     static func detailHeight(for item: WatchItem) -> CGFloat {
         let note: CGFloat = item.note == nil ? 0 : 20
         if item.symbol.isFund {
             return (item.holding == nil ? 63 : 96) + note
         }
-        return (item.holding == nil ? 129 : 162) + QuoteChartSection.height + 6 + note
+        if item.symbol.isGlobal {
+            return 96 + (item.symbol.hasIntraday ? QuoteChartSection.height + 6 : 0) + note
+        }
+        let limits: CGFloat = QuoteDetailView.showsLimits(item.symbol) ? 33 : 0
+        return (item.holding == nil ? 129 : 162) + limits + QuoteChartSection.height + 6 + note
     }
 
     let item: WatchItem
@@ -98,6 +107,12 @@ struct QuoteRow: View {
 
     private var color: Color { Theme.priceColor(for: direction, convention: settings.colorConvention) }
 
+    /// 这一行画的迷你分时：设置里打开了、没展开（展开了有大的分时图）、有分时（场外基金、外汇没有），末端跟着现价走。
+    private var rowSparkline: Sparkline? {
+        guard settings.showSparklines, !expanded, item.symbol.hasIntraday, let sparkline = store.sparklines[item.symbol] else { return nil }
+        return sparkline.updating(with: quote, region: item.symbol.market.region)
+    }
+
     private var summary: some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
@@ -147,7 +162,14 @@ struct QuoteRow: View {
                     }
                 }
             }
+            // 名称、代码这一列排在现价后面，迷你分时让着它们。
+            .layoutPriority(1)
             Spacer(minLength: 6)
+            if let sparkline = rowSparkline {
+                SparklineView(sparkline: sparkline, reference: quote?.previousClose ?? 0, color: color)
+                    .frame(minWidth: Self.sparklineMinimumWidth, idealWidth: Self.sparklineWidth, maxWidth: Self.sparklineWidth)
+                    .frame(height: 20)
+            }
             VStack(alignment: .trailing, spacing: 1) {
                 priceLabel(size: 14)
                 if let position {
@@ -163,6 +185,8 @@ struct QuoteRow: View {
                     .help("持仓盈亏")
                 }
             }
+            // 现价最先排，永远不省略。
+            .layoutPriority(2)
             pill(width: 70, height: 24, fontSize: 12)
         }
     }
@@ -293,7 +317,7 @@ struct QuoteRow: View {
         Button(item.pinned ? "不在菜单栏显示" : "显示在菜单栏") {
             store.togglePinned(item.symbol)
         }
-        Button(item.symbol.isIndex ? "价格提醒与简称…" : "持仓、提醒与简称…") {
+        Button(item.symbol.canHold ? "持仓、提醒与简称…" : "价格提醒与简称…") {
             router.route = .edit(item.symbol)
         }
         Menu("分组") {
@@ -361,6 +385,27 @@ struct QuoteDetailView: View {
                     cell("日涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
                     cell("日涨幅", QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
                 }
+            } else if item.symbol.isGlobal {
+                // 期货外汇没有成交量：开高低收、买价卖价；外汇有 52 周最高最低，期货写振幅。国际期货有分时图（来自新浪）。
+                if item.symbol.hasIntraday {
+                    QuoteChartSection(item: item, quote: quote)
+                }
+                HStack(spacing: 0) {
+                    cell("今开", positivePrice(quote.open))
+                    cell("最高", positivePrice(quote.high))
+                    cell("最低", positivePrice(quote.low))
+                    cell(item.symbol.market == .hf ? "昨结" : "昨收", price(quote.previousClose))
+                }
+                HStack(spacing: 0) {
+                    cell("涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
+                    cell("买价", quote.bid.map(price) ?? "--")
+                    cell("卖价", quote.ask.map(price) ?? "--")
+                    if let high = quote.high52Week, let low = quote.low52Week {
+                        cell("52周高低", price(high) + "/" + price(low))
+                    } else {
+                        cell("振幅", quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                    }
+                }
             } else {
                 QuoteChartSection(item: item, quote: quote)
                 HStack(spacing: 0) {
@@ -384,6 +429,15 @@ struct QuoteDetailView: View {
                     cell("市盈率", peText)
                     cell("52周最高", quote.high52Week.map(price) ?? "--")
                     cell("52周最低", quote.low52Week.map(price) ?? "--")
+                }
+                if Self.showsLimits(item.symbol) {
+                    // 涨停价用涨的颜色、跌停价用跌的颜色；ETF 没有市净率，新浪的备用行情里这一行都没有。
+                    HStack(spacing: 0) {
+                        cell("涨停", quote.limitUp.map(price) ?? "--", color: profitColor(1))
+                        cell("跌停", quote.limitDown.map(price) ?? "--", color: profitColor(-1))
+                        cell("市净率", quote.pbRatio.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "--")
+                        cell("量比", quote.volumeRatio.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "--")
+                    }
                 }
             }
             if let holding = item.holding {
@@ -413,8 +467,9 @@ struct QuoteDetailView: View {
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
+                    .help(item.symbol.isFund ? "场外基金的净值每个交易日晚上更新，白天看到的是上一个交易日的" : "")
                 Spacer()
-                Button(item.symbol.isIndex ? "提醒" : "持仓与提醒") { router.route = .edit(item.symbol) }
+                Button(item.symbol.canHold ? "持仓与提醒" : "提醒") { router.route = .edit(item.symbol) }
                 if let web = QuoteLinks.web(item.symbol) {
                     Button(web.title) { NSWorkspace.shared.open(web.url) }
                 }
@@ -428,6 +483,16 @@ struct QuoteDetailView: View {
 
     private func price(_ value: Double) -> String {
         QuoteFormatter.price(value, decimals: quote.priceDecimals)
+    }
+
+    /// A 股个股和 ETF 多一行涨停价、跌停价、市净率和量比（指数、场外基金没有）。
+    static func showsLimits(_ symbol: Symbol) -> Bool {
+        symbol.market.region == .cn && !symbol.isIndex && !symbol.isFund
+    }
+
+    /// 还没开盘时今开、最高、最低是 0，写成 --。
+    private func positivePrice(_ value: Double) -> String {
+        value > 0 ? price(value) : "--"
     }
 
     /// 亏损公司的市盈率是负数，和券商软件一样显示“亏损”。
@@ -464,7 +529,7 @@ struct QuoteDetailView: View {
         // 场外基金写净值是哪天的，每个交易日晚上才出当天的。
         if item.symbol.isFund {
             guard let timestamp = quote.timestamp else { return "净值每个交易日晚上更新" }
-            return "净值日期 " + ProfitHistory.day(of: timestamp, region: .cn) + " · 每个交易日晚上更新"
+            return "净值日期 " + ProfitHistory.day(of: timestamp, region: .cn)
         }
         // 美股不在常规交易时，这一行换成盘前盘后价和它的成交时间；行情时间这时总是收盘那一刻，不用再写。
         if settings.showExtendedHours, let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
@@ -473,6 +538,10 @@ struct QuoteDetailView: View {
             return text
         }
         guard let timestamp = quote.timestamp else { return "" }
+        // 期货外汇的行情时间本来就是北京时间。
+        if item.symbol.isGlobal {
+            return "北京时间 " + QuoteFormatter.time(timestamp, timeZone: region.timeZone)
+        }
         var text = "\(region.displayName)时间 \(QuoteFormatter.time(timestamp, timeZone: region.timeZone))"
         if region == .hk { text += " · 延时约 15 分钟" }
         return text

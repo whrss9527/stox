@@ -17,6 +17,24 @@ struct PanelSizeKey: PreferenceKey {
     }
 }
 
+/// 列表上方几张卡片（更新提示、小技巧、持仓合计）各自的高度，屏幕放不下时用来算它们能占多高。
+struct CardHeightsKey: PreferenceKey {
+    static let defaultValue: [CGFloat] = []
+
+    static func reduce(value: inout [CGFloat], nextValue: () -> [CGFloat]) {
+        value += nextValue()
+    }
+}
+
+extension View {
+    /// 报告这张卡片的高度（见 CardHeightsKey）。
+    func reportsCardHeight() -> some View {
+        background(GeometryReader { proxy in
+            Color.clear.preference(key: CardHeightsKey.self, value: [proxy.size.height])
+        })
+    }
+}
+
 /// 面板根视图：自选列表页和单只证券的编辑页，外面是一层玻璃。
 @MainActor
 struct PanelView: View {
@@ -36,12 +54,17 @@ struct PanelView: View {
                 AlertLogPanel()
             case .rank:
                 RankPanel()
+            case .calendar:
+                ProfitCalendarPanel()
             }
         }
         .padding(12)
         .frame(width: Theme.panelWidth)
         .background(GlassPanelBackground())
         .padding(8)
+        // 按内容本来的高度量：窗口比内容矮时 SwiftUI 会把内容压扁去凑窗口，量出来的就不是真的高度，
+        // 放不下时也就不会去压矮列表。
+        .fixedSize(horizontal: false, vertical: true)
         .background(GeometryReader { proxy in
             Color.clear.preference(key: PanelSizeKey.self, value: proxy.size)
         })
@@ -66,8 +89,19 @@ struct WatchlistPanel: View {
             PanelHeader()
             SearchBar()
             if router.trimmedQuery.isEmpty {
-                TipsCards()
-                HoldingsSummaryView()
+                if let maxHeight = router.cardsMaxHeight {
+                    // 屏幕太矮、列表已经压到最矮还放不下时，列表上方的提示和持仓合计放进一个能滚动的区域。
+                    ScrollView {
+                        VStack(spacing: 10) {
+                            TipsCards()
+                            HoldingsSummaryView()
+                        }
+                    }
+                    .frame(height: min(maxHeight, router.cardsHeight))
+                } else {
+                    TipsCards()
+                    HoldingsSummaryView()
+                }
                 WatchlistView()
             } else if router.batch != nil {
                 BatchAddView()
@@ -79,6 +113,13 @@ struct WatchlistPanel: View {
         }
         .task(id: router.searchText) {
             await router.runSearch(using: store)
+        }
+        .onPreferenceChange(CardHeightsKey.self) { heights in
+            // 几张卡片之间隔着 10。
+            let total = heights.reduce(0, +) + CGFloat(max(heights.count - 1, 0)) * 10
+            if abs(total - router.cardsHeight) > 0.5 {
+                router.cardsHeight = total
+            }
         }
     }
 }
@@ -97,7 +138,8 @@ struct PanelHeader: View {
                 Text("Stox")
                     .font(.system(size: 14, weight: .semibold))
                 HStack(spacing: 8) {
-                    ForEach(store.activeRegions, id: \.self) { region in
+                    // 期货外汇工作日全天都在交易，不占这里的地方。
+                    ForEach(store.activeRegions.filter { $0 != .global }, id: \.self) { region in
                         let phase = store.phase(for: region)
                         HStack(spacing: 3) {
                             Circle()
@@ -198,6 +240,12 @@ struct WatchlistView: View {
     /// 屏幕够高时列表最多这么高；屏幕放不下整个面板时由 PanelRouter.listMaxHeight 再压低。
     static let defaultMaxHeight: CGFloat = 430
 
+    /// 取迷你分时的任务按这个重新开始：面板开关、设置改了、列表里的证券变了（只是顺序变了不算）。
+    private struct SparklineTrack: Hashable {
+        var active: Bool
+        var symbols: Set<Symbol>
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if store.items.isEmpty {
@@ -257,6 +305,12 @@ struct WatchlistView: View {
                         // 方向键移动时马上滚到看得见的地方，不等动画。
                         if let symbol { proxy.scrollTo(symbol) }
                     }
+                }
+                .task(id: SparklineTrack(
+                    active: router.isOpen && settings.showSparklines && !settings.compactRows, symbols: Set(visible.map(\.symbol))
+                )) {
+                    guard router.isOpen, settings.showSparklines, !settings.compactRows else { return }
+                    await store.trackSparklines(visible.map(\.symbol))
                 }
             }
         }
@@ -501,7 +555,7 @@ struct TipsCards: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("已更新到 \(version)")
                             .font(.system(size: 12, weight: .semibold))
-                        Text("自选和设置都还在")
+                        Text(settings.whatsNewSince.map { "从 \($0) 更新上来，自选和设置都还在" } ?? "自选和设置都还在")
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
                     }
@@ -525,8 +579,9 @@ struct TipsCards: View {
             }
             .padding(10)
             .glassCard()
+            .reportsCardHeight()
             .task(id: version) {
-                whatsNewNotes = await Self.loadNotes(version)
+                whatsNewNotes = await Self.loadNotes(version, since: settings.whatsNewSince)
             }
         }
         if !settings.tipsDismissed {
@@ -547,27 +602,42 @@ struct TipsCards: View {
             }
             .padding(10)
             .glassCard()
+            .reportsCardHeight()
         }
     }
 
     /// 发布说明里“更新内容”的前几条。
-    private static func loadNotes(_ version: String) async -> String? {
-        let release: ReleaseInfo
+    /// 隔了几个版本才更新时，每个版本一行（它的第一条更新内容），最多 5 个版本；只差一个版本时是这个版本的前几条。
+    private static func loadNotes(_ version: String, since: String?) async -> String? {
+        let lines: [String]
         do {
-            release = try await UpdateCheck.release(version: version, currentVersion: AppInfo.version)
+            let all = try await UpdateCheck.releases(count: 30, currentVersion: AppInfo.version)
+            let range = UpdateCheck.releases(all, after: since ?? version, upTo: version)
+            if range.count > 1 {
+                lines = ReleaseNotesText.firstLines(range, limit: 5)
+            } else {
+                // 只差一个版本，或者不知道是从哪个版本更新的：这个版本自己的前几条。
+                let release: ReleaseInfo
+                if let found = all.first(where: { $0.version == version }) {
+                    release = found
+                } else {
+                    release = try await UpdateCheck.release(version: version, currentVersion: AppInfo.version)
+                }
+                lines = Array(release.highlights
+                    .split(separator: "\n")
+                    .map(String.init)
+                    .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
+                    .prefix(4))
+            }
         } catch {
             Log.info("取 \(version) 的更新内容失败：\(error.localizedDescription)")
             print("STOX_DIAG whatsnew=failed \(error)")
             fflush(stdout)
             return nil
         }
-        let lines = release.highlights
-            .split(separator: "\n")
-            .map(String.init)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        print("STOX_DIAG whatsnew=\(lines.count) lines")
+        print("STOX_DIAG whatsnew=\(lines.count) lines since=\(since ?? "none")")
         fflush(stdout)
-        return lines.isEmpty ? nil : lines.prefix(4).joined(separator: "\n")
+        return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
 
     private func tip(_ text: String) -> some View {
@@ -596,6 +666,7 @@ struct TipsCards: View {
 struct HoldingsSummaryView: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
+    @EnvironmentObject private var router: PanelRouter
 
     var body: some View {
         // 跟着列表上方的筛选走：只看某个分组、某个市场时只算这些。
@@ -652,6 +723,7 @@ struct HoldingsSummaryView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .glassCard()
+            .reportsCardHeight()
             .help((filtered ? "只算列表上方选中的“\(filter.title)”。" : "")
                 + "按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币")
         }
@@ -716,9 +788,18 @@ struct HoldingsSummaryView: View {
             ForEach(store.profitHistory.regions, id: \.self) { region in
                 historyRow(region)
             }
-            Text("每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。")
-                .font(.system(size: 9.5))
-                .foregroundStyle(.tertiary)
+            HStack(spacing: 6) {
+                Text("每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。")
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                Spacer(minLength: 0)
+                Button("日历") { router.route = .calendar }
+                    .buttonStyle(.link)
+                    .font(.system(size: 10))
+                    .help("按月看每天赚了多少")
+            }
         }
     }
 
@@ -989,6 +1070,8 @@ struct PanelFooter: View {
                     .disabled(store.items.isEmpty)
                 Button("最近的提醒…") { router.route = .alerts }
                     .disabled(store.alertLog.entries.isEmpty)
+                Button("盈亏日历…") { router.route = .calendar }
+                    .disabled(store.profitHistory.records.isEmpty)
                 Button("A 股涨跌榜…") { router.route = .rank }
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")

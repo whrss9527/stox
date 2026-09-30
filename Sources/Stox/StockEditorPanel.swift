@@ -95,7 +95,7 @@ struct StockEditorPanel: View {
                         .padding(.horizontal, 12)
                         .glassCard()
 
-                        if !symbol.isIndex {
+                        if symbol.canHold {
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("持仓")
                                     .font(.system(size: 12.5, weight: .semibold))
@@ -432,7 +432,8 @@ struct StockEditorPanel: View {
     /// 自选里已经有的分组，编辑时可以直接选。
     private var existingGroups: [String] { Watchlist.groups(in: store.items) }
 
-    private var currency: String { symbol.market.region.currency }
+    /// 价格后面写的货币。期货外汇不写：外汇的价格是另一种货币的汇率，期货是每盎司、每桶多少美元。
+    private var currency: String { symbol.isGlobal ? "" : symbol.market.region.currency }
 
     private var alertFooter: String {
         var text = "留空表示不提醒。每个条件每个交易日最多提醒一次。"

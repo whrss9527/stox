@@ -31,8 +31,9 @@ jobs:
         # 真实请求腾讯行情接口和 GitHub 的发布接口；偶尔抖动时不阻塞构建。
         continue-on-error: true
         run: |
-          swift run stox-cli quote sh000001 sh600519 sz000001 sz399006 sh510300 bj920819 hk00700 hkHSI usAAPL usBRK.B us.IXIC
+          swift run stox-cli quote sh000001 sh600519 sz000001 sz399006 sh510300 bj920819 hk00700 hkHSI usAAPL usBRK.B us.IXIC hf_XAU whUSDCNY
           swift run stox-cli search gzmt
+          swift run stox-cli search 黄金
           swift run stox-cli search 腾讯
           swift run stox-cli kline sh600519 day
           swift run stox-cli kline hk00700 week
@@ -40,6 +41,7 @@ jobs:
           swift run stox-cli book sh600519
           swift run stox-cli rank gainers 5
           swift run stox-cli rank industries 5
+          swift run stox-cli flow sh600519
           swift run stox-cli sina sh000001 sh600519 sh510300 hk00700 hkHSI usAAPL usBRK.B us.IXIC
           swift run stox-cli latest-release 0.0.1
 
@@ -100,7 +102,8 @@ jobs:
           for log in shots/*.log; do
             name=$(basename "$log" .log)
             [ -f "shots/$name-full.png" ] || continue
-            frame=$(grep -o 'capture_frame=[0-9 -]*' "$log" | head -1 | cut -d= -f2)
+            # 取最后一次报的范围：晚几秒再报的那次，面板已经按慢到的内容调整好了，和截图时一致。
+            frame=$(grep -o 'capture_frame=[0-9 -]*' "$log" | tail -1 | cut -d= -f2)
             [ -n "$frame" ] || continue
             "$RUNNER_TEMP/crop" "shots/$name-full.png" "shots/$name.jpg" $frame 900 0.85
             "$RUNNER_TEMP/crop" "shots/$name-full.png" "shots/$name-preview.jpg" $frame 640 0.45
