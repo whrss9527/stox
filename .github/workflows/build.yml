@@ -188,7 +188,7 @@ jobs:
           mkdir -p shots/app-store
           for name in appstore-panel appstore-detail; do
             [ -f "shots/$name-full.png" ] || continue
-            frame=$(grep -o 'capture_frame=[0-9 -]*' "shots/$name.log" | tail -1 | cut -d= -f2)
+            frame=$(grep -o 'panel_frame=[0-9 -]*' "shots/$name.log" | tail -1 | cut -d= -f2)
             [ -n "$frame" ] || continue
             swift scripts/app-store-screenshot.swift "shots/$name-full.png" "shots/app-store/$name-1440x900.png" $frame 1440 900
           done

@@ -11,7 +11,7 @@ PNG or JPEG, no transparency. The first three show up on the product page, so pu
 
 ## From CI (1440 × 900)
 
-The `App Store edition (sandbox)` job in the `build` workflow launches the sandboxed build, opens the panel, and turns the capture into 1440 × 900 images with `scripts/app-store-screenshot.swift` (the real panel, cropped from the menu bar down, placed on a gradient canvas). Download the `app-store-screenshots` artifact from the run; the images are in `shots/app-store/`.
+The `App Store edition (sandbox)` job in the `build` workflow launches the sandboxed build, opens the panel, and turns the capture into 1440 × 900 images with `scripts/app-store-screenshot.swift`: a menu bar across the top whose right end is the real one (Stox's ticker and the clock), and the real panel below it, clipped to its rounded corners, on a gradient desktop. Download the `app-store-screenshots` artifact from the run; the images are in `shots/app-store/`.
 
 The CI runner's screen is 1× and its system language is English, so the screenshots are in whatever language the UI shows on an English system. Until the English UI lands on `main` the panel is Chinese; after that, the same job produces English screenshots with no changes. To add a caption on the left:
 
@@ -19,7 +19,7 @@ The CI runner's screen is 1× and its system language is English, so the screens
 swift scripts/app-store-screenshot.swift shots/appstore-panel-full.png out.png $frame 1440 900 "Your watchlist,\none click away"
 ```
 
-(`$frame` is the last `capture_frame=` value in `shots/appstore-panel.log`.)
+(`$frame` is the last `panel_frame=` value in `shots/appstore-panel.log`: the panel's x, y, width and height in points.)
 
 ## Sharper, on your own Mac (2880 × 1800)
 
@@ -28,7 +28,7 @@ For Retina-quality images, take them on a Retina Mac with the English UI:
 1. Set a clean desktop picture; a fresh macOS user account keeps other menu bar items out of the shot.
 2. Build and run the App Store edition: `ADHOC=1 UNIVERSAL=0 scripts/build-app-store.sh && open dist/appstore/Stox.app` (or install the TestFlight build).
 3. Open the panel, then capture it with the diagnostics so the frame is known:
-   `dist/appstore/Stox.app/Contents/MacOS/Stox --show-panel --expand usAAPL` prints `STOX_DIAG capture_frame=x y w h`.
+   `dist/appstore/Stox.app/Contents/MacOS/Stox --show-panel --expand usAAPL` prints `STOX_DIAG panel_frame=x y w h …`.
 4. `screencapture -x full.png`, then
    `swift scripts/app-store-screenshot.swift full.png shot1.png x y w h 2880 1800 "Stocks in your menu bar"`.
 
