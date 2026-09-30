@@ -49,7 +49,6 @@
 "点击设置" = "Click to Set";
 
 /* Stox/IntradayChart.swift */
-"成本 " = "Cost ";
 "正在加载分时…" = "Loading intraday…";
 "今天还没有分时数据" = "No intraday data today yet";
 "分时走势" = "Intraday chart";
@@ -426,6 +425,8 @@
 "日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。分时图和五日图上画成交均价（橙色），指数没有。" = "Daily, weekly and monthly charts show 5, 10 and 20-period moving averages of the close, with their values above the chart (for the hovered candle when pointing). Intraday and 5-day charts show the average trade price in orange, except for indices.";
 "画成本线和买卖点" = "Show cost line and trades";
 "填了持仓的，分时图和 K 线上成本价落在图里时画一条虚线；K 线上用 B、S 标出“记一笔”记过买入、卖出的那几根。" = "For holdings, draws a dashed line at your cost when it falls within the chart; candlestick charts mark buys and sells recorded with “Record” with B and S.";
+"画提醒线" = "Show alert lines";
+"设了价格提醒的，提醒价落在图里时画一条褐色的虚线；止盈止损按成本价折成价格，涨跌幅提醒按昨收折成价格，只画在分时图上。" = "For price alerts, draws a brown dashed line at the alert price when it falls within the chart. Take-profit and stop-loss levels are worked out from your cost; % change alerts from the previous close, and those appear on the intraday chart only.";
 "美股盘前盘后价" = "US pre-market and after-hours prices";
 "美股个股不在常规交易时段时，代码旁边显示盘前或盘后的最新价相对收盘的涨跌，详情里有价格和成交时间。每只美股个股要多发一个请求。" = "Outside regular hours, shows the latest pre-market or after-hours change from the close next to US stock symbols, with the price and time in the details. Needs one extra request per US stock.";
 "给别人看屏幕时用：市值、盈亏金额和持有数量换成 ****，盈亏比例照常显示；菜单栏的今日盈亏换成比例，收盘小结和止盈止损的通知里也不写金额。持仓合计里“市值”旁边的小眼睛可以随时切换。编辑页和复制出来的表格照常是实际数字。" = "For sharing your screen: values, P&L amounts and share counts become **** while percentages stay; the menu bar shows today’s P&L as a percentage, and close summaries and take-profit or stop-loss notifications leave out amounts. Toggle it anytime with the eye next to “Mkt value” in the holdings total. The edit page and copied tables still show real numbers.";
@@ -614,6 +615,12 @@
 "Stox 有新版本 %@" = "Stox %@ is available";
 "打开行情面板点“更新”，自动下载安装并重新启动" = "Open the panel and click “Update” to download, install and relaunch";
 "检查更新失败：%@" = "Couldn’t check for updates: %@";
+
+/* StoxCore/ChartLevel.swift */
+"成本 " = "Cost ";
+"提醒 " = "Alert ";
+"止盈 " = "TP ";
+"止损 " = "SL ";
 
 /* StoxCore/ExtendedHours.swift */
 "盘前" = "Pre";

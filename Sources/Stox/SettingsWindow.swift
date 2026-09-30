@@ -363,6 +363,8 @@ struct DisplayPage: View {
                     FormNote(L("日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。分时图和五日图上画成交均价（橙色），指数没有。"))
                     Toggle(L("画成本线和买卖点"), isOn: $settings.showCostAndTrades)
                     FormNote(L("填了持仓的，分时图和 K 线上成本价落在图里时画一条虚线；K 线上用 B、S 标出“记一笔”记过买入、卖出的那几根。"))
+                    Toggle(L("画提醒线"), isOn: $settings.showAlertLines)
+                    FormNote(L("设了价格提醒的，提醒价落在图里时画一条褐色的虚线；止盈止损按成本价折成价格，涨跌幅提醒按昨收折成价格，只画在分时图上。"))
                     Toggle(L("美股盘前盘后价"), isOn: $settings.showExtendedHours)
                     FormNote(L("美股个股不在常规交易时段时，代码旁边显示盘前或盘后的最新价相对收盘的涨跌，详情里有价格和成交时间。每只美股个股要多发一个请求。"))
                     Toggle(L("隐藏金额"), isOn: $settings.hideAmounts)
