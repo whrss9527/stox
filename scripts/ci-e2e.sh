@@ -103,6 +103,7 @@ smoke() {
   check_fits detail
   run_case search --show-panel --search 腾讯
   run_case settings-general --show-settings general
+  grep -q "english=false interface_language=simplifiedChinese" shots/settings-general.log || fail "设置里的界面语言应该是简体中文"
   run_case settings-display --show-settings display
   grep -q "panel_frame=" shots/panel.log || fail "面板没有打开"
   grep -q 'english=false sample="设置…"' shots/panel.log || fail "界面应该是中文"
@@ -469,7 +470,11 @@ english() {
   run_case en-detail --show-panel --expand sh600519 "${en[@]}"
   check_fits en-detail
   run_case en-search --show-panel --search 腾讯 "${en[@]}"
-  run_case en-settings-general --show-settings general "${en[@]}"
+  # 设置里选了 English：只在 Stox 自己的偏好设置里写 AppleLanguages（不带启动参数），界面就是英文。
+  defaults write "$DOMAIN" AppleLanguages -array en
+  run_case en-settings-general --show-settings general
+  grep -q "english=true interface_language=english" shots/en-settings-general.log || fail "设置里选了 English，界面应该是英文"
+  use_chinese
   run_case en-settings-display --show-settings display "${en[@]}"
   grep -q "settings_page=display" shots/en-settings-display.log || fail "英文界面的设置窗口没有打开"
   # 持仓：菜单栏显示今日盈亏时写“Today”，大数用 K、M 而不是万、亿。
@@ -712,6 +717,11 @@ appstore_test() {
   grep -q "expanded=sh600519" shots/appstore-detail.log || fail "App Store 版展开详情失败"
   run_case appstore-settings --show-settings about
   grep -q "settings_page=about" shots/appstore-settings.log || fail "App Store 版的设置窗口没有打开"
+  # 界面语言：沙盒里的设置在容器里，设置页从那里读出选的语言，启动时也按它显示。
+  defaults write "$prefs" AppleLanguages -array zh-Hans
+  run_case appstore-language --show-settings general
+  defaults delete "$prefs" AppleLanguages
+  grep -q "english=false interface_language=simplifiedChinese" shots/appstore-language.log || fail "App Store 版没有按设置里选的语言显示"
 
   # 同步：沙盒里只能写自己的容器，把同步文件夹指到容器里，确认协调写入在沙盒里能用。
   # ad-hoc 签名不能带 iCloud 容器的 entitlement（要描述文件），所以这里不测真正的 iCloud 容器。

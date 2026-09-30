@@ -235,14 +235,16 @@ App Store 版编译时加 `-D APP_STORE`（`STOX_FLAVOR=appstore scripts/build-a
 
 ## 13. 界面语言
 
-界面有简体中文和英文两种，跟随系统语言：系统语言是中文时是中文，其他语言都是英文（`CFBundleDevelopmentRegion` 是 `en`）。只想换 Stox 的语言，可以在“系统设置 → 通用 → 语言与地区 → App”里单独给 Stox 选。
+界面有简体中文和英文两种，默认跟随系统语言：系统语言是中文时是中文，其他语言都是英文（`CFBundleDevelopmentRegion` 是 `en`）。
+
+- **设置里选语言**。设置的“通用”页有“界面语言”：跟随系统、English、简体中文（语言名用它自己的写法）。选了某种语言就把 `AppleLanguages` 写进 Stox 自己的偏好设置，跟随系统时删掉这个键；这和“系统设置 → 通用 → 语言与地区 → App”里单独给 Stox 选语言是同一个键，两边看到的一样（在那里选了 Stox 没有的语言，设置里显示为跟随系统）。系统启动时按它选翻译表，`AppLanguage.isEnglish` 也只在启动时算一次，所以要重新启动：选的和这次启动时的不一样时，下面写着“重新启动 Stox 后生效”和“立即重新启动”按钮。重新启动用 `NSWorkspace.openApplication`（`createsNewApplicationInstance`）打开一个新实例，参数里带 `--relaunch-after <旧进程号>`，打开后旧的退出；新实例在 `main` 里先等旧的退出（最多 15 秒）再建菜单栏图标、注册快捷键。不用一键更新的 shell 脚本，所以 App Store 版（沙盒，没有 `Shell`）一样能用。这个设置只在这台 Mac 上，不同步也不写进备份。
 
 - **中文原文就是键**。代码里显示给用户的文字都写成 `L("中文原文", 参数…)`（`StoxCore/AppLanguage.swift`），原文同时是 `Resources/en.lproj`、`Resources/zh-Hans.lproj` 里 `Localizable.strings` 的键，打包时复制进 `Stox.app/Contents/Resources`。命令行工具和单元测试里没有翻译表，`L` 原样返回中文，测试照旧比较中文。
 - **不用 SwiftUI 自己的查表**。Stox 是 SwiftPM 的可执行文件，`Text("…")` 的插值会生成 `%lld`、`%@` 这样依赖参数类型的键，脚本很难检查全，所以一律写成 `Text(L("…"))`：`L` 返回的是字符串，SwiftUI 原样显示。带参数的文字用 `%@` 占位，参数按字符串插值的写法转成文字，数字的格式和原来一样；英文语序不同时译文里用 `%1$@`、`%2$@`。
 - **检查**。`scripts/check-localization.py` 检查两种语言的键完全一致、代码里用到的键都有翻译、占位数量对得上，并且代码里没有漏掉 `L()` 的中文（日志、诊断输出和行尾标了 `// l10n-ignore` 的数据除外，比如默认自选的名称和发布说明的标题）。CI 的 Linux 任务每次都跑。
 - **数字**。英文界面里大数用 K、M、B、T（`27.83亿` 是 `2.78B`），成交量是 lots、shares；小数位数、正负号和百分比不变。日期、相对时间和月份名跟着界面语言。
 - **不翻译的**：证券名称来自行情接口，更新日志和发布说明只有中文，命令行工具 `stox-cli` 是给开发者用的，也只有中文。
-- CI 的系统语言是英文：启动测试先用 `AppleLanguages` 把 Stox 固定成中文（README 的截图和检查菜单栏文字都用中文界面），最后带上 `-AppleLanguages '(en)'` 再启动几次，检查界面是英文，截图是 `shots/en-*`。
+- CI 的系统语言是英文：启动测试先用 `AppleLanguages` 把 Stox 固定成中文（README 的截图和检查菜单栏文字都用中文界面），最后带上 `-AppleLanguages '(en)'` 再启动几次，检查界面是英文，截图是 `shots/en-*`；其中设置的“通用”页不带参数、只在偏好设置里写 `AppleLanguages` 为 `en`，检查设置里选 English 的效果。App Store 版在沙盒容器的偏好设置里写 `zh-Hans`，检查沙盒里也按它显示。
 
 ## 14. 质量保障
 

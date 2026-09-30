@@ -7,6 +7,9 @@ import StoxCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static func main() {
+        // 设置里点了“立即重新启动”打开的新实例：先等旧的退出。
+        LanguageSetting.waitForPreviousInstance(arguments: ProcessInfo.processInfo.arguments)
+        _ = LanguageSetting.atLaunch
         let app = NSApplication.shared
         let delegate = AppDelegate()
         app.delegate = delegate
