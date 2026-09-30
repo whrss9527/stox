@@ -5,13 +5,32 @@
 #   UNIVERSAL=1 scripts/build-app.sh     Apple 芯片 + Intel 通用版（需要完整 Xcode）
 #   CODESIGN_IDENTITY="Developer ID Application: ..." scripts/build-app.sh   用自己的证书签名
 #   ZIP=1 scripts/build-app.sh           另外打成 dist/Stox.zip（发布用）
+#   STOX_FLAVOR=appstore scripts/build-app.sh   App Store 版（-D APP_STORE：没有一键更新，沙盒运行），
+#                                        产物放在 dist/appstore/Stox.app；签名和打包见 scripts/build-app-store.sh
+#   CODESIGN_ENTITLEMENTS=文件            签名时带上这些 entitlement（App Store 版必须有沙盒）
+#   PROVISIONING_PROFILE=文件             签名前放进 Contents/embedded.provisionprofile（App Store 版上传时必须有）
 #
 # 产物: dist/Stox.app
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_NAME="Stox"
-DIST="dist"
+FLAVOR="${STOX_FLAVOR:-github}"
+# 两个版本用不同的编译目录，互相不会冲掉对方的编译缓存。
+SWIFT_FLAGS=""
+case "$FLAVOR" in
+  github)
+    DIST="dist"
+    ;;
+  appstore)
+    DIST="dist/appstore"
+    SWIFT_FLAGS="-Xswiftc -DAPP_STORE --scratch-path .build/appstore"
+    ;;
+  *)
+    echo "error: STOX_FLAVOR 只能是 github 或 appstore（现在是 $FLAVOR）" >&2
+    exit 2
+    ;;
+esac
 APP="$DIST/$APP_NAME.app"
 
 VERSION="${VERSION:-}"
@@ -27,11 +46,11 @@ if [[ "${UNIVERSAL:-0}" == "1" ]]; then
   ARCH_FLAGS="--arch arm64 --arch x86_64"
 fi
 
-echo "==> 编译 $APP_NAME $VERSION ($BUILD_NUMBER) ${ARCH_FLAGS}"
+echo "==> 编译 $APP_NAME $VERSION ($BUILD_NUMBER) $FLAVOR ${ARCH_FLAGS}"
 # shellcheck disable=SC2086
-swift build -c release --product "$APP_NAME" $ARCH_FLAGS
+swift build -c release --product "$APP_NAME" $ARCH_FLAGS $SWIFT_FLAGS
 # shellcheck disable=SC2086
-BIN_DIR="$(swift build -c release --product "$APP_NAME" $ARCH_FLAGS --show-bin-path)"
+BIN_DIR="$(swift build -c release --product "$APP_NAME" $ARCH_FLAGS $SWIFT_FLAGS --show-bin-path)"
 
 echo "==> 组装 $APP"
 rm -rf "$APP"
@@ -40,6 +59,13 @@ cp "$BIN_DIR/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP/Contents/Info.plist"
+if [[ "$FLAVOR" == "appstore" ]]; then
+  # 只用 HTTPS（系统自带的加密），出口合规可以豁免；声明了以后每次上传不用再在 App Store Connect 里回答。
+  plutil -replace ITSAppUsesNonExemptEncryption -bool NO "$APP/Contents/Info.plist"
+fi
+if [[ -n "${PROVISIONING_PROFILE:-}" ]]; then
+  cp "$PROVISIONING_PROFILE" "$APP/Contents/embedded.provisionprofile"
+fi
 
 echo "==> 生成图标"
 ICON_TMP="$(mktemp -d)"
@@ -63,6 +89,12 @@ if [[ "$IDENTITY" != "-" ]]; then
 fi
 if [[ -n "${CODESIGN_KEYCHAIN:-}" ]]; then
   SIGN_ARGS+=(--keychain "$CODESIGN_KEYCHAIN")
+fi
+if [[ -n "${CODESIGN_ENTITLEMENTS:-}" ]]; then
+  SIGN_ARGS+=(--entitlements "$CODESIGN_ENTITLEMENTS")
+elif [[ "$FLAVOR" == "appstore" ]]; then
+  echo "error: App Store 版必须带沙盒的 entitlement 签名，请用 scripts/build-app-store.sh" >&2
+  exit 2
 fi
 codesign "${SIGN_ARGS[@]}" "$APP"
 codesign --verify --strict --verbose=2 "$APP"

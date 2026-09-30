@@ -58,9 +58,15 @@ final class SyncManager: ObservableObject {
         settings.onSyncedSettingChange = { [weak self] in self?.localChanged() }
     }
 
-    var folderURL: URL? { CloudFile.folderURL }
-    var fileURL: URL? { folderURL?.appendingPathComponent(CloudFile.fileName) }
-    var available: Bool { folderURL != nil }
+    /// App 自己的 iCloud 容器的根目录（只有 App Store 版有）。要在后台线程上向系统要，要到之前是 nil。
+    @Published private(set) var containerRoot: URL?
+    private var containerLookup: Task<Void, Never>?
+
+    /// 同步文件放在哪里：App Store 版在 App 的 iCloud 容器里，GitHub 版在 iCloud 云盘/Stox 文件夹里。
+    var location: SyncLocation? { CloudFile.location(containerRoot: containerRoot) }
+    var folderURL: URL? { location?.folderURL }
+    var fileURL: URL? { location?.fileURL }
+    var available: Bool { location != nil }
 
     private var currentContent: SyncContent {
         SyncContent(watchlist: store.items, settings: settings.syncedSettings)
@@ -85,21 +91,42 @@ final class SyncManager: ObservableObject {
 
     /// 启动时按记录的开关恢复。
     func start() {
+        // 有 iCloud 容器的 entitlement 时先在后台找容器（没开同步也找，设置页才知道能不能开）；GitHub 版立即返回。
+        containerLookup = Task { @MainActor [weak self] in await self?.lookUpContainer() }
         guard settings.syncEnabled else { return }
         enabled = true
         lastSynced = defaults.data(forKey: Self.lastSyncedKey).flatMap { try? JSONDecoder().decode(SyncContent.self, from: $0) }
-        guard available else {
-            status = .unavailable
-            return
-        }
         status = .syncing
-        startWatching()
-        pullTask = Task { @MainActor [weak self] in await self?.pull() }
+        pullTask = Task { @MainActor [weak self] in
+            await self?.containerLookup?.value
+            guard let self, self.enabled else { return }
+            guard self.available else {
+                self.status = .unavailable
+                return
+            }
+            self.startWatching()
+            await self.pull()
+        }
+    }
+
+    /// 向系统要 App 自己的 iCloud 容器。第一次可能要几秒，放在后台线程上；已经要到了、或者没有 entitlement 时直接返回。
+    private func lookUpContainer() async {
+        guard CloudFile.hasContainerEntitlement, containerRoot == nil else { return }
+        let root = await Task.detached(priority: .utility) { CloudFile.containerRoot() }.value
+        containerRoot = root
+        if let root {
+            Log.info("iCloud 同步：使用 App 的 iCloud 容器（\(root.path)）")
+        } else {
+            Log.info("iCloud 同步：拿不到 App 的 iCloud 容器（没有登录 iCloud，或者没有打开 iCloud 云盘）")
+        }
     }
 
     /// 用户打开开关：iCloud 里已有不同的内容时先问用户，否则直接开始。
     func enable() async {
         guard !enabled else { return }
+        // 启动时没要到容器（比如那时还没登录 iCloud）：再要一次。
+        await containerLookup?.value
+        await lookUpContainer()
         guard available else {
             status = .unavailable
             return
@@ -200,7 +227,7 @@ final class SyncManager: ObservableObject {
         if push {
             await self.push()
         }
-        Log.info("iCloud 同步：已开启（\(folderURL?.path ?? "")）")
+        Log.info("iCloud 同步：已开启（\(location?.kind ?? "")：\(folderURL?.path ?? "")）")
     }
 
     // MARK: - 本机改动

@@ -10,11 +10,24 @@ enum AppInfo {
 
     static let repositoryURL = URL(string: "https://github.com/\(UpdateCheck.repository)")!
     static let issuesURL = URL(string: "https://github.com/\(UpdateCheck.repository)/issues")!
+
+    /// 哪个版本：GitHub 版自带一键更新；App Store 版在沙盒里运行，更新交给 App Store，没有下面的 Updater。
+    /// 编译时加 -D APP_STORE 选择 App Store 版（scripts/build-app.sh 的 STOX_FLAVOR=appstore）。
+    #if APP_STORE
+    static let flavor = "appstore"
+    #else
+    static let flavor = "github"
+    #endif
 }
+
+// App Store 版不带自己的更新：不检查 GitHub 上的新版本，也没有下载、替换程序的代码（App 审核指南 2.4.5）。
+#if !APP_STORE
 
 /// 更新：检查 GitHub 上的新版本，下载、校验、替换程序并重新启动。状态只在主线程上改，界面直接观察它。
 @MainActor
 final class Updater: ObservableObject {
+    static let shared = Updater()
+
     enum Phase: Equatable {
         case idle
         case checking
@@ -265,3 +278,4 @@ final class Updater: ObservableObject {
         onRelaunch?()
     }
 }
+#endif

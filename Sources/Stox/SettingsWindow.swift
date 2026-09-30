@@ -45,14 +45,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private var settings: SettingsStore?
     private var store: QuoteStore?
-    private var updater: Updater?
     private var sync: SyncManager?
     private var appearanceSubscription: AnyCancellable?
 
-    func configure(settings: SettingsStore, store: QuoteStore, updater: Updater, sync: SyncManager) {
+    func configure(settings: SettingsStore, store: QuoteStore, sync: SyncManager) {
         self.settings = settings
         self.store = store
-        self.updater = updater
         self.sync = sync
         appearanceSubscription = settings.$appearance.sink { [weak self] mode in
             self?.window?.appearance = mode.nsAppearance
@@ -78,8 +76,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow? {
-        guard let settings, let store, let updater, let sync else { return nil }
-        let root = SettingsRootView(navigation: navigation, settings: settings, store: store, updater: updater, sync: sync)
+        guard let settings, let store, let sync else { return nil }
+        let root = SettingsRootView(navigation: navigation, settings: settings, store: store, sync: sync)
         let hosting = NSHostingController(rootView: root)
         let window = NSWindow(contentViewController: hosting)
         window.title = "Stox 设置"
@@ -117,7 +115,6 @@ struct SettingsRootView: View {
     @ObservedObject var navigation: SettingsNavigation
     let settings: SettingsStore
     let store: QuoteStore
-    let updater: Updater
     let sync: SyncManager
 
     var body: some View {
@@ -159,7 +156,7 @@ struct SettingsRootView: View {
         case .general: GeneralPage(settings: settings)
         case .display: DisplayPage(settings: settings)
         case .sync: SyncPage(sync: sync, store: store)
-        case .about: AboutPage(settings: settings, updater: updater)
+        case .about: AboutPage(settings: settings)
         }
     }
 }
@@ -631,7 +628,6 @@ struct SyncPage: View {
 @MainActor
 struct AboutPage: View {
     @ObservedObject var settings: SettingsStore
-    let updater: Updater
 
     var body: some View {
         VStack(spacing: 0) {
@@ -666,9 +662,11 @@ struct AboutPage: View {
                 Button("GitHub") { NSWorkspace.shared.open(AppInfo.repositoryURL) }
                 Button("反馈问题") { NSWorkspace.shared.open(AppInfo.issuesURL) }
             }
+            #if !APP_STORE
             Divider()
                 .padding(.horizontal, 40)
-            UpdateSection(updater: updater)
+            UpdateSection(updater: Updater.shared)
+            #endif
         }
         .frame(maxWidth: .infinity)
         .padding(24)
@@ -677,9 +675,11 @@ struct AboutPage: View {
 
     private var optionsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
+            #if !APP_STORE
             Toggle("自动检查更新", isOn: $settings.autoCheckUpdates)
             FormNote("启动后和之后每 6 小时检查一次 GitHub 上的新版本。有新版本时发通知，行情面板底部会出现“更新”按钮，点一下自动下载、校验、替换并重新启动，不会自动安装。")
             Divider()
+            #endif
             HStack {
                 FormNote("行情数据来自腾讯财经公开接口，仅供参考，港股延时约 15 分钟。")
                 Spacer()

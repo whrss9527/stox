@@ -4,6 +4,8 @@
 #   scripts/ci-e2e.sh smoke    面板、详情、搜索、设置窗口、右键隐藏行情
 #   scripts/ci-e2e.sh sync     假的 iCloud 云盘文件夹：启动时拉取、运行中收到改动、文件被删后写回
 #   scripts/ci-e2e.sh update   本地假发布 9.9.9：发现新版本、原地更新、从临时位置运行时装进“应用程序”
+#   scripts/ci-e2e.sh appstore App Store 版（dist/appstore/Stox.app，ad-hoc 签名带沙盒）：在沙盒里运行、取到行情、
+#                              打开面板和设置、同步文件写得进去，没有一键更新的代码
 #
 # 截图（*-full.png）、App 输出（*.log，含 STOX_DIAG 诊断行）都放在 shots/ 下，后面的步骤负责裁剪。
 set -euo pipefail
@@ -12,6 +14,12 @@ cd "$(dirname "$0")/.."
 APP="$PWD/dist/Stox.app"
 DOMAIN="io.github.whrss9527.stox"
 SUPPORT="$HOME/Library/Application Support/Stox"
+if [[ "${1:-}" == "appstore" ]]; then
+  # 沙盒里的 App 的家目录是它的容器：设置、日志都在容器里。
+  APP="$PWD/dist/appstore/Stox.app"
+  CONTAINER="$HOME/Library/Containers/$DOMAIN/Data"
+  SUPPORT="$CONTAINER/Library/Application Support/Stox"
+fi
 LOG="$SUPPORT/stox.log"
 WORK="${RUNNER_TEMP:-/tmp}/stox-e2e"
 mkdir -p shots "$SUPPORT" "$WORK"
@@ -585,12 +593,71 @@ PY
   defaults delete "$DOMAIN" 2>/dev/null || true
 }
 
+appstore_test() {
+  local binary="$APP/Contents/MacOS/Stox"
+  # 先存到文件再 grep：set -o pipefail 下 grep -q 提前退出会让前面的命令收到 SIGPIPE，整条管道算失败。
+  codesign -d --entitlements - "$APP" > "$WORK/entitlements.txt" 2>&1 || true
+  grep -q "com.apple.security.app-sandbox" "$WORK/entitlements.txt" || fail "App Store 版的签名里没有沙盒"
+
+  # 没有一键更新：Stox 模块里没有 Updater、UpdateInstaller、更新条这些类型（先确认 nm 看得到 Stox 模块的符号）。
+  nm "$binary" > "$WORK/symbols.txt"
+  grep -q '4Stox11SyncManagerC' "$WORK/symbols.txt" || fail "nm 看不到 Stox 模块的符号，没法检查"
+  local found
+  found=$(grep -E '4Stox(7Updater|15UpdateInstaller|12UpdateBanner|13UpdateSection|13Translocation|11AppLocation|5Shell)[A-Z]' "$WORK/symbols.txt" | head -5 || true)
+  [[ -z "$found" ]] || fail "App Store 版里还有一键更新的代码：$found"
+  # 界面文字直接在程序文件里找（strings 只列 ASCII）；不超过 15 字节的短字符串会编进指令里，所以找长一点的。
+  if LC_ALL=C grep -aEq '自动检查更新|Check for Updates' "$binary"; then
+    fail "App Store 版里还有“检查更新”的界面文字"
+  fi
+
+  # 第一次启动：系统建好沙盒容器，面板打开，取到行情（只有 network.client 权限）。
+  run_case appstore-panel --show-panel
+  grep -q "flavor=appstore sandboxed=true" shots/appstore-panel.log || fail "App Store 版没有在沙盒里运行"
+  [[ -d "$CONTAINER" ]] || fail "没有建出沙盒容器 $CONTAINER"
+  grep -q "panel_frame=" shots/appstore-panel.log || fail "App Store 版的面板没有打开"
+  grep -Eq "items=8 quotes=[1-9]" shots/appstore-panel.log || fail "App Store 版在沙盒里取不到行情"
+  check_fits appstore-panel
+  if grep -q "注册失败" "$LOG"; then
+    fail "App Store 版在沙盒里注册不了全局快捷键"
+  fi
+  if grep -q "检查更新" "$LOG"; then
+    fail "App Store 版不应该检查更新"
+  fi
+
+  # 设置写在容器里（沙盒里读不到 ~/Library/Preferences 里 GitHub 版的设置）。
+  local prefs="$CONTAINER/Library/Preferences/$DOMAIN"
+  defaults write "$prefs" tips.dismissed -bool true
+  run_case appstore-detail --show-panel --expand sh600519
+  grep -q "expanded=sh600519" shots/appstore-detail.log || fail "App Store 版展开详情失败"
+  run_case appstore-settings --show-settings about
+  grep -q "settings_page=about" shots/appstore-settings.log || fail "App Store 版的设置窗口没有打开"
+
+  # 同步：沙盒里只能写自己的容器，把同步文件夹指到容器里，确认协调写入在沙盒里能用。
+  # ad-hoc 签名不能带 iCloud 容器的 entitlement（要描述文件），所以这里不测真正的 iCloud 容器。
+  local cloud="$CONTAINER/tmp/fake-icloud"
+  rm -rf "$cloud"
+  mkdir -p "$cloud"
+  defaults write "$prefs" sync.enabled -bool true
+  : > "$LOG"
+  STOX_SYNC_DIR="$cloud" "$APP/Contents/MacOS/Stox" --show-panel > shots/appstore-sync.log 2>&1 &
+  local pid=$!
+  wait_for 30 log_has "已写入本机的自选和设置（8 只）" || fail "App Store 版在沙盒里没有写出同步文件"
+  grep -q '"sh600519"' "$cloud/sync.json" || fail "同步文件里没有默认自选"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  grep -q "sync_container=false" shots/appstore-sync.log || fail "ad-hoc 构建不应该有 iCloud 容器的 entitlement"
+  echo "===== stox.log ====="
+  cat "$LOG"
+  defaults delete "$prefs" 2>/dev/null || true
+}
+
 case "${1:-}" in
   smoke) smoke ;;
   sync) sync_test ;;
   update) update_test ;;
+  appstore) appstore_test ;;
   *)
-    echo "用法: $0 smoke|sync|update" >&2
+    echo "用法: $0 smoke|sync|update|appstore" >&2
     exit 2
     ;;
 esac

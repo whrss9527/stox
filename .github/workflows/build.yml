@@ -1,6 +1,7 @@
 name: build
 
-# 每次推送和合并请求：Linux 上跑 StoxCore 测试，macOS 上打包通用版 App、启动测试、同步测试和一键更新测试。
+# 每次推送和合并请求：Linux 上跑 StoxCore 测试，macOS 上打包通用版 App、启动测试、同步测试和一键更新测试；
+# 另外打一个 App Store 版（沙盒，ad-hoc 签名）启动测试。上传 App Store 用 app-store.yml（手动运行）。
 # 推到 main 且都通过后，看 CHANGELOG.md 最上面的版本有没有发布过，没有就用 Frit 的发布流程发布（见最后的 release）。
 on:
   push:
@@ -151,6 +152,53 @@ jobs:
           path: |
             dist/Stox.zip
             dist/SHA256SUMS.txt
+
+  appstore:
+    name: App Store edition (sandbox)
+    # App Store 版：ad-hoc 签名、带沙盒 entitlement（不需要证书），在沙盒里启动一遍，确认取得到行情、面板打得开、
+    # 同步文件写得进去、没有一键更新的代码，顺便做 App Store 尺寸的截图。和上面的 macOS app 并行，不拖慢它。
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Toolchain
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -iv -e beta -e release_candidate -e '_rc' | sort -V | tail -1 || true)
+          if [ -n "$latest" ]; then
+            sudo xcode-select -s "$latest"
+          fi
+          xcodebuild -version
+      - name: Build App Store edition (ad-hoc, sandboxed)
+        run: ADHOC=1 scripts/build-app-store.sh
+      - name: Inspect bundle
+        run: |
+          plutil -p dist/appstore/Stox.app/Contents/Info.plist
+          codesign -d --entitlements - dist/appstore/Stox.app
+          lipo -info dist/appstore/Stox.app/Contents/MacOS/Stox
+          pkgutil --payload-files dist/Stox-AppStore.pkg | head -20
+      - name: Sandbox launch test
+        run: scripts/ci-e2e.sh appstore
+      - name: App Store screenshots
+        # App Store 要 16:10 的截图（这里做 1440x900）。界面是什么语言就是什么语言的截图。
+        if: always()
+        continue-on-error: true
+        run: |
+          mkdir -p shots/app-store
+          for name in appstore-panel appstore-detail; do
+            [ -f "shots/$name-full.png" ] || continue
+            frame=$(grep -o 'capture_frame=[0-9 -]*' "shots/$name.log" | tail -1 | cut -d= -f2)
+            [ -n "$frame" ] || continue
+            swift scripts/app-store-screenshot.swift "shots/$name-full.png" "shots/app-store/$name-1440x900.png" $frame 1440 900
+          done
+          ls -la shots/app-store
+      - uses: actions/upload-artifact@v5
+        if: always()
+        continue-on-error: true
+        with:
+          name: app-store-screenshots
+          path: shots/
 
   release:
     name: Release

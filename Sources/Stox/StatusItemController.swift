@@ -11,7 +11,6 @@ import StoxCore
 final class StatusItemController: NSObject {
     private let store: QuoteStore
     private let settings: SettingsStore
-    private let updater: Updater
     private let sync: SyncManager
     private let router = PanelRouter()
     private let statusItem: NSStatusItem
@@ -29,10 +28,9 @@ final class StatusItemController: NSObject {
     private var tickerText = ""
     private var cancellables = Set<AnyCancellable>()
 
-    init(store: QuoteStore, settings: SettingsStore, updater: Updater, sync: SyncManager) {
+    init(store: QuoteStore, settings: SettingsStore, sync: SyncManager) {
         self.store = store
         self.settings = settings
-        self.updater = updater
         self.sync = sync
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
@@ -183,7 +181,9 @@ final class StatusItemController: NSObject {
             .environmentObject(store)
             .environmentObject(settings)
             .environmentObject(router)
-            .environmentObject(updater)
+            #if !APP_STORE
+            .environmentObject(Updater.shared)
+            #endif
             .environmentObject(sync)
         let hosting = NSHostingView(rootView: AnyView(root))
         hostingView = hosting

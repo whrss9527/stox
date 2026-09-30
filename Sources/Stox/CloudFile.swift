@@ -1,16 +1,17 @@
 import Foundation
 import StoxCore
+import Security
 import SystemConfiguration
 
-/// iCloud 云盘里的同步文件：~/Library/Mobile Documents/com~apple~CloudDocs/Stox/sync.json。
-/// 用 iCloud 云盘里的普通文件夹而不是 App 自己的 iCloud 容器，是因为没有开发者签名就拿不到 iCloud 的 entitlement。
+/// 同步文件 sync.json 的读写。放在哪里由 StoxCore 的 SyncLocation 决定：
+/// - App Store 版带着 iCloud 容器的 entitlement，放在 App 自己的容器 iCloud.io.github.whrss9527.stox 里（沙盒里只能用它）；
+/// - GitHub 版没有开发者描述文件，拿不到 iCloud 的 entitlement，放在 iCloud 云盘/Stox/sync.json，和以前一样。
 enum CloudFile {
     /// 测试用：把同步文件夹指到别处。
     static let overrideVariable = "STOX_SYNC_DIR"
-    static let folderName = "Stox"
-    static let fileName = "sync.json"
+    static let fileName = SyncLocation.fileName
 
-    /// iCloud 云盘的根目录；没开 iCloud 云盘时是 nil。
+    /// iCloud 云盘的根目录；没开 iCloud 云盘时是 nil。沙盒里的 App 看不到它（家目录是沙盒容器），也是 nil。
     static func driveURL(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> URL? {
         let url = home.appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
         var isDirectory: ObjCBool = false
@@ -20,12 +21,27 @@ enum CloudFile {
         return url
     }
 
-    /// 同步文件夹：iCloud 云盘/Stox。
-    static var folderURL: URL? {
-        if let override = ProcessInfo.processInfo.environment[overrideVariable], !override.isEmpty {
-            return URL(fileURLWithPath: override, isDirectory: true)
-        }
-        return driveURL()?.appendingPathComponent(folderName, isDirectory: true)
+    /// 签名里有没有 App 自己的 iCloud 容器（App Store 版有）。没有时完全不碰 iCloud 容器的接口。
+    static let hasContainerEntitlement: Bool = {
+        guard let task = SecTaskCreateFromSelf(nil) else { return false }
+        let value = SecTaskCopyValueForEntitlement(task, SyncLocation.containerEntitlementKey as CFString, nil)
+        return SyncLocation.hasContainer(entitlementValue: value)
+    }()
+
+    /// 向系统要 App 自己的 iCloud 容器的根目录；没有 entitlement、没登录 iCloud 或者关了 iCloud 云盘时是 nil。
+    /// 第一次调用时系统要准备容器，可能要几秒，不能在主线程上调用。
+    static func containerRoot() -> URL? {
+        guard hasContainerEntitlement else { return nil }
+        return FileManager.default.url(forUbiquityContainerIdentifier: SyncLocation.containerIdentifier)
+    }
+
+    /// 同步文件夹：测试用的覆盖 > App 的 iCloud 容器 > iCloud 云盘/Stox。
+    static func location(containerRoot: URL?) -> SyncLocation? {
+        SyncLocation.resolve(
+            override: ProcessInfo.processInfo.environment[overrideVariable],
+            containerRoot: containerRoot,
+            driveRoot: driveURL()
+        )
     }
 
     /// 这台 Mac 的名字（“系统设置 → 通用 → 关于本机”里的名称）。

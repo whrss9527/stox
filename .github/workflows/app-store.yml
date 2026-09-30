@@ -1,0 +1,162 @@
+name: app-store
+
+# 手动运行：构建 Mac App Store 版，签名打包成 Stox-AppStore.pkg，用 App Store Connect API 密钥校验并上传。
+# 上传后到 App Store Connect 里选这个构建版本、提交审核（见 docs/app-store.md）。
+# 需要仓库 Secrets（Settings → Secrets and variables → Actions）：
+#   APPSTORE_CERTIFICATE_P12        Apple Distribution 证书和私钥导出的 .p12，base64
+#   APPSTORE_CERTIFICATE_PASSWORD   上面 .p12 的密码
+#   APPSTORE_INSTALLER_P12          Mac Installer Distribution 证书和私钥导出的 .p12，base64
+#   APPSTORE_INSTALLER_PASSWORD     上面 .p12 的密码
+#   APPSTORE_PROVISIONING_PROFILE   Mac App Store Connect 类型的描述文件（.provisionprofile），base64
+#   ASC_KEY_ID                      App Store Connect API 密钥的 Key ID
+#   ASC_ISSUER_ID                   App Store Connect API 密钥的 Issuer ID
+#   ASC_KEY_P8                      API 密钥文件 AuthKey_XXXX.p8 的内容（原文或 base64 都行）
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "校验通过后上传到 App Store Connect（不勾就只构建和校验）"
+        type: boolean
+        default: true
+      version:
+        description: "版本号（CFBundleShortVersionString），留空时取最近的标签，比如 0.46.0"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store
+  cancel-in-progress: false
+
+jobs:
+  app-store:
+    name: Build and upload to App Store Connect
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      APPSTORE_CERTIFICATE_P12: ${{ secrets.APPSTORE_CERTIFICATE_P12 }}
+      APPSTORE_CERTIFICATE_PASSWORD: ${{ secrets.APPSTORE_CERTIFICATE_PASSWORD }}
+      APPSTORE_INSTALLER_P12: ${{ secrets.APPSTORE_INSTALLER_P12 }}
+      APPSTORE_INSTALLER_PASSWORD: ${{ secrets.APPSTORE_INSTALLER_PASSWORD }}
+      APPSTORE_PROVISIONING_PROFILE: ${{ secrets.APPSTORE_PROVISIONING_PROFILE }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - name: Check secrets
+        run: |
+          missing=""
+          for name in APPSTORE_CERTIFICATE_P12 APPSTORE_CERTIFICATE_PASSWORD APPSTORE_INSTALLER_P12 APPSTORE_INSTALLER_PASSWORD \
+                      APPSTORE_PROVISIONING_PROFILE ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8; do
+            if [ -z "${!name}" ]; then
+              missing="$missing $name"
+            fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error title=缺少 Secrets::仓库的 Actions Secrets 里没有:$missing。怎么准备见 docs/app-store.md 的“添加 Secrets”。"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Toolchain
+        run: |
+          latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -iv -e beta -e release_candidate -e '_rc' | sort -V | tail -1 || true)
+          if [ -n "$latest" ]; then
+            sudo xcode-select -s "$latest"
+          fi
+          xcodebuild -version
+          if ! xcrun --find altool > /dev/null 2>&1; then
+            echo "::error::这个 Xcode 里没有 altool，没法上传。可以把 .pkg 下载下来用 Transporter App 上传。"
+            exit 1
+          fi
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Import certificates and profile
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/appstore.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          printf '%s' "$APPSTORE_CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/distribution.p12"
+          printf '%s' "$APPSTORE_INSTALLER_P12" | base64 --decode > "$RUNNER_TEMP/installer.p12"
+          security import "$RUNNER_TEMP/distribution.p12" -k "$KEYCHAIN" -P "$APPSTORE_CERTIFICATE_PASSWORD" -f pkcs12 \
+            -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/security \
+            || { echo "::error::导入 APPSTORE_CERTIFICATE_P12 失败（base64 或密码不对？）"; exit 1; }
+          security import "$RUNNER_TEMP/installer.p12" -k "$KEYCHAIN" -P "$APPSTORE_INSTALLER_PASSWORD" -f pkcs12 \
+            -T /usr/bin/codesign -T /usr/bin/productbuild -T /usr/bin/security \
+            || { echo "::error::导入 APPSTORE_INSTALLER_P12 失败（base64 或密码不对？）"; exit 1; }
+          rm -f "$RUNNER_TEMP/distribution.p12" "$RUNNER_TEMP/installer.p12"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" > /dev/null
+          # 放进搜索列表，codesign 和 productbuild 才找得到证书链。
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v "$KEYCHAIN"
+
+          APP_IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN" | grep -E '"(Apple Distribution|3rd Party Mac Developer Application): ' | head -1 | sed -E 's/.*"(.*)"/\1/' || true)
+          INSTALLER_IDENTITY=$(security find-identity -v "$KEYCHAIN" | grep -E '"(3rd Party Mac Developer Installer|Mac Installer Distribution): ' | head -1 | sed -E 's/.*"(.*)"/\1/' || true)
+          [ -n "$APP_IDENTITY" ] || { echo "::error::APPSTORE_CERTIFICATE_P12 里没有 Apple Distribution 证书"; exit 1; }
+          [ -n "$INSTALLER_IDENTITY" ] || { echo "::error::APPSTORE_INSTALLER_P12 里没有 Mac Installer Distribution 证书（钥匙串里叫 3rd Party Mac Developer Installer）"; exit 1; }
+          echo "App: $APP_IDENTITY"
+          echo "Installer: $INSTALLER_IDENTITY"
+
+          printf '%s' "$APPSTORE_PROVISIONING_PROFILE" | base64 --decode > "$RUNNER_TEMP/Stox.provisionprofile"
+          {
+            echo "CODESIGN_KEYCHAIN=$KEYCHAIN"
+            echo "APP_SIGN_IDENTITY=$APP_IDENTITY"
+            echo "INSTALLER_SIGN_IDENTITY=$INSTALLER_IDENTITY"
+            echo "APPSTORE_PROFILE=$RUNNER_TEMP/Stox.provisionprofile"
+          } >> "$GITHUB_ENV"
+
+      - name: Build and package
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          # 构建号每次上传都要变大：提交数（换了代码就变大）加上这个工作流的运行次数（同一份代码重新上传也变大）。
+          export BUILD_NUMBER="$(git rev-list --count HEAD).${{ github.run_number }}"
+          scripts/build-app-store.sh
+
+      - name: App Store Connect API key
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          key=~/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8
+          if printf '%s' "$ASC_KEY_P8" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$ASC_KEY_P8" > "$key"
+          else
+            printf '%s' "$ASC_KEY_P8" | base64 --decode > "$key"
+          fi
+          grep -q "BEGIN PRIVATE KEY" "$key" || { echo "::error::ASC_KEY_P8 不是 .p8 私钥（原文或 base64）"; exit 1; }
+          chmod 600 "$key"
+
+      - name: Validate
+        run: |
+          xcrun altool --validate-app -f dist/Stox-AppStore.pkg -t macos \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" --output-format normal
+
+      - name: Upload
+        if: inputs.upload
+        run: |
+          xcrun altool --upload-app -f dist/Stox-AppStore.pkg -t macos \
+            --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID" --output-format normal
+          version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" dist/appstore/Stox.app/Contents/Info.plist)
+          build=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" dist/appstore/Stox.app/Contents/Info.plist)
+          echo "::notice title=已上传::Stox $version（构建 $build）已上传。App Store Connect 处理完（通常 10～30 分钟）后，在 App 的版本页选这个构建版本、提交审核。"
+
+      - uses: actions/upload-artifact@v5
+        if: always()
+        continue-on-error: true
+        with:
+          name: Stox-AppStore
+          path: dist/Stox-AppStore.pkg
+
+      - name: Clean up
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/appstore.keychain-db" 2>/dev/null || true
+          rm -rf ~/.appstoreconnect "$RUNNER_TEMP/Stox.provisionprofile"

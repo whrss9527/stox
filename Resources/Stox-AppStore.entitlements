@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Mac App Store 版的 entitlement。__TEAM_ID__ 由 scripts/build-app-store.sh 换成描述文件里的团队 ID。
+  - app-sandbox：App Store 要求沙盒。
+  - network.client：取行情（腾讯、新浪的公开接口，都是 HTTPS）。
+  - files.user-selected.read-write：“iCloud 同步 → 备份到文件”的导出、导入，只读写用户在存储/打开面板里选的文件。
+  - iCloud：自选和设置放在 App 自己的 iCloud 容器里同步（iCloud Documents）。
+  application-identifier、team-identifier 和 iCloud 的几项要和描述文件一致，没有描述文件时系统不让启动，
+  所以 CI 的 ad-hoc 构建（ADHOC=1）会去掉它们，只保留沙盒这三项。
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+	<key>com.apple.security.network.client</key>
+	<true/>
+	<key>com.apple.security.files.user-selected.read-write</key>
+	<true/>
+	<key>com.apple.application-identifier</key>
+	<string>__TEAM_ID__.io.github.whrss9527.stox</string>
+	<key>com.apple.developer.team-identifier</key>
+	<string>__TEAM_ID__</string>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.io.github.whrss9527.stox</string>
+	</array>
+	<key>com.apple.developer.ubiquity-container-identifiers</key>
+	<array>
+		<string>iCloud.io.github.whrss9527.stox</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudDocuments</string>
+	</array>
+	<key>com.apple.developer.icloud-container-environment</key>
+	<string>Production</string>
+</dict>
+</plist>

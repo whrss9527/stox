@@ -108,7 +108,9 @@ struct WatchlistPanel: View {
             } else {
                 SearchResultsView()
             }
+            #if !APP_STORE
             UpdateBanner { actions.openSettings(.about) }
+            #endif
             PanelFooter(actions: actions)
         }
         .task(id: router.searchText) {
@@ -546,6 +548,8 @@ struct TipsCards: View {
     @State private var whatsNewNotes: String?
 
     var body: some View {
+        // App Store 版的更新内容由 App Store 显示，不去 GitHub 取。
+        #if !APP_STORE
         if let version = settings.whatsNewVersion {
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 10) {
@@ -584,6 +588,7 @@ struct TipsCards: View {
                 whatsNewNotes = await Self.loadNotes(version, since: settings.whatsNewSince)
             }
         }
+        #endif
         if !settings.tipsDismissed {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
@@ -606,6 +611,7 @@ struct TipsCards: View {
         }
     }
 
+    #if !APP_STORE
     /// 发布说明里“更新内容”的前几条。
     /// 隔了几个版本才更新时，每个版本一行（它的第一条更新内容），最多 5 个版本；只差一个版本时是这个版本的前几条。
     private static func loadNotes(_ version: String, since: String?) async -> String? {
@@ -639,6 +645,7 @@ struct TipsCards: View {
         fflush(stdout)
         return lines.isEmpty ? nil : lines.joined(separator: "\n")
     }
+    #endif
 
     private func tip(_ text: String) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
