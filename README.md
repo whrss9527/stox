@@ -64,7 +64,7 @@
 
 1. 在仓库的 [Releases](https://github.com/whrss9527/stox/releases) 页面下载最新版本的 `Stox.zip`。想试用未发布的最新代码，可以在 [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) 页面最近一次成功的构建里下载 `Stox-app`。
 2. 解压后把 `Stox.app` 拖进“应用程序”文件夹。
-3. App 使用临时签名（没有 Apple 开发者证书），第一次打开会被系统拦截。任选一种方式放行：
+3. 发布说明里写着“已用 Developer ID 签名并通过苹果公证”的版本，双击就能打开。更早的版本使用临时签名，第一次打开会被系统拦截，任选一种方式放行：
    - 在终端执行 `xattr -dr com.apple.quarantine /Applications/Stox.app`，然后正常打开；
    - 或者先双击一次，再到“系统设置 → 隐私与安全性”里点“仍要打开”。
 4. 以后的新版本不用再手动下载：Stox 每 6 小时检查一次，有新版本时点面板底部的“更新”即可，也可以在设置的“关于与更新”里手动检查。
@@ -187,13 +187,13 @@ CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设
 
 ## 发布新版本
 
-两种方式都会由 CI 编译通用版 App，并把 `Stox.zip`、校验文件 `SHA256SUMS.txt` 连同安装说明发布到 Releases。已安装的 Stox 会据此提示更新：
+发版由 `CHANGELOG.md` 驱动，用的是 [Frit](https://github.com/whrss9527/frit) 里共用的发布流程：
 
-- 在 Actions 页面选择 build 工作流，点 Run workflow，填写版本号，例如 `v0.2.0`。CI 会在当前 `main` 上创建同名标签。
-- 或者在本地推送一个 `v` 开头的标签：
+1. 在 `CHANGELOG.md` 最上面加一节新版本，比如 `## 0.46.0`，内容会放进发布说明，App 的“关于与更新”页显示的也是这一节；
+2. 推到 main（或者合并进 main）。build 通过后，最后一步 release 发现这个版本还没有 `v0.46.0` 标签，就打包通用版 `Stox.zip`、生成校验文件 `SHA256SUMS.txt`，打上标签并发布。已安装的 Stox 下一次检查时就会提示更新。
 
-```bash
-git tag v0.2.0 && git push origin v0.2.0
-```
+仓库的 Secrets 里配了 Developer ID 证书和公证凭据时，发布的包会用证书签名并通过苹果公证，用户下载后双击就能打开；没配时照旧临时签名。配置方法见 Frit 的 [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md)。
+
+也可以在 Actions 页面手动运行 release：不填标签就发 `CHANGELOG.md` 最上面的版本；勾选 overwrite 可以用原标签的代码重新打包、替换附件。
 
 设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。
