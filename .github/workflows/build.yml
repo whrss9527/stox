@@ -199,6 +199,25 @@ jobs:
         with:
           name: app-store-screenshots
           path: shots/
+      # 提交信息里带 [screenshots] 时，把 App Store 截图缩小后以注释形式发布，和上面的 macOS app 一样可以通过 API 取回。
+      - name: Pick App Store screenshot
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
+        continue-on-error: true
+        run: |
+          sips -s format jpeg -s formatOptions 45 -Z 720 shots/app-store/appstore-panel-1440x900.png --out shots/appstore-store-preview.jpg
+          echo appstore-store > shots/annotate.txt
+      - name: App Store screenshot annotations (1)
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
+        continue-on-error: true
+        run: scripts/ci-annotate-image.sh 1
+      - name: App Store screenshot annotations (2)
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
+        continue-on-error: true
+        run: scripts/ci-annotate-image.sh 2
+      - name: App Store screenshot annotations (3)
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
+        continue-on-error: true
+        run: scripts/ci-annotate-image.sh 3
 
   release:
     name: Release
