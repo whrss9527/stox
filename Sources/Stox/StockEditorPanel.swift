@@ -198,10 +198,7 @@ struct StockEditorPanel: View {
 
     /// 记一笔买卖：买入按加权平均重新算成本，卖出只减数量。价格不填时按现价。
     private var tradeRow: some View {
-        HStack(spacing: 6) {
-            Text(L("记一笔"))
-                .font(.system(size: 12.5))
-            Spacer(minLength: 4)
+        editorRow(L("记一笔")) {
             TextField("", text: $tradeShares, prompt: Text(L("数量")))
                 .textFieldStyle(.roundedBorder)
                 .multilineTextAlignment(.trailing)
@@ -222,6 +219,28 @@ struct StockEditorPanel: View {
         .help(L("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量、按成本价算出赚了多少。记完检查一下，点保存才生效"))
     }
 
+    /// 编辑页里左边是标题、右边是一排输入框和按钮的一行。一行放不下时（英文的字比中文长）标题单独放在上面一行，
+    /// 输入框和按钮靠右排在下面，不把标题挤成两行。
+    private func editorRow<Controls: View>(_ title: String, @ViewBuilder controls: () -> Controls) -> some View {
+        let controls = controls()
+        return ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                Text(title)
+                    .font(.system(size: 12.5))
+                Spacer(minLength: 4)
+                controls
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 12.5))
+                HStack(spacing: 6) {
+                    Spacer(minLength: 0)
+                    controls
+                }
+            }
+        }
+    }
+
     /// A 股的分红按“每 10 股”说（10 派 25 元、10 送 4 股），港股、美股按每股，场外基金按每份。
     private var perTen: Bool { symbol.market.region == .cn && !symbol.isFund }
 
@@ -230,10 +249,7 @@ struct StockEditorPanel: View {
 
     /// 分红送转：现金分红从总成本里扣掉，送转的股加到数量里，成本价跟着摊薄。港股、美股只有现金分红。
     private var dividendRow: some View {
-        HStack(spacing: 6) {
-            Text(L("分红送转"))
-                .font(.system(size: 12.5))
-            Spacer(minLength: 4)
+        editorRow(L("分红送转")) {
             Text(perTen ? L("10股派") : (symbol.isFund ? L("每份派") : L("每股派")))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)

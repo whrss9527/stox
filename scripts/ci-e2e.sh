@@ -463,6 +463,25 @@ english() {
   if grep -Eq 'status_title="[^"]*[万亿]' shots/en-holdings.log; then
     fail "英文界面的菜单栏不应该出现万、亿"
   fi
+  # 使用提示和“已更新到 x.y.z”（更新内容本身来自中文的发布说明）。
+  defaults delete "$DOMAIN" tips.dismissed
+  defaults write "$DOMAIN" app.lastVersion -string 0.1.0
+  run_case en-tips --show-panel "${en[@]}"
+  check_fits en-tips
+  defaults write "$DOMAIN" tips.dismissed -bool true
+  defaults delete "$DOMAIN" update.whatsNew 2>/dev/null || true
+  # 盈亏日历：这个月记过两天，月份名是英文。
+  local this_month
+  this_month=$(TZ=Asia/Shanghai date +%Y-%m)
+  defaults write "$DOMAIN" holdings.history.v1 -data "$(printf '%s' '{"records":[
+    {"day":"'"$this_month"'-01","region":"cn","dayProfit":1200,"totalProfit":5000,"marketValue":150000},
+    {"day":"'"$this_month"'-02","region":"cn","dayProfit":-800,"totalProfit":4200,"marketValue":149000}]}' | xxd -p | tr -d '\n')"
+  run_case en-calendar --show-panel --calendar "${en[@]}"
+  defaults delete "$DOMAIN" holdings.history.v1
+  grep -Eq "calendar=[2-9]" shots/en-calendar.log || fail "英文界面的盈亏日历里应该有这个月记的两天"
+  # A 股涨跌榜。
+  run_case en-rank --show-panel --rank "${en[@]}"
+  grep -q "route=rank" shots/en-rank.log || fail "英文界面没有打开涨跌榜"
 }
 
 sync_test() {
