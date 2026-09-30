@@ -320,7 +320,7 @@
 "新股上市首日（名字前面有 N）和注册制新股上市后前 5 天（有 C）没有涨跌幅限制，常常挤满涨幅榜" = "New listings on their first day (N before the name) and in their first 5 days under the registration system (C) have no price limits and often crowd the gainers list";
 "A 股涨跌榜" = "A-Share Movers";
 "申万一级行业" = "SW Level 1 industries";
-"沪深京全部 A 股" = "All Shanghai, Shenzhen and Beijing A-shares";
+"沪深京全部 A 股" = "All A-shares";
 "%@ 更新" = "Updated %@";
 "取不到榜单：%@" = "Couldn’t load the list: %@";
 "正在加载…" = "Loading…";
@@ -331,7 +331,7 @@
 "已在自选里，点一下回到列表并展开" = "In your watchlist. Click to go back to the list and expand it";
 "加到自选" = "Add to Watchlist";
 " · 成交 " = " · Turnover ";
-" · 换手 " = " · Turnover rate ";
+" · 换手 " = " · Turnover ";
 
 /* Stox/SettingsStore.swift */
 "红涨绿跌" = "Red Up, Green Down";
