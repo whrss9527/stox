@@ -70,7 +70,8 @@ else
   if /usr/libexec/PlistBuddy -c "Print :ProvisionedDevices" "$WORK/profile.plist" > /dev/null 2>&1; then
     fail "这是开发用的描述文件（列着测试设备），上传要用“Mac App Store Connect”类型的描述文件"
   fi
-  plist_value "$WORK/profile.plist" Entitlements:com.apple.developer.icloud-container-identifiers | grep -q "$CONTAINER" \
+  PROFILE_CONTAINERS="$(plist_value "$WORK/profile.plist" Entitlements:com.apple.developer.icloud-container-identifiers)"
+  [[ "$PROFILE_CONTAINERS" == *"$CONTAINER"* ]] \
     || fail "描述文件里没有 iCloud 容器 $CONTAINER：在开发者网站给 App ID 打开 iCloud 并添加这个容器，再重新生成描述文件"
 
   sed "s/__TEAM_ID__/$TEAM_ID/g" "$TEMPLATE" > "$ENTITLEMENTS"
