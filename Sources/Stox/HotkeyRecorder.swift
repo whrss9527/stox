@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import StoxCore
 
 /// 快捷键录制框：点一下，再按下新的组合键；按 Esc 取消。
 struct HotkeyRecorder: NSViewRepresentable {

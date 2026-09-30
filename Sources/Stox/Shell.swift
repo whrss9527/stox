@@ -1,4 +1,5 @@
 import Foundation
+import StoxCore
 
 struct ShellResult {
     let output: String

@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import StoxCore
 
 /// 全局快捷键的组合：Carbon 键码、修饰键和显示用的文字。
 struct HotkeyBinding: Codable, Equatable {
