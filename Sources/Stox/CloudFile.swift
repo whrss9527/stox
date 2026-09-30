@@ -36,11 +36,13 @@ enum CloudFile {
     }
 
     /// 同步文件夹：测试用的覆盖 > App 的 iCloud 容器 > iCloud 云盘/Stox。
+    /// 有容器的 entitlement 时只用容器：容器还没要到（或者没登录 iCloud）时算作不可用，
+    /// 而不是先写到 iCloud 云盘文件夹里，免得两处各有一份。
     static func location(containerRoot: URL?) -> SyncLocation? {
         SyncLocation.resolve(
             override: ProcessInfo.processInfo.environment[overrideVariable],
             containerRoot: containerRoot,
-            driveRoot: driveURL()
+            driveRoot: hasContainerEntitlement ? nil : driveURL()
         )
     }
 

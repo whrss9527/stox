@@ -41,7 +41,7 @@ App Store 版的 entitlement 只有：
 
 1. 调试用的 `STOX_SYNC_DIR`；
 2. App 签名里有 iCloud 容器的 entitlement 时（App Store 版），用 `FileManager.url(forUbiquityContainerIdentifier:)` 要到的容器里的 `Documents/sync.json`。第一次要容器可能要几秒，在后台线程上做；读写都经过 `NSFileCoordinator`；
-3. 否则是 iCloud 云盘/Stox/sync.json（GitHub 版，和以前一样）。
+3. 签名里没有这个 entitlement 时是 iCloud 云盘/Stox/sync.json（GitHub 版，和以前一样）。有 entitlement 的 App 只用容器，容器还没要到、或者没登录 iCloud 时算作“iCloud 不可用”，不会退回 iCloud 云盘文件夹，免得两处各有一份。
 
 所以：
 
