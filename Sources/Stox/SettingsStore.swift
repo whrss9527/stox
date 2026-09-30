@@ -281,6 +281,10 @@ final class SettingsStore: ObservableObject {
     @Published var showCostAndTrades: Bool {
         didSet { defaults.set(showCostAndTrades, forKey: Keys.showCostAndTrades) }
     }
+    /// 设了价格提醒、止盈止损的在分时图、K 线上画提醒线。
+    @Published var showAlertLines: Bool {
+        didSet { defaults.set(showAlertLines, forKey: Keys.showAlertLines) }
+    }
     /// 涨跌榜上次看的是哪个榜。
     @Published var rankKind: RankKind {
         didSet { defaults.set(rankKind.rawValue, forKey: Keys.rankKind) }
@@ -373,6 +377,7 @@ final class SettingsStore: ObservableObject {
         flashOnChange = defaults.object(forKey: Keys.flashOnChange) as? Bool ?? true
         showMovingAverages = defaults.object(forKey: Keys.showMovingAverages) as? Bool ?? true
         showCostAndTrades = defaults.object(forKey: Keys.showCostAndTrades) as? Bool ?? true
+        showAlertLines = defaults.object(forKey: Keys.showAlertLines) as? Bool ?? true
         rankKind = defaults.string(forKey: Keys.rankKind).flatMap(RankKind.init(rawValue:)) ?? .gainers
         rankHidesNewListings = defaults.object(forKey: Keys.rankHidesNewListings) as? Bool ?? true
         compactRows = defaults.object(forKey: Keys.compactRows) as? Bool ?? false
@@ -466,6 +471,7 @@ final class SettingsStore: ObservableObject {
         static let flashOnChange = "list.flash"
         static let showMovingAverages = "chart.movingAverages"
         static let showCostAndTrades = "chart.costAndTrades"
+        static let showAlertLines = "chart.alertLines"
         static let rankKind = "rank.kind"
         static let rankHidesNewListings = "rank.hideNew"
         static let compactRows = "list.compact"

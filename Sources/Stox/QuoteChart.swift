@@ -96,10 +96,39 @@ struct QuoteChartSection: View {
 
     private var fiveDaySeries: MultiDaySeries? { store.fiveDay[item.symbol] }
 
-    /// 图上画的成本线：有持仓、成本价大于 0、设置里没关掉时才有。
-    private var cost: Double? {
-        guard settings.showCostAndTrades, let cost = item.holding?.cost, cost > 0 else { return nil }
-        return cost
+    /// 图上画的横线：成本线（有持仓、成本价大于 0）和提醒线（设了价格提醒、止盈止损），设置里可以分别关掉。
+    private var levels: [ChartLevel] {
+        Self.levels(item: item, quote: quote, period: period, settings: settings)
+    }
+
+    /// 涨跌幅提醒按昨收折成价格，只画在分时图上；K 线上的是过去的日子，不画。
+    static func levels(item: WatchItem, quote: Quote, period: ChartPeriod, settings: SettingsStore) -> [ChartLevel] {
+        item.chartLevels(
+            previousClose: period == .intraday ? quote.previousClose : nil,
+            cost: settings.showCostAndTrades, alerts: settings.showAlertLines
+        )
+    }
+
+    /// CI 用：这只在现在这张图上有几条提醒线（不算成本线），几条落在图的范围里。
+    static func alertLineCounts(item: WatchItem, quote: Quote, store: QuoteStore, settings: SettingsStore) -> (total: Int, inView: Int) {
+        let period = settings.chartPeriod.effective(for: quote)
+        let alerts = Self.levels(item: item, quote: quote, period: period, settings: settings).filter(\.isAlert)
+        var bounds: (top: Double, bottom: Double)?
+        switch period {
+        case .intraday:
+            bounds = IntradayChart.scale(
+                series: store.intraday[item.symbol], previousClose: quote.previousClose, region: item.symbol.market.region,
+                size: CGSize(width: 100, height: IntradayChart.height), includingAverages: settings.showMovingAverages
+            ).map { (top: $0.top, bottom: $0.bottom) }
+        case .day, .week, .month:
+            if let kline = period.klinePeriod, let series = store.klines[KlineKey(symbol: item.symbol, period: kline)] {
+                bounds = KlineChart.bounds(KlineChartData(series: series.merging(quote)), includingAverages: settings.showMovingAverages)
+            }
+        case .fiveDay, .orderBook, .fundFlow:
+            return (0, 0)  // 这几页不画横线
+        }
+        let inView = bounds.map { ChartLevelLines.visible(alerts, top: $0.top, bottom: $0.bottom).count } ?? 0
+        return (alerts.count, inView)
     }
 
     /// K 线上的买卖点。
@@ -120,7 +149,7 @@ struct QuoteChartSection: View {
                 hovered: hoveredPoint,
                 showAverage: settings.showMovingAverages,
                 decimals: quote.priceDecimals,
-                cost: cost,
+                levels: levels,
                 convention: settings.colorConvention
             )
         case .fiveDay:
@@ -140,7 +169,7 @@ struct QuoteChartSection: View {
                 hoveredIndex: hoveredCandle(in: data),
                 showAverages: settings.showMovingAverages,
                 decimals: quote.priceDecimals,
-                cost: cost,
+                levels: levels,
                 marks: tradeMarks(in: data)
             )
         case .orderBook:
@@ -389,7 +418,8 @@ struct QuoteChartSection: View {
 }
 
 /// K 线图：每根一个实体加上下影线，红涨绿跌跟着设置走。不显示红绿时阳线空心、阴线实心。
-/// 最下面四分之一淡淡地画着成交量柱。有持仓时成本价落在图里就画一条虚线，记过买卖的那几根下面标 B、上面标 S。
+/// 最下面四分之一淡淡地画着成交量柱。有持仓时成本价、设了提醒时提醒价落在图里就画一条虚线（见 ChartLevelLines），
+/// 记过买卖的那几根下面标 B、上面标 S。
 /// 画均线时上方留一行写 MA5、MA10、MA20 的值：鼠标指着时是那一根的，否则是最后一根的。
 struct KlineChart: View {
     static let legendHeight: CGFloat = 11
@@ -401,8 +431,8 @@ struct KlineChart: View {
     var hoveredIndex: Int?
     var showAverages = true
     var decimals = 2
-    /// 持仓成本价，不画时为 nil。
-    var cost: Double?
+    /// 成本线和提醒线：落在图的范围里的画一条虚线。
+    var levels: [ChartLevel] = []
     /// 记过买卖的那几根。
     var marks: [KlineTradeMark] = []
 
@@ -448,13 +478,18 @@ struct KlineChart: View {
         averageColors[line % averageColors.count]
     }
 
+    /// 纵轴的上下限：K 线的最高最低（画均线时再加上均线），上下各留一点边，最高最低点不贴着边；一动不动时给 1% 的范围。
+    static func bounds(_ data: KlineChartData, includingAverages: Bool) -> (top: Double, bottom: Double)? {
+        guard let range = data.priceRange(includingAverages: includingAverages) else { return nil }
+        let span = max(range.high - range.low, range.high * 0.01, 0.0001)
+        return (range.high + span * 0.06, range.low - span * 0.06)
+    }
+
     private func draw(_ data: KlineChartData, in context: inout GraphicsContext, size: CGSize) {
         let candles = data.candles
-        guard size.width > 0, size.height > 0, let range = data.priceRange(includingAverages: showAverages) else { return }
-        // 上下各留一点边，最高最低点不贴着边；一动不动时给 1% 的范围。
-        let span = max(range.high - range.low, range.high * 0.01, 0.0001)
-        let top = range.high + span * 0.06
-        let bottom = range.low - span * 0.06
+        guard size.width > 0, size.height > 0, let bounds = Self.bounds(data, includingAverages: showAverages) else { return }
+        let top = bounds.top
+        let bottom = bounds.bottom
         func y(_ price: Double) -> CGFloat {
             CGFloat((top - price) / (top - bottom)) * size.height
         }
@@ -529,25 +564,8 @@ struct KlineChart: View {
             }
         }
 
-        // 成本线：落在图的范围里才画，右边写着成本价，垫一块底色，压在均线和成交量柱上也看得清。
-        if let cost, cost > bottom, cost < top {
-            let costY = y(cost)
-            var line = Path()
-            line.move(to: CGPoint(x: 0, y: costY))
-            line.addLine(to: CGPoint(x: size.width, y: costY))
-            context.stroke(line, with: .color(Self.costColor), style: StrokeStyle(lineWidth: 1, dash: [4, 2]))
-            let label = context.resolve(
-                Text(L("成本 ") + QuoteFormatter.price(cost, decimals: decimals))
-                    .font(.system(size: 8, weight: .medium).monospacedDigit())
-                    .foregroundColor(Self.costColor)
-            )
-            let textSize = label.measure(in: size)
-            // 放在线的上面，贴着顶边时放到下面。
-            let labelY = costY - textSize.height - 2 >= 0 ? costY - textSize.height - 2 : costY + 2
-            let box = CGRect(x: size.width - textSize.width - 5, y: labelY, width: textSize.width + 4, height: textSize.height)
-            context.fill(Path(roundedRect: box, cornerRadius: 2), with: .color(Self.labelBackground))
-            context.draw(label, in: box.insetBy(dx: 2, dy: 0))
-        }
+        // 成本线、提醒线：落在图的范围里才画，字靠右写，最新的那几根旁边。
+        ChartLevelLines.draw(levels, top: top, bottom: bottom, y: y, decimals: decimals, alignment: .trailing, in: &context, size: size)
 
         // 买卖点：买入在那一根的最低价下面标 B，卖出在最高价上面标 S，不出图的边。
         for mark in marks where candles.indices.contains(mark.index) {

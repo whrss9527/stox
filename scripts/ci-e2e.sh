@@ -139,6 +139,24 @@ smoke() {
     echo "::warning::月 K 没有取到数据，这次不检查买卖点"
   fi
 
+  # 提醒线：按茅台现在的价格设价格提醒和止盈止损，分时图、日 K 上画出来（看截图）。止盈价和“价格高于”挨得很近，字应该并排。
+  # 先取一次现价（开盘前现价是 0 时用昨收），取不到就用一个大概的价格，这时线多半不在图里，只提醒。
+  local price above below cost
+  price=$(curl -s --max-time 10 "https://qt.gtimg.cn/q=sh600519" | awk -F'~' '{ p = $4 + 0; if (p <= 0) p = $5 + 0; if (p > 0) printf "%.2f", p }' || true)
+  [[ -n "$price" ]] || price=1400
+  above=$(awk -v p="$price" 'BEGIN { printf "%.2f", p * 1.03 }')
+  below=$(awk -v p="$price" 'BEGIN { printf "%.2f", p * 0.95 }')
+  cost=$(awk -v p="$price" 'BEGIN { printf "%.2f", p * 0.98 }')
+  write_watchlist '[{"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":'"$cost"'},
+    "alert":{"priceAbove":'"$above"',"priceBelow":'"$below"',"riseAbove":0.5,"fallBelow":0.5,"profitAbove":5,"lossBelow":8}}]'
+  run_case alert-lines --show-panel --expand sh600519
+  run_case alert-lines-kline --show-panel --expand sh600519 --chart day
+  defaults delete "$DOMAIN" chart.period
+  defaults delete "$DOMAIN" watchlist.v1
+  grep -q "alert_lines=6 " shots/alert-lines.log || fail "分时图上应该有六条提醒线：价格高于、低于，涨跌幅，止盈，止损"
+  grep -q "alert_lines=4 " shots/alert-lines-kline.log || fail "日 K 上应该有四条提醒线，涨跌幅提醒只画在分时图上"
+  grep -Eq "alert_lines_in_view=[1-9]" shots/alert-lines-kline.log || echo "::warning::日 K 上的提醒线都不在图的范围里（现价 $price）"
+
   # 五档：A 股个股有买卖五档，开盘前、停牌、涨跌停时不满，只提示。港股没有五档，选着五档时看分时，也不列五档。
   run_case orderbook --show-panel --expand sh600519 --chart orderBook
   run_case orderbook-hk --show-panel --expand hk00700 --chart orderBook

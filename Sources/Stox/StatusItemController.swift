@@ -599,8 +599,17 @@ final class StatusItemController: NSObject {
             } ?? 0
         // 展开的那只的五档：买盘、卖盘各有几档，没有五档的是 none。
         let book = router.expanded.flatMap { store.quotes[$0]?.orderBook }.map { "\($0.bids.count)/\($0.asks.count)" } ?? "none"
-        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) book=\(book) flow=\(fundFlowDiagnostics) marks=\(marks) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
+        print("STOX_DIAG chart=\(settings.chartPeriod.rawValue) book=\(book) flow=\(fundFlowDiagnostics) marks=\(marks) \(alertLineDiagnostics) ma20=\(ma20) avg=\(averages) highlight=\(router.highlighted?.rawValue ?? "none") expanded=\(router.expanded?.rawValue ?? "none") search=\"\(router.searchText)\"")
         fflush(stdout)
+    }
+
+    /// 展开的那只在现在这张图上有几条提醒线，几条落在图的范围里，CI 用来检查。
+    var alertLineDiagnostics: String {
+        guard let symbol = router.expanded, let item = store.item(for: symbol), let quote = store.quotes[symbol] else {
+            return "alert_lines=0 alert_lines_in_view=0"
+        }
+        let counts = QuoteChartSection.alertLineCounts(item: item, quote: quote, store: store, settings: settings)
+        return "alert_lines=\(counts.total) alert_lines_in_view=\(counts.inView)"
     }
 
     /// 美股现在的时段和取到的盘前盘后价，CI 用来检查。
