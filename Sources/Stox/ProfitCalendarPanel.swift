@@ -30,7 +30,7 @@ struct ProfitCalendarPanel: View {
                     .padding(10)
                     .glassCard()
             } else {
-                Text("还没有盈亏记录：填了持仓以后，每个交易日收盘后会记一笔")
+                Text(L("还没有盈亏记录：填了持仓以后，每个交易日收盘后会记一笔"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
@@ -41,7 +41,7 @@ struct ProfitCalendarPanel: View {
             }
             HStack {
                 Spacer()
-                Button("返回") { router.route = .list }
+                Button(L("返回")) { router.route = .list }
                     .keyboardShortcut(.defaultAction)
             }
             .controlSize(.regular)
@@ -57,11 +57,11 @@ struct ProfitCalendarPanel: View {
                 Image(systemName: "chevron.left")
             }
             .buttonStyle(IconButtonStyle())
-            .help("返回（Esc）")
+            .help(L("返回（Esc）"))
             VStack(alignment: .leading, spacing: 2) {
-                Text("盈亏日历")
+                Text(L("盈亏日历"))
                     .font(.system(size: 14, weight: .semibold))
-                Text("每个交易日收盘后记下的今日盈亏，只在这台 Mac 上")
+                Text(L("每个交易日收盘后记下的今日盈亏，只在这台 Mac 上"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -69,17 +69,17 @@ struct ProfitCalendarPanel: View {
             }
             Spacer(minLength: 4)
             // 从按月切到按年时看的是正在看的那个月所在的一年。
-            Picker("按月或按年", selection: Binding(get: { settings.profitCalendarByYear }, set: { byYear in
+            Picker(L("按月或按年"), selection: Binding(get: { settings.profitCalendarByYear }, set: { byYear in
                 if byYear, let region = shownRegion { yearValue = shownMonth(region) / 12 }
                 settings.profitCalendarByYear = byYear
             })) {
-                Text("月").tag(false)
-                Text("年").tag(true)
+                Text(L("月")).tag(false)
+                Text(L("年")).tag(true)
             }
             .pickerStyle(.segmented)
             .labelsHidden()
             .frame(width: 76)
-            .help("按月看每天，或者按年看每个月")
+            .help(L("按月看每天，或者按年看每个月"))
         }
         .padding(10)
         .glassCard(prominent: true)
@@ -112,7 +112,7 @@ struct ProfitCalendarPanel: View {
         let regions = store.profitHistory.regions
         VStack(spacing: 8) {
             if regions.count > 1 {
-                Picker("货币", selection: Binding(get: { region }, set: { self.region = $0; monthIndex = nil; yearValue = nil })) {
+                Picker(L("货币"), selection: Binding(get: { region }, set: { self.region = $0; monthIndex = nil; yearValue = nil })) {
                     ForEach(regions, id: \.self) { region in
                         Text(region.currencyName).tag(region)
                     }
@@ -142,7 +142,7 @@ struct ProfitCalendarPanel: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .disabled(range.map { index <= $0.lowerBound } ?? true)
-                .help("上一个月")
+                .help(L("上一个月"))
                 Spacer()
                 Text(calendar.title)
                     .font(.system(size: 12.5, weight: .semibold).monospacedDigit())
@@ -154,7 +154,7 @@ struct ProfitCalendarPanel: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .disabled(range.map { index >= $0.upperBound } ?? true)
-                .help("下一个月")
+                .help(L("下一个月"))
             }
             grid(calendar, today: ProfitHistory.day(of: Date(), region: region))
             summary(calendar)
@@ -175,7 +175,7 @@ struct ProfitCalendarPanel: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .disabled(range.map { year <= $0.lowerBound } ?? true)
-                .help("上一年")
+                .help(L("上一年"))
                 Spacer()
                 Text(profitYear.title)
                     .font(.system(size: 12.5, weight: .semibold).monospacedDigit())
@@ -187,7 +187,7 @@ struct ProfitCalendarPanel: View {
                 }
                 .buttonStyle(IconButtonStyle())
                 .disabled(range.map { year >= $0.upperBound } ?? true)
-                .help("下一年")
+                .help(L("下一年"))
             }
             yearGrid(profitYear, region: region)
             yearSummary(profitYear)
@@ -208,7 +208,7 @@ struct ProfitCalendarPanel: View {
                     monthCell(month, scale: scale, isCurrent: now.year == year.year && now.month == month.month)
                 }
                 .buttonStyle(.plain)
-                .help(monthHelp(month, year: year.year) + "，点一下看这个月每天的")
+                .help(monthHelp(month, year: year.year) + L("，点一下看这个月每天的"))
             }
         }
     }
@@ -219,7 +219,7 @@ struct ProfitCalendarPanel: View {
         // 底色深浅按这一年赚（亏）得最多的那个月比。
         let strength = total.flatMap { value in scale.map { $0 > 0 ? min(abs(value) / $0, 1) : 0 } } ?? 0
         return VStack(alignment: .leading, spacing: 0) {
-            Text("\(month.month)月")
+            Text(AppLanguage.monthName(month.month))
                 .font(.system(size: 10.5).monospacedDigit())
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
@@ -245,24 +245,24 @@ struct ProfitCalendarPanel: View {
         )
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(month.month) 月")
-        .accessibilityValue(month.total.map { "记了 \(month.recordedDays) 天，合计 " + amount(QuoteFormatter.signedMoney($0)) } ?? "没有记录")
+        .accessibilityLabel(AppLanguage.monthName(month.month, full: true))
+        .accessibilityValue(month.total.map { L("记了 %@ 天，合计 ", month.recordedDays) + amount(QuoteFormatter.signedMoney($0)) } ?? L("没有记录"))
     }
 
     private func monthHelp(_ month: ProfitYear.Month, year: Int) -> String {
-        guard let total = month.total else { return "\(year)年\(month.month)月没有记录" }
-        return "\(year)年\(month.month)月记了 \(month.recordedDays) 天，合计 " + amount(QuoteFormatter.signedMoney(total))
+        guard let total = month.total else { return L("%@没有记录", AppLanguage.monthTitle(year: year, month: month.month)) }
+        return L("%@记了 %@ 天，合计 ", AppLanguage.monthTitle(year: year, month: month.month), month.recordedDays) + amount(QuoteFormatter.signedMoney(total))
     }
 
     private func yearSummary(_ year: ProfitYear) -> some View {
         HStack(spacing: 8) {
             if let total = year.total {
-                Text("全年 " + amount(QuoteFormatter.signedMoney(total)))
+                Text(L("全年 ") + amount(QuoteFormatter.signedMoney(total)))
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(total), convention: settings.colorConvention))
-                Text("赚 \(year.profitMonths) 个月 · 亏 \(year.lossMonths) 个月")
+                Text(L("赚 %@ 个月 · 亏 %@ 个月", year.profitMonths, year.lossMonths))
                     .foregroundStyle(.secondary)
             } else {
-                Text("这一年没有记录")
+                Text(L("这一年没有记录"))
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
@@ -321,21 +321,21 @@ struct ProfitCalendarPanel: View {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .strokeBorder(Color.accentColor.opacity(isToday ? 0.8 : 0), lineWidth: 1)
         )
-        .help(profit.map { "\(cell.date) 今日盈亏 " + amount(QuoteFormatter.signedMoney($0)) } ?? "\(cell.date) 没有记录")
+        .help(profit.map { L("%@ 今日盈亏 ", cell.date) + amount(QuoteFormatter.signedMoney($0)) } ?? L("%@ 没有记录", cell.date))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(cell.day) 日")
-        .accessibilityValue(profit.map { "今日盈亏 " + amount(QuoteFormatter.signedMoney($0)) } ?? "没有记录")
+        .accessibilityLabel(L("%@ 日", cell.day))
+        .accessibilityValue(profit.map { L("今日盈亏 ") + amount(QuoteFormatter.signedMoney($0)) } ?? L("没有记录"))
     }
 
     private func summary(_ calendar: ProfitCalendar) -> some View {
         HStack(spacing: 8) {
             if let total = calendar.total {
-                Text("本月 " + amount(QuoteFormatter.signedMoney(total)))
+                Text(L("本月 ") + amount(QuoteFormatter.signedMoney(total)))
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(total), convention: settings.colorConvention))
-                Text("赚 \(calendar.profitDays) 天 · 亏 \(calendar.lossDays) 天")
+                Text(L("赚 %@ 天 · 亏 %@ 天", calendar.profitDays, calendar.lossDays))
                     .foregroundStyle(.secondary)
             } else {
-                Text("这个月没有记录")
+                Text(L("这个月没有记录"))
                     .foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)

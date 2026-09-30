@@ -79,14 +79,14 @@ final class Updater: ObservableObject {
 
     /// 没法在程序里更新的原因：只有不是从 .app 运行（开发时 swift run）才会这样。
     var installProblem: String? {
-        plan == nil ? "不是从 Stox.app 运行的，没法在程序里更新" : nil
+        plan == nil ? L("不是从 Stox.app 运行的，没法在程序里更新") : nil
     }
 
     /// 从下载文件夹这类临时位置运行时，更新会装进“应用程序”。
     var relocationNote: String? {
         guard let plan, plan.relocating else { return nil }
         let folder = AppLocation.displayName(of: plan.target.deletingLastPathComponent())
-        return "现在是从下载文件夹这类临时位置运行的，这次会装进\(folder)" + (plan.trashAfter == nil ? "" : "，旧的那份移到废纸篓")
+        return L("现在是从下载文件夹这类临时位置运行的，这次会装进%@", folder) + (plan.trashAfter == nil ? "" : L("，旧的那份移到废纸篓"))
     }
 
     private var skippedVersion: String? {
@@ -154,14 +154,14 @@ final class Updater: ObservableObject {
             }
             if !manual, defaults.string(forKey: Self.notifiedKey) != latest.version {
                 defaults.set(latest.version, forKey: Self.notifiedKey)
-                notify?("Stox 有新版本 \(latest.version)", "打开行情面板点“更新”，自动下载安装并重新启动")
+                notify?(L("Stox 有新版本 %@", latest.version), L("打开行情面板点“更新”，自动下载安装并重新启动"))
             }
             return latest
         } catch {
             Log.error("检查更新失败：\(error.localizedDescription)")
             phase = previous
             if manual {
-                checkError = "检查更新失败：\(error.localizedDescription)"
+                checkError = L("检查更新失败：%@", error.localizedDescription)
             }
             return nil
         }

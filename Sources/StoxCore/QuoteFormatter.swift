@@ -18,19 +18,33 @@ public enum QuoteFormatter {
     }
 
     /// 用万、亿、万亿表示的大数：`27.83亿`、`992.57万`。
+    /// 英文界面用 K、M、B、T：`2.78B`、`9.93M`。
     public static func largeNumber(_ value: Double, decimals: Int = 2) -> String {
         let magnitude = abs(value)
-        if magnitude >= 1e12 { return fixed(value / 1e12, decimals: decimals) + "万亿" }
-        if magnitude >= 1e8 { return fixed(value / 1e8, decimals: decimals) + "亿" }
-        if magnitude >= 1e4 { return fixed(value / 1e4, decimals: decimals) + "万" }
+        if AppLanguage.isEnglish {
+            if magnitude >= 1e12 { return fixed(value / 1e12, decimals: decimals) + "T" }
+            if magnitude >= 1e9 { return fixed(value / 1e9, decimals: decimals) + "B" }
+            if magnitude >= 1e6 { return fixed(value / 1e6, decimals: decimals) + "M" }
+            if magnitude >= 1e4 { return fixed(value / 1e3, decimals: decimals) + "K" }
+            return fixed(value, decimals: 0)
+        }
+        if magnitude >= 1e12 { return fixed(value / 1e12, decimals: decimals) + "万亿" }  // l10n-ignore
+        if magnitude >= 1e8 { return fixed(value / 1e8, decimals: decimals) + "亿" }  // l10n-ignore
+        if magnitude >= 1e4 { return fixed(value / 1e4, decimals: decimals) + "万" }  // l10n-ignore
         return fixed(value, decimals: 0)
     }
 
     /// 金额（市值、盈亏）：10 万以内保留两位小数，更大的用万、亿表示：`3958.00`、`12.40万`。
     public static func money(_ value: Double) -> String {
         let magnitude = abs(value)
-        if magnitude >= 1e8 { return fixed(value / 1e8, decimals: 2) + "亿" }
-        if magnitude >= 1e5 { return fixed(value / 1e4, decimals: 2) + "万" }
+        if AppLanguage.isEnglish {
+            if magnitude >= 1e9 { return fixed(value / 1e9, decimals: 2) + "B" }
+            if magnitude >= 1e6 { return fixed(value / 1e6, decimals: 2) + "M" }
+            if magnitude >= 1e5 { return fixed(value / 1e3, decimals: 2) + "K" }
+            return fixed(value, decimals: 2)
+        }
+        if magnitude >= 1e8 { return fixed(value / 1e8, decimals: 2) + "亿" }  // l10n-ignore
+        if magnitude >= 1e5 { return fixed(value / 1e4, decimals: 2) + "万" }  // l10n-ignore
         return fixed(value, decimals: 2)
     }
 
@@ -52,8 +66,15 @@ public enum QuoteFormatter {
     /// 菜单栏里的金额，越短越好：100 以内两位小数，1 万以内取整，更大的用万、亿：`12.90`、`688`、`1.20万`。
     public static func compactMoney(_ value: Double) -> String {
         let magnitude = abs(value)
-        if magnitude >= 1e8 { return fixed(value / 1e8, decimals: 2) + "亿" }
-        if magnitude >= 1e4 { return fixed(value / 1e4, decimals: 2) + "万" }
+        if AppLanguage.isEnglish {
+            if magnitude >= 1e9 { return fixed(value / 1e9, decimals: 2) + "B" }
+            if magnitude >= 1e6 { return fixed(value / 1e6, decimals: 2) + "M" }
+            if magnitude >= 1e4 { return fixed(value / 1e3, decimals: 2) + "K" }
+            if magnitude >= 100 { return fixed(value, decimals: 0) }
+            return fixed(value, decimals: 2)
+        }
+        if magnitude >= 1e8 { return fixed(value / 1e8, decimals: 2) + "亿" }  // l10n-ignore
+        if magnitude >= 1e4 { return fixed(value / 1e4, decimals: 2) + "万" }  // l10n-ignore
         if magnitude >= 100 { return fixed(value, decimals: 0) }
         return fixed(value, decimals: 2)
     }
@@ -70,8 +91,8 @@ public enum QuoteFormatter {
     /// 成交量：A 股按“手”显示，港美股按“股”显示。
     public static func volume(_ shares: Double, market: Market) -> String {
         guard shares > 0 else { return "--" }
-        if market.region == .cn { return largeNumber(shares / 100) + "手" }
-        return largeNumber(shares) + "股"
+        if market.region == .cn { return L("%@手", largeNumber(shares / 100)) }
+        return L("%@股", largeNumber(shares))
     }
 
     public static func time(_ date: Date, timeZone: TimeZone = .current) -> String {

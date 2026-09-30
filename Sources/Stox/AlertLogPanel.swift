@@ -15,7 +15,7 @@ struct AlertLogPanel: View {
         VStack(spacing: 10) {
             header
             if store.alertLog.entries.isEmpty {
-                Text("还没有发过提醒")
+                Text(L("还没有发过提醒"))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
@@ -38,10 +38,10 @@ struct AlertLogPanel: View {
                 .glassCard()
             }
             HStack {
-                Button("清空") { store.clearAlertLog() }
+                Button(L("清空")) { store.clearAlertLog() }
                     .disabled(store.alertLog.entries.isEmpty)
                 Spacer()
-                Button("返回") { router.route = .list }
+                Button(L("返回")) { router.route = .list }
                     .keyboardShortcut(.defaultAction)
             }
             .controlSize(.regular)
@@ -57,11 +57,11 @@ struct AlertLogPanel: View {
                 Image(systemName: "chevron.left")
             }
             .buttonStyle(IconButtonStyle())
-            .help("返回（Esc）")
+            .help(L("返回（Esc）"))
             VStack(alignment: .leading, spacing: 2) {
-                Text("最近的提醒")
+                Text(L("最近的提醒"))
                     .font(.system(size: 14, weight: .semibold))
-                Text("最多留 \(AlertLog.limit) 条，只在这台 Mac 上")
+                Text(L("最多留 %@ 条，只在这台 Mac 上", AlertLog.limit))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -97,7 +97,7 @@ struct AlertLogPanel: View {
         }
         .buttonStyle(.plain)
         .disabled(entry.symbol.map { !store.contains($0) } ?? false)
-        .help(entry.symbol == nil ? "回到列表" : "回到列表并展开这一只")
+        .help(entry.symbol == nil ? L("回到列表") : L("回到列表并展开这一只"))
     }
 
     /// 今天的只写时刻，别的日子写月日和时刻。

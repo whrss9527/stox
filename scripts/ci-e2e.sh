@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CI 端到端测试：真正启动打包好的 dist/Stox.app，检查面板、设置窗口、iCloud 同步和一键更新，顺便截图。
 #
-#   scripts/ci-e2e.sh smoke    面板、详情、搜索、设置窗口、右键隐藏行情
+#   scripts/ci-e2e.sh smoke    面板、详情、搜索、设置窗口、右键隐藏行情，以及英文界面
 #   scripts/ci-e2e.sh sync     假的 iCloud 云盘文件夹：启动时拉取、运行中收到改动、文件被删后写回
 #   scripts/ci-e2e.sh update   本地假发布 9.9.9：发现新版本、原地更新、从临时位置运行时装进“应用程序”
 #
@@ -68,6 +68,12 @@ run_case() {
   wait "$pid" 2>/dev/null || true
 }
 
+# CI 机器的系统语言是英文。下面的检查和 README 的截图用中文界面，先把 Stox 的语言固定成简体中文；
+# 英文界面单独启动几次，参数里带 -AppleLanguages '(en)'（见 smoke 最后）。
+use_chinese() {
+  defaults write "$DOMAIN" AppleLanguages -array zh-Hans
+}
+
 # 面板放得下：窗口不比屏幕能放的高，内容也不比窗口高，底下的按钮总看得见。
 check_fits() {
   local name="$1" frame_h fitting available
@@ -79,6 +85,7 @@ check_fits() {
 }
 
 smoke() {
+  use_chinese
   # CI 里不去 GitHub 检查更新，也就不会弹出通知挡住截图；使用提示单独截一张，其他截图里不显示。
   defaults write "$DOMAIN" update.autoCheck -bool false
   defaults write "$DOMAIN" tips.dismissed -bool true
@@ -90,6 +97,7 @@ smoke() {
   run_case settings-general --show-settings general
   run_case settings-display --show-settings display
   grep -q "panel_frame=" shots/panel.log || fail "面板没有打开"
+  grep -q 'english=false sample="设置…"' shots/panel.log || fail "界面应该是中文"
   # 列表里的迷你分时：面板打开后一只一只地取，几秒后应该有了；取不到只提示。
   grep -Eq "late flow=[^ ]+ sparklines=[1-9]" shots/panel.log || echo "::warning::列表里的迷你分时没有取到"
   grep -q 'image=false color=redUp' shots/panel.log || fail "默认应该在菜单栏显示行情、红涨绿跌"
@@ -422,6 +430,39 @@ smoke() {
   defaults delete "$DOMAIN" chart.movingAverages
   defaults delete "$DOMAIN" chart.period
   grep -q "STOX_DIAG late us_phase=[a-zA-Z]* extended=0 " shots/plain.log || fail "关掉盘前盘后价以后不应该再取"
+
+  english
+}
+
+# 英文界面：系统语言是英文时，面板、详情、编辑页、设置窗口都是英文，截图放在 shots/en-*.png。
+english() {
+  local en=(-AppleLanguages '(en)')
+  run_case en-panel --show-panel "${en[@]}"
+  check_fits en-panel
+  grep -q 'english=true sample="Settings…"' shots/en-panel.log || fail "英文系统下界面应该是英文"
+  run_case en-detail --show-panel --expand sh600519 "${en[@]}"
+  check_fits en-detail
+  run_case en-search --show-panel --search 腾讯 "${en[@]}"
+  run_case en-settings-general --show-settings general "${en[@]}"
+  run_case en-settings-display --show-settings display "${en[@]}"
+  grep -q "settings_page=display" shots/en-settings-display.log || fail "英文界面的设置窗口没有打开"
+  # 持仓：菜单栏显示今日盈亏时写“Today”，大数用 K、M 而不是万、亿。
+  write_watchlist '[{"symbol":"sh000001","name":"上证指数","alias":"上证","pinned":true},
+    {"symbol":"sh600519","name":"贵州茅台","holding":{"shares":100,"cost":1200}},
+    {"symbol":"hk00700","name":"腾讯控股","holding":{"shares":200,"cost":380}},
+    {"symbol":"usAAPL","name":"苹果","holding":{"shares":10,"cost":300}}]'
+  defaults write "$DOMAIN" ticker.dayProfit -bool true
+  defaults write "$DOMAIN" holdings.allocation -bool true
+  run_case en-holdings --show-panel --expand sh600519 "${en[@]}"
+  check_fits en-holdings
+  run_case en-editor --show-panel --edit sh600519 "${en[@]}"
+  defaults delete "$DOMAIN" ticker.dayProfit
+  defaults delete "$DOMAIN" holdings.allocation
+  defaults delete "$DOMAIN" watchlist.v1
+  grep -q 'status_title="上证 .* Today ' shots/en-holdings.log || fail "英文界面的菜单栏应该写 Today"
+  if grep -Eq 'status_title="[^"]*[万亿]' shots/en-holdings.log; then
+    fail "英文界面的菜单栏不应该出现万、亿"
+  fi
 }
 
 sync_test() {
@@ -436,6 +477,7 @@ sync_test() {
                          {"symbol":"usAAPL","name":"苹果"}],
             "settings":{"colorScheme":"neutral","refreshInterval":5}}}
 JSON
+  use_chinese
   defaults write "$DOMAIN" update.autoCheck -bool false
   defaults write "$DOMAIN" sync.enabled -bool true
   : > "$LOG"
@@ -535,6 +577,7 @@ Server(("127.0.0.1", 8765), handler).serve_forever()
 PY
   wait_for 15 curl -sf -o /dev/null http://127.0.0.1:8765/latest.json || fail "本地假发布没有启动"
   export STOX_UPDATE_URL=http://127.0.0.1:8765/latest.json
+  use_chinese
   defaults write "$DOMAIN" update.autoCheck -bool false
   defaults write "$DOMAIN" tips.dismissed -bool true
 

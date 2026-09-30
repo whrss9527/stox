@@ -40,6 +40,10 @@ cp "$BIN_DIR/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP/Contents/Info.plist"
+# 界面文字的翻译：英文和简体中文，按系统语言选（见 Sources/StoxCore/AppLanguage.swift）。
+for lproj in Resources/*.lproj; do
+  cp -R "$lproj" "$APP/Contents/Resources/"
+done
 
 echo "==> 生成图标"
 ICON_TMP="$(mktemp -d)"

@@ -44,7 +44,7 @@ final class StatusItemController: NSObject {
             // 和系统菜单一样在按下鼠标时响应。
             button.sendAction(on: [.leftMouseDown, .rightMouseDown])
             button.imagePosition = .imageLeading
-            button.toolTip = "Stox 行情\n左键：打开 / 关闭行情面板\n右键：隐藏 / 显示菜单栏行情"
+            button.toolTip = L("Stox 行情\n左键：打开 / 关闭行情面板\n右键：隐藏 / 显示菜单栏行情")
         }
 
         Publishers.Merge(store.objectWillChange, settings.objectWillChange)
@@ -562,6 +562,7 @@ final class StatusItemController: NSObject {
         let imageSize = statusItem.button?.image.map { "\(Int($0.size.width))x\(Int($0.size.height))" } ?? "none"
         print("STOX_DIAG ticker_layout=\(settings.tickerLayout.rawValue) status_image=\(imageSize)")
         print("STOX_DIAG ticker_hidden=\(tickerHidden) ticker_live=\(tickerMarketsLive) when_closed=\(settings.hideTickerWhenClosed)")
+        print("STOX_DIAG language=\(Bundle.main.preferredLocalizations.first ?? "none") english=\(AppLanguage.isEnglish) sample=\"\(L("设置…"))\"")
         let statusFrame = statusItem.button?.window?.frame
         if let statusFrame {
             print("STOX_DIAG status_frame=\(topLeft(statusFrame))")
@@ -727,7 +728,7 @@ final class PanelRouter: ObservableObject {
                 clearSearch()
             }
         } catch {
-            batchError = "查询行情失败：\(error.localizedDescription)"
+            batchError = L("查询行情失败：%@", error.localizedDescription)
         }
     }
 

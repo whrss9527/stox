@@ -182,7 +182,7 @@ public enum TencentFundFlow {
     /// 接口的小结。ETF 没有排名，开头会多一个逗号，去掉。
     static func note(_ text: String?) -> String? {
         guard let text else { return nil }
-        let trimmed = text.trimmingCharacters(in: CharacterSet(charactersIn: "，,；; ").union(.whitespacesAndNewlines))
+        let trimmed = text.trimmingCharacters(in: CharacterSet(charactersIn: "，,；; ").union(.whitespacesAndNewlines))  // l10n-ignore
         return trimmed.isEmpty ? nil : trimmed
     }
 

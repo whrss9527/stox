@@ -8,17 +8,17 @@ enum ColorConvention: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .redUp: return "红涨绿跌"
-        case .greenUp: return "绿涨红跌"
-        case .neutral: return "不显示红绿"
+        case .redUp: return L("红涨绿跌")
+        case .greenUp: return L("绿涨红跌")
+        case .neutral: return L("不显示红绿")
         }
     }
 
     var detail: String {
         switch self {
-        case .redUp: return "A 股、港股的习惯"
-        case .greenUp: return "美股的习惯"
-        case .neutral: return "全部使用系统默认颜色，不显眼"
+        case .redUp: return L("A 股、港股的习惯")
+        case .greenUp: return L("美股的习惯")
+        case .neutral: return L("全部使用系统默认颜色，不显眼")
         }
     }
 }
@@ -26,10 +26,10 @@ enum ColorConvention: String, CaseIterable, Identifiable {
 extension WatchlistSort {
     var title: String {
         switch self {
-        case .custom: return "自定义顺序"
-        case .gainers: return "涨幅从高到低"
-        case .losers: return "跌幅从高到低"
-        case .holdingProfit: return "持仓盈亏从高到低"
+        case .custom: return L("自定义顺序")
+        case .gainers: return L("涨幅从高到低")
+        case .losers: return L("跌幅从高到低")
+        case .holdingProfit: return L("持仓盈亏从高到低")
         }
     }
 }
@@ -37,12 +37,12 @@ extension WatchlistSort {
 extension WatchlistFilter {
     var title: String {
         switch self {
-        case .all: return "全部"
-        case .cn: return "A股"
-        case .hk: return "港股"
-        case .us: return "美股"
-        case .global: return "期货外汇"
-        case .holdings: return "持仓"
+        case .all: return L("全部")
+        case .cn: return L("A股")
+        case .hk: return L("港股")
+        case .us: return L("美股")
+        case .global: return L("期货外汇")
+        case .holdings: return L("持仓")
         case .group(let name): return name
         }
     }
@@ -56,9 +56,9 @@ enum ChangeDisplay: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .percent: return "涨跌幅"
-        case .change: return "涨跌额"
-        case .marketCap: return "总市值"
+        case .percent: return L("涨跌幅")
+        case .change: return L("涨跌额")
+        case .marketCap: return L("总市值")
         }
     }
 
@@ -80,13 +80,13 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .intraday: return "分时"
-        case .fiveDay: return "五日"
-        case .day: return "日K"
-        case .week: return "周K"
-        case .month: return "月K"
-        case .orderBook: return "五档"
-        case .fundFlow: return "资金"
+        case .intraday: return L("分时")
+        case .fiveDay: return L("五日")
+        case .day: return L("日K")
+        case .week: return L("周K")
+        case .month: return L("月K")
+        case .orderBook: return L("五档")
+        case .fundFlow: return L("资金")
         }
     }
 
@@ -133,9 +133,9 @@ enum AppearanceMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .system: return "跟随系统"
-        case .light: return "浅色"
-        case .dark: return "深色"
+        case .system: return L("跟随系统")
+        case .light: return L("浅色")
+        case .dark: return L("深色")
         }
     }
 

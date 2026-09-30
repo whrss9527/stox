@@ -8,10 +8,10 @@ public enum RankKind: String, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .gainers: return "涨幅榜"
-        case .losers: return "跌幅榜"
-        case .turnover: return "成交额"
-        case .industries: return "行业"
+        case .gainers: return L("涨幅榜")
+        case .losers: return L("跌幅榜")
+        case .turnover: return L("成交额")
+        case .industries: return L("行业")
         }
     }
 }

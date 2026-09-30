@@ -198,7 +198,7 @@ public enum SymbolInput {
     /// 至少能认出两个代码时返回结果（去重、保持顺序），否则返回 nil，按普通搜索处理。
     /// 这时纯字母按美股代码处理，是否真的存在由调用方再查一次行情确认。
     public static func parseList(_ input: String) -> (symbols: [Symbol], rejected: [String])? {
-        let separators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",，、;；|"))
+        let separators = CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: ",，、;；|"))  // l10n-ignore
         let tokens = input.components(separatedBy: separators).filter { !$0.isEmpty }
         guard tokens.count >= 2 else { return nil }
         var symbols: [Symbol] = []

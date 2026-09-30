@@ -23,9 +23,9 @@ struct GroupEditorPanel: View {
             header
 
             HStack {
-                Text("组名")
+                Text(L("组名"))
                 Spacer()
-                TextField("", text: $name, prompt: Text("比如 科技、长期持有"))
+                TextField("", text: $name, prompt: Text(L("比如 科技、长期持有")))
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 200)
                     .onSubmit(save)
@@ -37,10 +37,10 @@ struct GroupEditorPanel: View {
 
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Text("放进这个分组的")
+                    Text(L("放进这个分组的"))
                         .font(.system(size: 12.5, weight: .semibold))
                     Spacer()
-                    Text("已选 \(members.count) 只")
+                    Text(L("已选 %@ 只", members.count))
                         .font(.system(size: 11).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
@@ -62,14 +62,14 @@ struct GroupEditorPanel: View {
 
             HStack {
                 if let original {
-                    Button("解散分组", role: .destructive) {
+                    Button(L("解散分组"), role: .destructive) {
                         store.saveGroup("", members: [], replacing: original)
                         router.route = .list
                     }
                 }
                 Spacer()
-                Button("取消") { router.route = .list }
-                Button("保存", action: save)
+                Button(L("取消")) { router.route = .list }
+                Button(L("保存"), action: save)
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
                     .disabled(!isValid)
@@ -88,12 +88,12 @@ struct GroupEditorPanel: View {
                 Image(systemName: "chevron.left")
             }
             .buttonStyle(IconButtonStyle())
-            .help("返回（Esc）")
+            .help(L("返回（Esc）"))
             VStack(alignment: .leading, spacing: 2) {
-                Text(original.map { "分组“\($0)”" } ?? "新建分组")
+                Text(original.map { L("分组“%@”", $0) } ?? L("新建分组"))
                     .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
-                Text("每只最多在一个分组里，放进来的会从原来的分组移出")
+                Text(L("每只最多在一个分组里，放进来的会从原来的分组移出"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
@@ -136,15 +136,15 @@ struct GroupEditorPanel: View {
     private var isValid: Bool { trimmedName != nil && !members.isEmpty }
 
     private var footer: String {
-        guard let trimmedName else { return "先填一个组名。" }
-        if members.isEmpty { return "至少勾上一只。" }
+        guard let trimmedName else { return L("先填一个组名。") }
+        if members.isEmpty { return L("至少勾上一只。") }
         if trimmedName != original, Watchlist.groups(in: store.items).contains(trimmedName) {
-            return "已经有“\(trimmedName)”这个分组了，保存后合在一起。"
+            return L("已经有“%@”这个分组了，保存后合在一起。", trimmedName)
         }
         if name.trimmingCharacters(in: .whitespacesAndNewlines).count > WatchItem.groupNameLimit {
-            return "组名最多 \(WatchItem.groupNameLimit) 个字，保存时会截断成“\(trimmedName)”。"
+            return L("组名最多 %@ 个字，保存时会截断成“%@”。", WatchItem.groupNameLimit, trimmedName)
         }
-        return "列表上方的筛选里会多出“\(trimmedName)”，右键它可以再编辑或解散。"
+        return L("列表上方的筛选里会多出“%@”，右键它可以再编辑或解散。", trimmedName)
     }
 
     private func load() {

@@ -7,8 +7,8 @@ public struct ExtendedHoursQuote: Sendable, Equatable {
 
         public var displayName: String {
             switch self {
-            case .preMarket: return "盘前"
-            case .afterHours: return "盘后"
+            case .preMarket: return L("盘前")
+            case .afterHours: return L("盘后")
             }
         }
     }

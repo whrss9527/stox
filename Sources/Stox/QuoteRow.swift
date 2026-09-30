@@ -124,13 +124,13 @@ struct QuoteRow: View {
                         Image(systemName: "menubar.rectangle")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
-                            .help("显示在菜单栏")
+                            .help(L("显示在菜单栏"))
                     }
                     if !item.alert.isEmpty {
                         Image(systemName: "bell.fill")
                             .font(.system(size: 8.5))
                             .foregroundStyle(.orange)
-                            .help("已设置价格提醒")
+                            .help(L("已设置价格提醒"))
                     }
                     if let note = item.note {
                         Image(systemName: "text.bubble")
@@ -182,7 +182,7 @@ struct QuoteRow: View {
                     }
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(position.totalProfit), convention: settings.colorConvention))
                     .lineLimit(1)
-                    .help("持仓盈亏")
+                    .help(L("持仓盈亏"))
                 }
             }
             // 现价最先排，永远不省略。
@@ -213,7 +213,7 @@ struct QuoteRow: View {
                 Image(systemName: "bell.fill")
                     .font(.system(size: 8))
                     .foregroundStyle(.orange)
-                    .help("已设置价格提醒")
+                    .help(L("已设置价格提醒"))
             }
             Spacer(minLength: 6)
             priceLabel(size: 13)
@@ -253,24 +253,24 @@ struct QuoteRow: View {
                 .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
-        .help("\(settings.changeDisplay.title)。点一下切换涨跌幅、涨跌额、总市值")
+        .help(L("%@。点一下切换涨跌幅、涨跌额、总市值", settings.changeDisplay.title))
     }
 
     /// 读屏软件念的内容：名称、代码、现价、涨跌，有持仓时加上持仓盈亏。
     private var accessibilityText: String {
-        var text = "\(quote?.name ?? item.displayName)，\(item.symbol.displayCode)"
-        guard let quote else { return text + "，暂无行情" }
-        text += "，现价 \(QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))"
+        var text = L("%@，%@", quote?.name ?? item.displayName, item.symbol.displayCode)
+        guard let quote else { return text + L("，暂无行情") }
+        text += L("，现价 %@", QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))
         switch quote.direction {
-        case .up: text += "，上涨 \(QuoteFormatter.fixed(abs(quote.changePercent), decimals: 2))%"
-        case .down: text += "，下跌 \(QuoteFormatter.fixed(abs(quote.changePercent), decimals: 2))%"
-        case .flat: text += "，平盘"
+        case .up: text += L("，上涨 %@%", QuoteFormatter.fixed(abs(quote.changePercent), decimals: 2))
+        case .down: text += L("，下跌 %@%", QuoteFormatter.fixed(abs(quote.changePercent), decimals: 2))
+        case .flat: text += L("，平盘")
         }
         if let position {
-            text += "，持仓盈亏 \(holdingText(position))"
+            text += L("，持仓盈亏 %@", holdingText(position))
         }
         if let extended {
-            text += "，\(extended.label) \(extended.priceText)，\(QuoteFormatter.percent(extended.percent))"
+            text += L("，%@ %@，%@", extended.label, extended.priceText, QuoteFormatter.percent(extended.percent))
         }
         return text
     }
@@ -305,22 +305,22 @@ struct QuoteRow: View {
     /// 停牌、涨停、跌停等状态标签。
     private var statusTag: String? {
         guard let quote else { return nil }
-        if quote.isLimitUp { return "涨停" }
-        if quote.isLimitDown { return "跌停" }
+        if quote.isLimitUp { return L("涨停") }
+        if quote.isLimitDown { return L("跌停") }
         let phase = store.phase(for: item.symbol.market.region)
-        if !quote.hasTraded, phase == .trading || phase == .lunchBreak { return "停牌" }
+        if !quote.hasTraded, phase == .trading || phase == .lunchBreak { return L("停牌") }
         return nil
     }
 
     @ViewBuilder
     private var contextMenu: some View {
-        Button(item.pinned ? "不在菜单栏显示" : "显示在菜单栏") {
+        Button(item.pinned ? L("不在菜单栏显示") : L("显示在菜单栏")) {
             store.togglePinned(item.symbol)
         }
-        Button(item.symbol.canHold ? "持仓、提醒与简称…" : "价格提醒与简称…") {
+        Button(item.symbol.canHold ? L("持仓、提醒与简称…") : L("价格提醒与简称…")) {
             router.route = .edit(item.symbol)
         }
-        Menu("分组") {
+        Menu(L("分组")) {
             let groups = Watchlist.groups(in: store.items)
             ForEach(groups, id: \.self) { name in
                 Button {
@@ -336,30 +336,30 @@ struct QuoteRow: View {
             if !groups.isEmpty {
                 Divider()
             }
-            Button("新建分组…") {
+            Button(L("新建分组…")) {
                 router.route = .group(nil, member: item.symbol)
             }
             if item.group != nil {
-                Button("移出分组") {
+                Button(L("移出分组")) {
                     store.setGroup(nil, for: item.symbol)
                 }
             }
         }
         if let web = QuoteLinks.web(item.symbol) {
-            Button("在\(web.title)中查看") {
+            Button(L("在%@中查看", web.title)) {
                 NSWorkspace.shared.open(web.url)
             }
         }
-        Button("复制代码") {
+        Button(L("复制代码")) {
             NSPasteboard.general.clearContents()
             NSPasteboard.general.setString(item.symbol.displayCode, forType: .string)
         }
         Divider()
-        Button("移到最前") {
+        Button(L("移到最前")) {
             store.moveToTop(item.symbol)
         }
         Divider()
-        Button("删除", role: .destructive) {
+        Button(L("删除"), role: .destructive) {
             store.remove(item.symbol)
         }
     }
@@ -380,10 +380,10 @@ struct QuoteDetailView: View {
             if item.symbol.isFund {
                 // 场外基金只有每天的净值：单位净值、累计净值和这一天的涨跌。
                 HStack(spacing: 0) {
-                    cell("单位净值", price(quote.price))
-                    cell("累计净值", quote.cumulativeNAV.map(price) ?? "--")
-                    cell("日涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
-                    cell("日涨幅", QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
+                    cell(L("单位净值"), price(quote.price))
+                    cell(L("累计净值"), quote.cumulativeNAV.map(price) ?? "--")
+                    cell(L("日涨跌"), QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
+                    cell(L("日涨幅"), QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
                 }
             } else if item.symbol.isGlobal {
                 // 期货外汇没有成交量：开高低收、买价卖价；外汇有 52 周最高最低，期货写振幅。国际期货有分时图（来自新浪）。
@@ -391,65 +391,65 @@ struct QuoteDetailView: View {
                     QuoteChartSection(item: item, quote: quote)
                 }
                 HStack(spacing: 0) {
-                    cell("今开", positivePrice(quote.open))
-                    cell("最高", positivePrice(quote.high))
-                    cell("最低", positivePrice(quote.low))
-                    cell(item.symbol.market == .hf ? "昨结" : "昨收", price(quote.previousClose))
+                    cell(L("今开"), positivePrice(quote.open))
+                    cell(L("最高"), positivePrice(quote.high))
+                    cell(L("最低"), positivePrice(quote.low))
+                    cell(item.symbol.market == .hf ? L("昨结") : L("昨收"), price(quote.previousClose))
                 }
                 HStack(spacing: 0) {
-                    cell("涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
-                    cell("买价", quote.bid.map(price) ?? "--")
-                    cell("卖价", quote.ask.map(price) ?? "--")
+                    cell(L("涨跌"), QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
+                    cell(L("买价"), quote.bid.map(price) ?? "--")
+                    cell(L("卖价"), quote.ask.map(price) ?? "--")
                     if let high = quote.high52Week, let low = quote.low52Week {
-                        cell("52周高低", price(high) + "/" + price(low))
+                        cell(L("52周高低"), price(high) + "/" + price(low))
                     } else {
-                        cell("振幅", quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                        cell(L("振幅"), quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
                     }
                 }
             } else {
                 QuoteChartSection(item: item, quote: quote)
                 HStack(spacing: 0) {
-                    cell("今开", price(quote.open))
-                    cell("最高", price(quote.high))
-                    cell("最低", price(quote.low))
-                    cell("昨收", price(quote.previousClose))
+                    cell(L("今开"), price(quote.open))
+                    cell(L("最高"), price(quote.high))
+                    cell(L("最低"), price(quote.low))
+                    cell(L("昨收"), price(quote.previousClose))
                 }
                 HStack(spacing: 0) {
-                    cell("涨跌", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
-                    cell("成交量", QuoteFormatter.volume(quote.volume, market: item.symbol.market))
-                    cell("成交额", quote.amount > 0 ? QuoteFormatter.largeNumber(quote.amount) : "--")
-                    cell("换手率", quote.turnoverRate.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                    cell(L("涨跌"), QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
+                    cell(L("成交量"), QuoteFormatter.volume(quote.volume, market: item.symbol.market))
+                    cell(L("成交额"), quote.amount > 0 ? QuoteFormatter.largeNumber(quote.amount) : "--")
+                    cell(L("换手率"), quote.turnoverRate.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
                 }
                 HStack(spacing: 0) {
                     if let marketCap = quote.marketCap {
-                        cell("市值", QuoteFormatter.largeNumber(marketCap))
+                        cell(L("市值"), QuoteFormatter.largeNumber(marketCap))
                     } else {
-                        cell("振幅", quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                        cell(L("振幅"), quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
                     }
-                    cell("市盈率", peText)
-                    cell("52周最高", quote.high52Week.map(price) ?? "--")
-                    cell("52周最低", quote.low52Week.map(price) ?? "--")
+                    cell(L("市盈率"), peText)
+                    cell(L("52周最高"), quote.high52Week.map(price) ?? "--")
+                    cell(L("52周最低"), quote.low52Week.map(price) ?? "--")
                 }
                 if Self.showsLimits(item.symbol) {
                     // 涨停价用涨的颜色、跌停价用跌的颜色；ETF 没有市净率，新浪的备用行情里这一行都没有。
                     HStack(spacing: 0) {
-                        cell("涨停", quote.limitUp.map(price) ?? "--", color: profitColor(1))
-                        cell("跌停", quote.limitDown.map(price) ?? "--", color: profitColor(-1))
-                        cell("市净率", quote.pbRatio.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "--")
-                        cell("量比", quote.volumeRatio.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "--")
+                        cell(L("涨停"), quote.limitUp.map(price) ?? "--", color: profitColor(1))
+                        cell(L("跌停"), quote.limitDown.map(price) ?? "--", color: profitColor(-1))
+                        cell(L("市净率"), quote.pbRatio.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "--")
+                        cell(L("量比"), quote.volumeRatio.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "--")
                     }
                 }
             }
             if let holding = item.holding {
                 HStack(spacing: 0) {
-                    cell("持有", amount(QuoteFormatter.plain(holding.shares) + (item.symbol.isFund ? "份" : "股")))
-                    cell("成本", QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))
+                    cell(L("持有"), amount(item.symbol.isFund ? L("%@份", QuoteFormatter.plain(holding.shares)) : L("%@股", QuoteFormatter.plain(holding.shares))))
+                    cell(L("成本"), QuoteFormatter.fixed(holding.cost, decimals: max(quote.priceDecimals, 2)))
                     if let position = Portfolio.position(holding, quote: quote, trades: item.trades) {
-                        cell("持仓盈亏", amount(QuoteFormatter.signedMoney(position.totalProfit)), color: profitColor(position.totalProfit))
-                        cell("今日盈亏", amount(QuoteFormatter.signedMoney(position.dayProfit)), color: profitColor(position.dayProfit))
+                        cell(L("持仓盈亏"), amount(QuoteFormatter.signedMoney(position.totalProfit)), color: profitColor(position.totalProfit))
+                        cell(L("今日盈亏"), amount(QuoteFormatter.signedMoney(position.dayProfit)), color: profitColor(position.dayProfit))
                     } else {
-                        cell("持仓盈亏", "--")
-                        cell("今日盈亏", "--")
+                        cell(L("持仓盈亏"), "--")
+                        cell(L("今日盈亏"), "--")
                     }
                 }
             }
@@ -467,9 +467,9 @@ struct QuoteDetailView: View {
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
-                    .help(item.symbol.isFund ? "场外基金的净值每个交易日晚上更新，白天看到的是上一个交易日的" : "")
+                    .help(item.symbol.isFund ? L("场外基金的净值每个交易日晚上更新，白天看到的是上一个交易日的") : "")
                 Spacer()
-                Button(item.symbol.canHold ? "持仓与提醒" : "提醒") { router.route = .edit(item.symbol) }
+                Button(item.symbol.canHold ? L("持仓与提醒") : L("提醒")) { router.route = .edit(item.symbol) }
                 if let web = QuoteLinks.web(item.symbol) {
                     Button(web.title) { NSWorkspace.shared.open(web.url) }
                 }
@@ -498,7 +498,7 @@ struct QuoteDetailView: View {
     /// 亏损公司的市盈率是负数，和券商软件一样显示“亏损”。
     private var peText: String {
         guard let pe = quote.peRatio else { return "--" }
-        return pe < 0 ? "亏损" : QuoteFormatter.fixed(pe, decimals: 2)
+        return pe < 0 ? L("亏损") : QuoteFormatter.fixed(pe, decimals: 2)
     }
 
     private func profitColor(_ value: Double) -> Color {
@@ -528,22 +528,22 @@ struct QuoteDetailView: View {
         let region = item.symbol.market.region
         // 场外基金写净值是哪天的，每个交易日晚上才出当天的。
         if item.symbol.isFund {
-            guard let timestamp = quote.timestamp else { return "净值每个交易日晚上更新" }
-            return "净值日期 " + ProfitHistory.day(of: timestamp, region: .cn)
+            guard let timestamp = quote.timestamp else { return L("净值每个交易日晚上更新") }
+            return L("净值日期 ") + ProfitHistory.day(of: timestamp, region: .cn)
         }
         // 美股不在常规交易时，这一行换成盘前盘后价和它的成交时间；行情时间这时总是收盘那一刻，不用再写。
         if settings.showExtendedHours, let extended = ExtendedQuote(store.extendedHours[item.symbol], quote: quote) {
             var text = "\(extended.label) \(extended.priceText) \(QuoteFormatter.percent(extended.percent))"
-            if let time = extended.timeText { text += " · 美东 \(time)" }
+            if let time = extended.timeText { text += L(" · 美东 %@", time) }
             return text
         }
         guard let timestamp = quote.timestamp else { return "" }
         // 期货外汇的行情时间本来就是北京时间。
         if item.symbol.isGlobal {
-            return "北京时间 " + QuoteFormatter.time(timestamp, timeZone: region.timeZone)
+            return L("北京时间 ") + QuoteFormatter.time(timestamp, timeZone: region.timeZone)
         }
-        var text = "\(region.displayName)时间 \(QuoteFormatter.time(timestamp, timeZone: region.timeZone))"
-        if region == .hk { text += " · 延时约 15 分钟" }
+        var text = L("%@时间 %@", region.displayName, QuoteFormatter.time(timestamp, timeZone: region.timeZone))
+        if region == .hk { text += L(" · 延时约 15 分钟") }
         return text
     }
 }
@@ -576,8 +576,8 @@ struct ExtendedQuote {
 
     /// 鼠标停在标签上时的说明：价格、相对收盘的涨跌和成交时间。
     var helpText: String {
-        var text = "\(label) \(priceText)，相对收盘 \(QuoteFormatter.percent(percent))"
-        if let timeText { text += "，美东时间 \(timeText)" }
+        var text = L("%@ %@，相对收盘 %@", label, priceText, QuoteFormatter.percent(percent))
+        if let timeText { text += L("，美东时间 %@", timeText) }
         return text
     }
 }

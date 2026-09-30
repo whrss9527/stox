@@ -150,7 +150,7 @@ struct PanelHeader: View {
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)
                         }
-                        .help(region == .hk ? "港股行情延时约 15 分钟" : "")
+                        .help(region == .hk ? L("港股行情延时约 15 分钟") : "")
                     }
                 }
             }
@@ -158,7 +158,7 @@ struct PanelHeader: View {
             if let error = store.lastError {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
-                    .help("刷新失败：\(error)")
+                    .help(L("刷新失败：%@", error))
             }
             Button {
                 settings.panelPinned.toggle()
@@ -166,7 +166,7 @@ struct PanelHeader: View {
                 Image(systemName: settings.panelPinned ? "pin.fill" : "pin")
             }
             .buttonStyle(IconButtonStyle())
-            .help(settings.panelPinned ? "取消钉住：点别处时自动关闭" : "钉住：点别处时不关闭，可以拖到任何位置")
+            .help(settings.panelPinned ? L("取消钉住：点别处时自动关闭") : L("钉住：点别处时不关闭，可以拖到任何位置"))
             Button {
                 store.restart()
             } label: {
@@ -176,7 +176,7 @@ struct PanelHeader: View {
             }
             .buttonStyle(IconButtonStyle())
             .keyboardShortcut("r", modifiers: .command)
-            .help("立即刷新（⌘R）")
+            .help(L("立即刷新（⌘R）"))
         }
         .padding(10)
         .glassCard(prominent: true)
@@ -192,7 +192,7 @@ struct SearchBar: View {
         HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.secondary)
-            TextField("搜索代码、名称或拼音，回车添加", text: $router.searchText)
+            TextField(L("搜索代码、名称或拼音，回车添加"), text: $router.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12.5))
                 .onSubmit(submit)
@@ -253,14 +253,14 @@ struct WatchlistView: View {
                     Image(systemName: "star")
                         .font(.system(size: 26))
                         .foregroundStyle(.tertiary)
-                    Text("还没有自选，在上面的搜索框里添加")
+                    Text(L("还没有自选，在上面的搜索框里添加"))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
-                    Button("添加常用指数") {
+                    Button(L("添加常用指数")) {
                         store.add(Watchlist.commonIndices)
                     }
                     .controlSize(.small)
-                    .help(Watchlist.commonIndices.map(\.name).joined(separator: "、"))
+                    .help(Watchlist.commonIndices.map(\.name).joined(separator: L("、")))
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 160)
@@ -371,7 +371,7 @@ struct WatchlistFilterBar: View {
                 }
             }
             .frame(height: 20)
-            Text("\(count) 只")
+            Text(L("%@ 只", count))
                 .font(.system(size: 10).monospacedDigit())
                 .foregroundStyle(.tertiary)
                 .fixedSize()
@@ -384,10 +384,10 @@ struct WatchlistFilterBar: View {
         if case .group(let name) = filter {
             chipButton(filter)
                 .contextMenu {
-                    Button("编辑分组…") { router.route = .group(name, member: nil) }
-                    Button("解散“\(name)”分组") { store.dissolveGroup(name) }
+                    Button(L("编辑分组…")) { router.route = .group(name, member: nil) }
+                    Button(L("解散“%@”分组", name)) { store.dissolveGroup(name) }
                 }
-                .help("分组“\(name)”，右键可以编辑或解散")
+                .help(L("分组“%@”，右键可以编辑或解散", name))
         } else {
             chipButton(filter)
         }
@@ -420,7 +420,7 @@ struct SearchResultsView: View {
     var body: some View {
         Group {
             if router.searchResults.isEmpty {
-                Text(router.isSearching ? "搜索中…" : (router.searchError.map { "搜索失败：\($0)" } ?? "没有找到相关证券"))
+                Text(router.isSearching ? L("搜索中…") : (router.searchError.map { L("搜索失败：%@", $0) } ?? L("没有找到相关证券")))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity)
@@ -468,10 +468,10 @@ struct BatchAddView: View {
             let pending = batch.symbols.filter { !store.contains($0) && !router.batchMissing.contains($0) }
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("认出 \(batch.symbols.count) 个代码")
+                    Text(L("认出 %@ 个代码", batch.symbols.count))
                         .font(.system(size: 12.5, weight: .semibold))
                     Spacer()
-                    Button(pending.isEmpty ? "都已处理" : "全部添加（\(pending.count)）") {
+                    Button(pending.isEmpty ? L("都已处理") : L("全部添加（%@）", pending.count)) {
                         Task { await router.addBatch(using: store) }
                     }
                     .buttonStyle(.borderedProminent)
@@ -487,7 +487,7 @@ struct BatchAddView: View {
                 }
                 .frame(height: min(CGFloat(batch.symbols.count) * 28, 280))
                 if !batch.rejected.isEmpty {
-                    Text("认不出：" + batch.rejected.joined(separator: "、"))
+                    Text(L("认不出：") + batch.rejected.joined(separator: L("、")))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 }
@@ -496,7 +496,7 @@ struct BatchAddView: View {
                         .font(.system(size: 11))
                         .foregroundStyle(.orange)
                 }
-                Text("回车全部添加，会先查一次行情，只添加存在的代码。")
+                Text(L("回车全部添加，会先查一次行情，只添加存在的代码。"))
                     .font(.system(size: 10.5))
                     .foregroundStyle(.tertiary)
             }
@@ -521,11 +521,11 @@ struct BatchAddView: View {
             }
             Spacer()
             if store.contains(symbol) {
-                Label("已添加", systemImage: "checkmark")
+                Label(L("已添加"), systemImage: "checkmark")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             } else if router.batchMissing.contains(symbol) {
-                Label("没有这个代码", systemImage: "xmark")
+                Label(L("没有这个代码"), systemImage: "xmark")
                     .font(.system(size: 11))
                     .foregroundStyle(.orange)
             } else {
@@ -553,14 +553,14 @@ struct TipsCards: View {
                         .font(.system(size: 16))
                         .foregroundStyle(Color.accentColor)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("已更新到 \(version)")
+                        Text(L("已更新到 %@", version))
                             .font(.system(size: 12, weight: .semibold))
-                        Text(settings.whatsNewSince.map { "从 \($0) 更新上来，自选和设置都还在" } ?? "自选和设置都还在")
+                        Text(settings.whatsNewSince.map { L("从 %@ 更新上来，自选和设置都还在", $0) } ?? L("自选和设置都还在"))
                             .font(.system(size: 10.5))
                             .foregroundStyle(.secondary)
                     }
                     Spacer(minLength: 4)
-                    Button("看看更新了什么") {
+                    Button(L("看看更新了什么")) {
                         if let url = URL(string: "https://github.com/\(UpdateCheck.repository)/releases/tag/v\(version)") {
                             NSWorkspace.shared.open(url)
                         }
@@ -587,18 +587,18 @@ struct TipsCards: View {
         if !settings.tipsDismissed {
             VStack(alignment: .leading, spacing: 6) {
                 HStack {
-                    Label("几个小技巧", systemImage: "lightbulb")
+                    Label(L("几个小技巧"), systemImage: "lightbulb")
                         .font(.system(size: 12, weight: .semibold))
                     Spacer()
                     closeButton { settings.tipsDismissed = true }
                 }
-                tip("右键单击菜单栏图标，在显示行情和只显示图标之间切换")
-                tip("\(settings.toggleHotkey.display) 在任何 App 里打开或关闭这个面板")
-                tip("右键单击一只可以固定到菜单栏、放进分组，或者填持仓和价格提醒")
-                tip("点右边的色块，在涨跌幅、涨跌额和总市值之间切换")
-                tip("一次粘贴多个代码，回车全部添加")
-                tip("↑ ↓ 选择，回车添加或展开；展开后 ← → 切换分时和 K 线")
-                tip("点右上角的图钉，面板就一直显示，可以拖到任何位置")
+                tip(L("右键单击菜单栏图标，在显示行情和只显示图标之间切换"))
+                tip(L("%@ 在任何 App 里打开或关闭这个面板", settings.toggleHotkey.display))
+                tip(L("右键单击一只可以固定到菜单栏、放进分组，或者填持仓和价格提醒"))
+                tip(L("点右边的色块，在涨跌幅、涨跌额和总市值之间切换"))
+                tip(L("一次粘贴多个代码，回车全部添加"))
+                tip(L("↑ ↓ 选择，回车添加或展开；展开后 ← → 切换分时和 K 线"))
+                tip(L("点右上角的图钉，面板就一直显示，可以拖到任何位置"))
             }
             .padding(10)
             .glassCard()
@@ -657,7 +657,7 @@ struct TipsCards: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(.secondary)
-        .help("不再显示")
+        .help(L("不再显示"))
     }
 }
 
@@ -688,10 +688,10 @@ struct HoldingsSummaryView: View {
                             Color.clear
                                 .gridCellUnsizedAxes([.horizontal, .vertical])
                         }
-                        header("今日盈亏")
-                        header("持仓盈亏")
+                        header(L("今日盈亏"))
+                        header(L("持仓盈亏"))
                         HStack(spacing: 4) {
-                            header(showsCurrency ? "市值" : "持仓市值")
+                            header(showsCurrency ? L("市值") : L("持仓市值"))
                             hideAmountsButton
                         }
                         .gridColumnAlignment(.trailing)
@@ -703,7 +703,7 @@ struct HoldingsSummaryView: View {
                     if let total = Portfolio.combined(summaries, rates: store.rates) {
                         Divider()
                             .gridCellUnsizedAxes(.horizontal)
-                        row("合计", total, showsCurrency: true, help: combinedHelp)
+                        row(L("合计"), total, showsCurrency: true, help: combinedHelp)
                     }
                 }
                 // 今年卖出和分红的已实现盈亏：编辑页里记了卖出、分红才有。
@@ -724,20 +724,20 @@ struct HoldingsSummaryView: View {
             .padding(.vertical, 8)
             .glassCard()
             .reportsCardHeight()
-            .help((filtered ? "只算列表上方选中的“\(filter.title)”。" : "")
-                + "按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币")
+            .help((filtered ? L("只算列表上方选中的“%@”。", filter.title) : "")
+                + L("按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币"))
         }
     }
 
     /// 持仓分布：点一下展开或收起，展开后每只一行，横条是占总市值的比例。
     @ViewBuilder
     private var allocation: some View {
-        disclosure("持仓分布", expanded: $settings.showAllocation, help: "看每只持仓占总市值多少")
+        disclosure(L("持仓分布"), expanded: $settings.showAllocation, help: L("看每只持仓占总市值多少"))
         if settings.showAllocation {
             let entries = Self.allocation(store: store, settings: settings)
             let view = AllocationView(entries)
             if entries.isEmpty {
-                Text("几种货币都有时，要等取到汇率才能放在一起比。")
+                Text(L("几种货币都有时，要等取到汇率才能放在一起比。"))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
             }
@@ -761,12 +761,12 @@ struct HoldingsSummaryView: View {
                         .frame(width: 42, alignment: .trailing)
                 }
                 .frame(height: 15)
-                .help("\(entry.name)：市值 \(amount(QuoteFormatter.money(entry.marketValue)))"
-                    + (entry.profitPercent.map { "，持仓盈亏 \(QuoteFormatter.percent($0))" } ?? ""))
+                .help(L("%@：市值 %@", entry.name, amount(QuoteFormatter.money(entry.marketValue)))
+                    + (entry.profitPercent.map { L("，持仓盈亏 %@", QuoteFormatter.percent($0)) } ?? ""))
             }
             if view.restCount > 0 {
                 HStack(spacing: 6) {
-                    Text("其余 \(view.restCount) 只")
+                    Text(L("其余 %@ 只", view.restCount))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                     Spacer(minLength: 6)
@@ -783,22 +783,22 @@ struct HoldingsSummaryView: View {
     /// 盈亏记录：点一下展开或收起，展开后每种货币一行，柱子是最近 20 个交易日的今日盈亏，右边是本周、本月合计。
     @ViewBuilder
     private var history: some View {
-        disclosure("盈亏记录", expanded: $settings.showProfitHistory, help: "看最近每个交易日赚了多少")
+        disclosure(L("盈亏记录"), expanded: $settings.showProfitHistory, help: L("看最近每个交易日赚了多少"))
         if settings.showProfitHistory {
             ForEach(store.profitHistory.regions, id: \.self) { region in
                 historyRow(region)
             }
             HStack(spacing: 6) {
-                Text("每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。")
+                Text(L("每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。"))
                     .font(.system(size: 9.5))
                     .foregroundStyle(.tertiary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
                 Spacer(minLength: 0)
-                Button("日历") { router.route = .calendar }
+                Button(L("日历")) { router.route = .calendar }
                     .buttonStyle(.link)
                     .font(.system(size: 10))
-                    .help("按月看每天赚了多少")
+                    .help(L("按月看每天赚了多少"))
             }
         }
     }
@@ -815,11 +815,11 @@ struct HoldingsSummaryView: View {
                 .frame(width: 34, alignment: .leading)
             ProfitBars(values: records.map(\.dayProfit), convention: settings.colorConvention)
                 .frame(height: 18)
-                .help(records.last.map { "最近一天 \($0.day) \(amount(QuoteFormatter.signedMoney($0.dayProfit)))" } ?? "")
+                .help(records.last.map { L("最近一天 %@ %@", $0.day, amount(QuoteFormatter.signedMoney($0.dayProfit))) } ?? "")
             VStack(alignment: .trailing, spacing: 0) {
-                Text("本周 " + amount(QuoteFormatter.signedMoney(week)))
+                Text(L("本周 ") + amount(QuoteFormatter.signedMoney(week)))
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(week), convention: settings.colorConvention))
-                Text("本月 " + amount(QuoteFormatter.signedMoney(month)))
+                Text(L("本月 ") + amount(QuoteFormatter.signedMoney(month)))
                     .foregroundStyle(Theme.priceColor(for: PriceDirection(month), convention: settings.colorConvention))
             }
             .font(.system(size: 10).monospacedDigit())
@@ -845,7 +845,7 @@ struct HoldingsSummaryView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(expanded.wrappedValue ? "收起\(title)" : help)
+        .help(expanded.wrappedValue ? L("收起%@", title) : help)
     }
 
     /// 列表上方筛选出来的那些持仓，各占总市值多少。
@@ -863,7 +863,7 @@ struct HoldingsSummaryView: View {
     /// 今年已实现：人民币 +1234.00 · 美元 -56.00。只有一种货币时不写币种。
     private func realizedRow(_ realized: [(region: MarketRegion, profit: Double)]) -> some View {
         HStack(spacing: 8) {
-            Text("今年已实现")
+            Text(L("今年已实现"))
                 .foregroundStyle(.secondary)
             ForEach(realized.indices, id: \.self) { index in
                 let entry = realized[index]
@@ -875,7 +875,7 @@ struct HoldingsSummaryView: View {
         .font(.system(size: 10.5).monospacedDigit())
         .lineLimit(1)
         .minimumScaleFactor(0.8)
-        .help("今年卖出的部分按当时的成本价算出的盈亏，加上记下的现金分红，来自编辑页里“记一笔”记下的卖出和分红")
+        .help(L("今年卖出的部分按当时的成本价算出的盈亏，加上记下的现金分红，来自编辑页里“记一笔”记下的卖出和分红"))
     }
 
     /// 列表上方筛选出来的那些持仓，按币种合计。
@@ -904,8 +904,8 @@ struct HoldingsSummaryView: View {
 
     private var combinedHelp: String {
         guard let rates = store.rates else { return "" }
-        return "按现在的汇率折成人民币：1 港币 = \(QuoteFormatter.fixed(rates.hkdCNY, decimals: 4)) 元，"
-            + "1 美元 = \(QuoteFormatter.fixed(rates.usdCNY, decimals: 4)) 元。成本也按现在的汇率折算"
+        return L("按现在的汇率折成人民币：1 港币 = %@ 元，", QuoteFormatter.fixed(rates.hkdCNY, decimals: 4))
+            + L("1 美元 = %@ 元。成本也按现在的汇率折算", QuoteFormatter.fixed(rates.usdCNY, decimals: 4))
     }
 
     private func header(_ title: String) -> some View {
@@ -931,8 +931,8 @@ struct HoldingsSummaryView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(settings.hideAmounts ? "显示金额" : "隐藏金额：市值、盈亏金额和持有数量换成 ****，比例照常显示，给别人看屏幕时用")
-        .accessibilityLabel(settings.hideAmounts ? "显示金额" : "隐藏金额")
+        .help(settings.hideAmounts ? L("显示金额") : L("隐藏金额：市值、盈亏金额和持有数量换成 ****，比例照常显示，给别人看屏幕时用"))
+        .accessibilityLabel(settings.hideAmounts ? L("显示金额") : L("隐藏金额"))
     }
 
     /// 金额在上、比例在下，窄一点也放得下。
@@ -994,7 +994,7 @@ struct SearchResultRow: View {
                     .lineLimit(1)
                 }
                 if added {
-                    Label("已添加", systemImage: "checkmark")
+                    Label(L("已添加"), systemImage: "checkmark")
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                 } else {
@@ -1016,8 +1016,8 @@ struct SearchResultRow: View {
     }
 
     private var subtitle: String {
-        if missing { return result.isDirect ? "查不到这个代码的行情" : "\(result.symbol.displayCode) · 查不到行情" }
-        return result.isDirect ? "按代码添加" : "\(result.symbol.displayCode) · \(result.typeLabel)"
+        if missing { return result.isDirect ? L("查不到这个代码的行情") : L("%@ · 查不到行情", result.symbol.displayCode) }
+        return result.isDirect ? L("按代码添加") : "\(result.symbol.displayCode) · \(result.typeLabel)"
     }
 }
 
@@ -1036,11 +1036,11 @@ struct PanelFooter: View {
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
-                .help(store.usingBackup ? "腾讯的行情接口暂时取不到，正在用新浪的行情；分时和 K 线要等腾讯恢复" : "")
+                .help(store.usingBackup ? L("腾讯的行情接口暂时取不到，正在用新浪的行情；分时和 K 线要等腾讯恢复") : "")
             Spacer(minLength: 4)
             Menu {
-                Text("排序")
-                Picker("排序", selection: $settings.sortMode) {
+                Text(L("排序"))
+                Picker(L("排序"), selection: $settings.sortMode) {
                     ForEach(WatchlistSort.allCases, id: \.self) { mode in
                         Text(mode.title).tag(mode)
                     }
@@ -1048,8 +1048,8 @@ struct PanelFooter: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
                 Divider()
-                Text("右边的色块显示")
-                Picker("右边的色块显示", selection: $settings.changeDisplay) {
+                Text(L("右边的色块显示"))
+                Picker(L("右边的色块显示"), selection: $settings.changeDisplay) {
                     ForEach(ChangeDisplay.allCases) { mode in
                         Text(mode.title).tag(mode)
                     }
@@ -1057,22 +1057,22 @@ struct PanelFooter: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
                 Divider()
-                Button("复制全部代码") { copyCodes() }
+                Button(L("复制全部代码")) { copyCodes() }
                     .disabled(store.items.isEmpty)
-                Button("复制持仓表格") { copyHoldings() }
+                Button(L("复制持仓表格")) { copyHoldings() }
                     .disabled(!store.items.contains { $0.holding != nil })
-                Button("复制买卖记录") { copyTrades() }
+                Button(L("复制买卖记录")) { copyTrades() }
                     .disabled(!store.items.contains { !$0.trades.isEmpty })
-                Button("复制盈亏记录") { copyProfitHistory() }
+                Button(L("复制盈亏记录")) { copyProfitHistory() }
                     .disabled(store.profitHistory.records.isEmpty)
                 Divider()
-                Button("新建分组…") { router.route = .group(nil, member: nil) }
+                Button(L("新建分组…")) { router.route = .group(nil, member: nil) }
                     .disabled(store.items.isEmpty)
-                Button("最近的提醒…") { router.route = .alerts }
+                Button(L("最近的提醒…")) { router.route = .alerts }
                     .disabled(store.alertLog.entries.isEmpty)
-                Button("盈亏日历…") { router.route = .calendar }
+                Button(L("盈亏日历…")) { router.route = .calendar }
                     .disabled(store.profitHistory.records.isEmpty)
-                Button("A 股涨跌榜…") { router.route = .rank }
+                Button(L("A 股涨跌榜…")) { router.route = .rank }
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
             }
@@ -1082,7 +1082,7 @@ struct PanelFooter: View {
             .buttonStyle(IconButtonStyle())
             .frame(width: 30, height: 30)
             .background(Circle().fill(Color.primary.opacity(0.05)))
-            .help("排序：\(settings.sortMode.title)；色块显示\(settings.changeDisplay.title)")
+            .help(L("排序：%@；色块显示%@", settings.sortMode.title, settings.changeDisplay.title))
             Button {
                 actions.openSettings(nil)
             } label: {
@@ -1090,7 +1090,7 @@ struct PanelFooter: View {
             }
             .buttonStyle(IconButtonStyle())
             .keyboardShortcut(",", modifiers: .command)
-            .help("设置（⌘,）")
+            .help(L("设置（⌘,）"))
             Button {
                 actions.quit()
             } label: {
@@ -1098,14 +1098,14 @@ struct PanelFooter: View {
             }
             .buttonStyle(IconButtonStyle())
             .keyboardShortcut("q", modifiers: .command)
-            .help("退出 Stox（⌘Q）")
+            .help(L("退出 Stox（⌘Q）"))
         }
         .padding(.horizontal, 4)
     }
 
     /// 复制出去的代码粘贴到另一台 Mac（或者重装后）的搜索框里，回车就能全部加回来。
     private func copyCodes() {
-        copy(Watchlist.exportText(store.items), message: "已复制 \(store.items.count) 个代码，粘贴到搜索框就能全部加回来")
+        copy(Watchlist.exportText(store.items), message: L("已复制 %@ 个代码，粘贴到搜索框就能全部加回来", store.items.count))
     }
 
     /// 持仓表格用制表符分隔，粘贴到 Numbers、Excel 就是一张表。
@@ -1113,20 +1113,20 @@ struct PanelFooter: View {
         let text = Portfolio.tableText(items: store.items, quotes: store.quotes)
         guard !text.isEmpty else { return }
         let rows = text.components(separatedBy: "\n").count - 1
-        copy(text, message: "已复制 \(rows) 行持仓，可以直接粘贴到表格里")
+        copy(text, message: L("已复制 %@ 行持仓，可以直接粘贴到表格里", rows))
     }
 
     private func copyTrades() {
         let text = Portfolio.tradesText(items: store.items)
         guard !text.isEmpty else { return }
         let rows = text.components(separatedBy: "\n").count - 1
-        copy(text, message: "已复制 \(rows) 笔买卖，可以直接粘贴到表格里")
+        copy(text, message: L("已复制 %@ 笔买卖，可以直接粘贴到表格里", rows))
     }
 
     private func copyProfitHistory() {
         let text = store.profitHistory.tableText
         guard !text.isEmpty else { return }
-        copy(text, message: "已复制 \(store.profitHistory.records.count) 天的盈亏记录，可以直接粘贴到表格里")
+        copy(text, message: L("已复制 %@ 天的盈亏记录，可以直接粘贴到表格里", store.profitHistory.records.count))
     }
 
     private func copy(_ text: String, message: String) {
@@ -1143,23 +1143,23 @@ struct PanelFooter: View {
         if let copiedMessage {
             return copiedMessage
         }
-        if store.items.isEmpty { return "还没有自选" }
-        guard let updated = store.lastUpdated else { return "正在获取行情…" }
+        if store.items.isEmpty { return L("还没有自选") }
+        guard let updated = store.lastUpdated else { return L("正在获取行情…") }
         let cadence = store.effectiveInterval > settings.refreshInterval
-            ? "休市中每分钟刷新"
-            : "每 \(Int(settings.refreshInterval)) 秒刷新"
+            ? L("休市中每分钟刷新")
+            : L("每 %@ 秒刷新", Int(settings.refreshInterval))
         // 用新浪行情时地方不够，省掉排序方式，标出行情来源。
         if store.usingBackup {
-            return "\(QuoteFormatter.time(updated)) 更新 · 新浪行情 · \(cadence)"
+            return L("%@ 更新 · 新浪行情 · %@", QuoteFormatter.time(updated), cadence)
         }
         let filter = WatchlistFilter.effective(settings.listFilter, items: store.items)
         let order: String
         if filter != .all {
-            order = "只看\(filter.title)"
+            order = L("只看%@", filter.title)
         } else {
-            order = settings.sortMode == .custom ? "拖动排序" : settings.sortMode.title
+            order = settings.sortMode == .custom ? L("拖动排序") : settings.sortMode.title
         }
-        return "\(QuoteFormatter.time(updated)) 更新 · \(cadence) · \(order)"
+        return L("%@ 更新 · %@ · %@", QuoteFormatter.time(updated), cadence, order)
     }
 }
 
@@ -1172,6 +1172,8 @@ struct MarketBadge: View {
         let tint = Theme.marketTint(market, convention: settings.colorConvention)
         Text(market.label)
             .font(.system(size: 9, weight: .semibold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
             .foregroundStyle(tint)
             .frame(width: 15, height: 13)
             .background(RoundedRectangle(cornerRadius: 3).fill(tint.opacity(0.14)))
