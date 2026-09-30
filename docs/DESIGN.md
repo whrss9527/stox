@@ -28,7 +28,7 @@
 
 ### 玻璃面板
 
-0.1.0 用的是 `NSPopover`。它自带的箭头和不透明底色做不出透出桌面的玻璃效果，0.2.0 换成了无边框的 `NSPanel`（`PanelWindow`），外观和 [ProxySwitch for Mac](https://github.com/whrss9527/proxyswitch-mac) 保持一致：
+0.1.0 用的是 `NSPopover`。它自带的箭头和不透明底色做不出透出桌面的玻璃效果，0.2.0 换成了无边框的 `NSPanel`（`PanelWindow`），外观和 [Proxi](https://github.com/whrss9527/proxi) 保持一致：
 
 - 底层是 `NSVisualEffectView`（`.hudWindow` 材质，`behindWindow` 混合），透出后面的桌面和窗口；上面一层由浅到透明的高光和一圈细边。
 - 面板里的标题、搜索框、列表、更新条都是半透明材质的卡片（`glassCard`）。用 Xcode 26 编译、运行在 macOS 26 上时，卡片换成系统的 Liquid Glass（`glassEffect`）；其他情况回退到系统材质，所以 macOS 13 也能用。
