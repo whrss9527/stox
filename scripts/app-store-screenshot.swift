@@ -94,6 +94,9 @@ let panelRect = NSRect(
     width: drawWidth,
     height: drawHeight
 )
+// 面板窗口比玻璃底每边大 8 点（PanelView 的 .padding(8)），玻璃底的圆角是 20 点：只留玻璃底，多裁半点免得露出截到的背景。
+let glassInset = 8.5 * unit * fit
+let glassRect = panelRect.insetBy(dx: glassInset, dy: glassInset)
 let radius = 20 * unit * fit
 NSGraphicsContext.saveGraphicsState()
 let shadow = NSShadow()
@@ -102,10 +105,10 @@ shadow.shadowBlurRadius = 30 * unit
 shadow.shadowOffset = NSSize(width: 0, height: -10 * unit)
 shadow.set()
 NSColor.black.setFill()
-NSBezierPath(roundedRect: panelRect, xRadius: radius, yRadius: radius).fill()
+NSBezierPath(roundedRect: glassRect, xRadius: radius, yRadius: radius).fill()
 NSGraphicsContext.restoreGraphicsState()
 NSGraphicsContext.saveGraphicsState()
-NSBezierPath(roundedRect: panelRect, xRadius: radius, yRadius: radius).addClip()
+NSBezierPath(roundedRect: glassRect, xRadius: radius, yRadius: radius).addClip()
 NSImage(cgImage: panel, size: .zero).draw(in: panelRect)
 NSGraphicsContext.restoreGraphicsState()
 
@@ -119,7 +122,7 @@ if !caption.isEmpty {
         .paragraphStyle: paragraph,
     ]
     let text = NSAttributedString(string: caption.replacingOccurrences(of: "\\n", with: "\n"), attributes: attributes)
-    let textWidth = max(200 * unit, panelRect.minX - 180 * unit)
+    let textWidth = max(200 * unit, glassRect.minX - 180 * unit)
     let bounds = text.boundingRect(with: NSSize(width: textWidth, height: height), options: [.usesLineFragmentOrigin])
     text.draw(with: NSRect(x: 90 * unit, y: (height - barHeight - bounds.height) / 2, width: textWidth, height: bounds.height),
               options: [.usesLineFragmentOrigin])
