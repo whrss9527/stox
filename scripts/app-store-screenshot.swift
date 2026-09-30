@@ -5,6 +5,7 @@
 // 坐标为屏幕点（左上角原点），由 `Stox --show-panel` 打印的 STOX_DIAG capture_frame 给出。默认画布 1440x900。
 // CI 的屏幕是 1 倍的，面板按原大小放上去最清楚；2880x1800 要在 Retina 屏上截（见 docs/app-store/screenshots.md）。
 import AppKit
+import ImageIO
 
 let args = CommandLine.arguments
 guard args.count >= 7,
@@ -36,13 +37,14 @@ let rect = CGRect(
 ).intersection(CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
 guard let cropped = cgImage.cropping(to: rect) else { exit(1) }
 
-let rep = NSBitmapImageRep(
-    bitmapDataPlanes: nil, pixelsWide: canvasWidth, pixelsHigh: canvasHeight, bitsPerSample: 8,
-    samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-)!
+// 不带透明通道（App Store 的截图不能有透明）：用 noneSkipLast 的位图画。
+guard let context = CGContext(
+    data: nil, width: canvasWidth, height: canvasHeight, bitsPerComponent: 8, bytesPerRow: 0,
+    space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+) else { exit(1) }
 let canvas = NSRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight)
 NSGraphicsContext.saveGraphicsState()
-NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: false)
 NSGraphicsContext.current?.imageInterpolation = .high
 
 // 背景：深蓝到紫的渐变，像桌面。
@@ -51,21 +53,18 @@ NSGradient(colors: [
     NSColor(calibratedRed: 0.36, green: 0.22, blue: 0.48, alpha: 1),
 ])!.draw(in: canvas, angle: -35)
 
-// 面板：放在右边，顶上对齐画布顶边（像从菜单栏弹出来），放不下时等比缩小。
-let unit = Double(canvasWidth) / 1440  // 画布相对 1440 宽的倍数
-let maxHeight = Double(canvasHeight) - 40 * unit
-let maxWidth = Double(canvasWidth) * 0.55
-var drawWidth = Double(cropped.width) / pixelScale * unit
-var drawHeight = Double(cropped.height) / pixelScale * unit
+// 面板：放在右边，顶上对齐画布顶边（像从菜单栏弹出来），放不下时等比缩小。都用 CGFloat 算，免得和 Double 混用时运算符有歧义。
+let width = CGFloat(canvasWidth)
+let height = CGFloat(canvasHeight)
+let unit = width / 1440  // 画布相对 1440 宽的倍数
+let maxHeight = height - 40 * unit
+let maxWidth = width * 0.55
+var drawWidth = CGFloat(cropped.width) / CGFloat(pixelScale) * unit
+var drawHeight = CGFloat(cropped.height) / CGFloat(pixelScale) * unit
 let fit = min(1, maxHeight / drawHeight, maxWidth / drawWidth)
 drawWidth *= fit
 drawHeight *= fit
-let panelRect = NSRect(
-    x: Double(canvasWidth) - drawWidth - 120 * unit,
-    y: Double(canvasHeight) - drawHeight,
-    width: drawWidth,
-    height: drawHeight
-)
+let panelRect = NSRect(x: width - drawWidth - 120 * unit, y: height - drawHeight, width: drawWidth, height: drawHeight)
 NSImage(cgImage: cropped, size: .zero).draw(in: panelRect)
 
 // 说明文字：左边竖着居中。
@@ -79,11 +78,15 @@ if !caption.isEmpty {
     ]
     let text = NSAttributedString(string: caption.replacingOccurrences(of: "\\n", with: "\n"), attributes: attributes)
     let textWidth = panelRect.minX - 200 * unit
-    let bounds = text.boundingRect(with: NSSize(width: textWidth, height: Double(canvasHeight)), options: [.usesLineFragmentOrigin])
-    text.draw(with: NSRect(x: 100 * unit, y: (Double(canvasHeight) - bounds.height) / 2, width: textWidth, height: bounds.height),
-              options: [.usesLineFragmentOrigin])
+    let bounds = text.boundingRect(with: NSSize(width: textWidth, height: height), options: [.usesLineFragmentOrigin])
+    let textRect = NSRect(x: 100 * unit, y: (height - bounds.height) / 2, width: textWidth, height: bounds.height)
+    text.draw(with: textRect, options: [.usesLineFragmentOrigin])
 }
 NSGraphicsContext.restoreGraphicsState()
 
-try rep.representation(using: .png, properties: [:])!.write(to: URL(fileURLWithPath: args[2]))
+guard let output = context.makeImage(),
+      let destination = CGImageDestinationCreateWithURL(URL(fileURLWithPath: args[2]) as CFURL, "public.png" as CFString, 1, nil)
+else { exit(1) }
+CGImageDestinationAddImage(destination, output, nil)
+guard CGImageDestinationFinalize(destination) else { exit(1) }
 print("已保存 \(args[2])（\(canvasWidth)x\(canvasHeight)）")
