@@ -44,7 +44,8 @@ if [[ "${ADHOC:-0}" == "1" ]]; then
   for key in com.apple.application-identifier com.apple.developer.team-identifier \
     com.apple.developer.icloud-container-identifiers com.apple.developer.ubiquity-container-identifiers \
     com.apple.developer.icloud-services com.apple.developer.icloud-container-environment; do
-    plutil -remove "$key" "$ENTITLEMENTS"
+    # 键名里有点，plutil 会当成嵌套的路径，用 PlistBuddy（它用冒号分隔）。
+    /usr/libexec/PlistBuddy -c "Delete :$key" "$ENTITLEMENTS"
   done
   IDENTITY="-"
   PROFILE=""
