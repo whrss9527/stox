@@ -103,6 +103,15 @@ UNIVERSAL=1 make app   # 打包 Apple 芯片 + Intel 通用版
 
 本机编译的 App 不会被 Gatekeeper 拦截。
 
+### GitHub 版和 App Store 版
+
+同一份代码构建两个版本，功能一样，区别在分发和更新：
+
+- **GitHub 版**（上面两种方式）：Developer ID 签名并公证，自带一键更新，iCloud 同步的文件放在 iCloud 云盘的 `Stox` 文件夹里。
+- **App Store 版**（准备上架中）：在沙盒里运行，更新交给 App Store，没有一键更新和“检查更新”；iCloud 同步的文件放在 App 自己的 iCloud 容器里。第一次打开是全新的设置，从 GitHub 版搬过来时用“设置 → iCloud 同步 → 备份到文件”导出、再导入。两个版本的 iCloud 同步互相看不到，同一台 Mac 上建议只装一个。
+
+构建和上架的步骤见 [docs/app-store.md](docs/app-store.md)。
+
 ## 功能
 
 ### 面板和菜单栏
@@ -174,7 +183,7 @@ UNIVERSAL=1 make app   # 打包 Apple 芯片 + Intel 通用版
 
 在设置窗口的“iCloud 同步”页打开开关即可，需要这台 Mac 已经打开 iCloud 云盘。同步的是自选列表（顺序、菜单栏固定、简称、持仓、价格提醒、分组）和刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关；“只显示图标”、面板外观、快捷键、登录时启动这些只和本机有关的设置不同步。
 
-数据保存在 iCloud 云盘的 `Stox/sync.json` 里。另一台 Mac 第一次开启时，如果 iCloud 里已经有自选，可以选择用 iCloud 的、用本机的，或者把两边合并。之后任何一台的改动几秒内就会出现在其他 Mac 上；改完马上退出也不要紧，下次启动时会先把本机的改动写上去。多台 Mac 同步持仓时，请把它们都更新到 0.3.0 或更新版本，同步分组时都更新到 0.19.0 或更新版本，旧版本写入时会丢掉这些内容。
+数据保存在 iCloud 云盘的 `Stox/sync.json` 里（App Store 版保存在 App 自己的 iCloud 容器里，两个版本之间不互通）。另一台 Mac 第一次开启时，如果 iCloud 里已经有自选，可以选择用 iCloud 的、用本机的，或者把两边合并。之后任何一台的改动几秒内就会出现在其他 Mac 上；改完马上退出也不要紧，下次启动时会先把本机的改动写上去。多台 Mac 同步持仓时，请把它们都更新到 0.3.0 或更新版本，同步分组时都更新到 0.19.0 或更新版本，旧版本写入时会丢掉这些内容。
 
 ### 更新
 
@@ -194,10 +203,11 @@ Sources/
   StoxCLI/    命令行调试工具 stox-cli
 Tests/StoxCoreTests/   单元测试，使用真实接口返回作为样本
 scripts/
-  build-app.sh         编译并组装、签名 Stox.app
+  build-app.sh         编译并组装、签名 Stox.app（STOX_FLAVOR=appstore 时是 App Store 版）
+  build-app-store.sh   App Store 版：带沙盒和描述文件签名，打成上传用的 Stox-AppStore.pkg
   make-icon.swift      生成 App 图标
   check-datasources.sh 打印行情接口的原始返回，排查格式变化
-  ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新
+  ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新、App Store 版在沙盒里运行
 ```
 
 用命令行检查数据源：
@@ -243,6 +253,8 @@ CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设
 仓库的 Secrets 里配了 Developer ID 证书和公证凭据时，发布的包会用证书签名并通过苹果公证，用户下载后双击就能打开；没配时照旧临时签名。配置方法见 Frit 的 [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md)。
 
 也可以在 Actions 页面手动运行 release：不填标签就发 `CHANGELOG.md` 最上面的版本；勾选 overwrite 可以用原标签的代码重新打包、替换附件。
+
+App Store 版不自动发布：GitHub 版发布以后，在 Actions 页面手动运行 app-store，构建、签名并上传到 App Store Connect，再到 App Store Connect 里提交审核，见 [docs/app-store.md](docs/app-store.md)。
 
 设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。
 
