@@ -4,6 +4,7 @@
 #   scripts/build-app.sh                 本机架构
 #   UNIVERSAL=1 scripts/build-app.sh     Apple 芯片 + Intel 通用版（需要完整 Xcode）
 #   CODESIGN_IDENTITY="Developer ID Application: ..." scripts/build-app.sh   用自己的证书签名
+#   ZIP=1 scripts/build-app.sh           另外打成 dist/Stox.zip（发布用）
 #
 # 产物: dist/Stox.app
 set -euo pipefail
@@ -51,13 +52,25 @@ fi
 rm -rf "$ICON_TMP"
 
 echo "==> 签名"
+# 都开 hardened runtime（公证要求；ad-hoc 的构建也开，CI 里测到的就是发布出去的运行方式）。
+# 有开发者证书时带安全时间戳（公证要求），ad-hoc 签名不能带时间戳。
+# 发布时由 Frit 的发布流程导入证书，设好 CODESIGN_IDENTITY 和 CODESIGN_KEYCHAIN。
 IDENTITY="${CODESIGN_IDENTITY:--}"
-if [[ "$IDENTITY" == "-" ]]; then
-  codesign --force --sign - "$APP"
-else
-  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP"
+# 证书名字里有空格，用数组（数组一开始就不空，bash 3.2 在 set -u 下展开也没问题）。
+SIGN_ARGS=(--force --options runtime --sign "$IDENTITY")
+if [[ "$IDENTITY" != "-" ]]; then
+  SIGN_ARGS+=(--timestamp)
 fi
-codesign --verify --verbose=2 "$APP"
+if [[ -n "${CODESIGN_KEYCHAIN:-}" ]]; then
+  SIGN_ARGS+=(--keychain "$CODESIGN_KEYCHAIN")
+fi
+codesign "${SIGN_ARGS[@]}" "$APP"
+codesign --verify --strict --verbose=2 "$APP"
+
+if [[ "${ZIP:-0}" == "1" ]]; then
+  (cd "$DIST" && rm -f "$APP_NAME.zip" && ditto -c -k --keepParent "$APP_NAME.app" "$APP_NAME.zip")
+  echo "==> 打包: $DIST/$APP_NAME.zip"
+fi
 
 echo "==> 完成: $APP"
 lipo -info "$APP/Contents/MacOS/$APP_NAME" || true
