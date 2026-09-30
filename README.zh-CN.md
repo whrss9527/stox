@@ -203,6 +203,14 @@ scripts/
   ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新
 ```
 
+### 界面语言
+
+显示给用户的文字在代码里写成 `L("中文原文", 参数…)`（见 `Sources/StoxCore/AppLanguage.swift`），中文原文就是 `Resources/en.lproj/Localizable.strings` 和 `Resources/zh-Hans.lproj/Localizable.strings` 里的键，`scripts/build-app.sh` 把它们复制进 App。参数用 `%@` 占位，译文里可以用 `%1$@`、`%2$@` 调换顺序。加文字或改文字时两种语言一起改，再跑一遍 `python3 scripts/check-localization.py`（`make test` 也会跑），CI 每次推送都会检查。不改系统语言也能看英文界面：
+
+```bash
+dist/Stox.app/Contents/MacOS/Stox --show-panel -AppleLanguages '(en)'
+```
+
 用命令行检查数据源：
 
 ```bash
