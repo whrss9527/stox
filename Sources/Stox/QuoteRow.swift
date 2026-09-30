@@ -538,13 +538,17 @@ struct QuoteDetailView: View {
             return text
         }
         guard let timestamp = quote.timestamp else { return "" }
+        let time = QuoteFormatter.time(timestamp, timeZone: region.timeZone)
         // 期货外汇的行情时间本来就是北京时间。
         if item.symbol.isGlobal {
-            return L("北京时间 ") + QuoteFormatter.time(timestamp, timeZone: region.timeZone)
+            return L("北京时间 %@", time)
         }
-        var text = L("%@时间 %@", region.displayName, QuoteFormatter.time(timestamp, timeZone: region.timeZone))
-        if region == .hk { text += L(" · 延时约 15 分钟") }
-        return text
+        switch region {
+        case .cn: return L("A股时间 %@", time)
+        case .hk: return L("港股时间 %@", time) + L(" · 延时约 15 分钟")
+        case .us: return L("美股时间 %@", time)
+        case .global: return L("北京时间 %@", time)
+        }
     }
 }
 

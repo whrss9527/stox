@@ -129,6 +129,16 @@ struct PanelHeader: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
 
+    /// 标题下面每个市场的状态：“A股交易中”，英文是“CN Open”。
+    static func status(_ region: MarketRegion, _ phase: MarketPhase) -> String {
+        switch region {
+        case .cn: return L("A股%@", phase.displayName)
+        case .hk: return L("港股%@", phase.displayName)
+        case .us: return L("美股%@", phase.displayName)
+        case .global: return L("期货外汇%@", phase.displayName)
+        }
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             Image(nsImage: NSApp.applicationIconImage)
@@ -145,7 +155,7 @@ struct PanelHeader: View {
                             Circle()
                                 .fill(Theme.phaseColor(phase, convention: settings.colorConvention))
                                 .frame(width: 6, height: 6)
-                            Text("\(region.displayName)\(phase.displayName)")
+                            Text(Self.status(region, phase))
                                 .font(.system(size: 10.5))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(1)

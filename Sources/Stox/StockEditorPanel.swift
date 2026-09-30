@@ -295,10 +295,13 @@ struct StockEditorPanel: View {
 
     /// “10 派 25、送 4”或“每股派 0.5”。
     private func dividendText(_ trade: Trade) -> String {
-        guard perTen else { return (symbol.isFund ? L("每份派 ") : L("每股派 ")) + QuoteFormatter.plain(trade.price) }
+        guard perTen else {
+            let cash = QuoteFormatter.plain(trade.price)
+            return symbol.isFund ? L("每份派 %@", cash) : L("每股派 %@", cash)
+        }
         var parts: [String] = []
-        if trade.price > 0 { parts.append(L("10 派 ") + QuoteFormatter.plain(trade.price * 10)) }
-        if let bonus = trade.bonus, bonus > 0 { parts.append(L("送转 ") + QuoteFormatter.plain(bonus * 10)) }
+        if trade.price > 0 { parts.append(L("10 派 %@", QuoteFormatter.plain(trade.price * 10))) }
+        if let bonus = trade.bonus, bonus > 0 { parts.append(L("送转 %@", QuoteFormatter.plain(bonus * 10))) }
         return parts.joined(separator: L("、"))
     }
 
@@ -495,7 +498,8 @@ struct StockEditorPanel: View {
             Text(unit)
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
-                .frame(width: 30, alignment: .leading)
+                // 英文的单位（shares、units）比“股”“份”宽。
+                .frame(width: AppLanguage.isEnglish ? 40 : 30, alignment: .leading)
         }
     }
 

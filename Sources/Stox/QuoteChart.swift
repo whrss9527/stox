@@ -60,7 +60,7 @@ struct QuoteChartSection: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(period == .orderBook ? L("买卖五档") : (period == .fundFlow ? L("资金流向") : L("%@走势", period.title)))
+        .accessibilityLabel(Self.chartName(period))
         .accessibilityValue(summary ?? "")
         .task(id: TrackID(symbol: item.symbol, period: period)) {
             switch period {
@@ -273,7 +273,20 @@ struct QuoteChartSection: View {
         switch period {
         case .orderBook: return L("买卖五档和内外盘（展开时也可以用 ← → 切换）")
         case .fundFlow: return L("资金流向：主力（超大单、大单）当天净流入多少，逐分钟累计（展开时也可以用 ← → 切换）")
-        default: return L("%@走势（展开时也可以用 ← → 切换）", period.title)
+        default: return Self.chartName(period) + L("（展开时也可以用 ← → 切换）")
+        }
+    }
+
+    /// 图的名字，读屏和鼠标停在切换按钮上时用。英文里按钮上的字很短（Day、Week），这里写全。
+    static func chartName(_ period: ChartPeriod) -> String {
+        switch period {
+        case .intraday: return L("分时走势")
+        case .fiveDay: return L("五日走势")
+        case .day: return L("日K走势")
+        case .week: return L("周K走势")
+        case .month: return L("月K走势")
+        case .orderBook: return L("买卖五档")
+        case .fundFlow: return L("资金流向")
         }
     }
 
