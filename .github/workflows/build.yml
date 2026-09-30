@@ -1,17 +1,17 @@
 name: build
 
 # 每次推送和合并请求：Linux 上跑 StoxCore 测试，macOS 上打包通用版 App、启动测试、同步测试和一键更新测试。
-# 发版不在这里：main 上的 build 通过后，release.yml 看 CHANGELOG.md 最上面的版本有没有发布过，没有就用 Frit 的发布流程发布。
+# 推到 main 且都通过后，看 CHANGELOG.md 最上面的版本有没有发布过，没有就用 Frit 的发布流程发布（见最后的 release）。
 on:
   push:
     branches: ["**"]
   pull_request:
   workflow_dispatch:
 
-# 同一分支上新的推送会取消还在跑的旧构建。
+# 同一分支上新的推送会取消还在跑的旧构建；main 上不取消，免得发版做到一半被打断。
 concurrency:
   group: build-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   core:
@@ -151,3 +151,22 @@ jobs:
           path: |
             dist/Stox.zip
             dist/SHA256SUMS.txt
+
+  release:
+    name: Release
+    needs: [core, app]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    # 和 release.yml 用同一个 Frit 提交；升级时 uses 的 @ 后面和 frit-ref 一起改。
+    uses: whrss9527/frit/.github/workflows/release-app.yml@b89083e92d0142abeaa35660cbdff47073435091
+    with:
+      app-name: Stox
+      ref: ${{ github.sha }}
+      # 上面已经跑过测试。
+      test-command: ""
+      build-command: UNIVERSAL=1 ZIP=1 scripts/build-app.sh
+      archives: dist/Stox.zip
+      notes-command: scripts/release-notes.sh
+      frit-ref: b89083e92d0142abeaa35660cbdff47073435091
+    secrets: inherit

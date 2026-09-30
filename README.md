@@ -190,7 +190,7 @@ CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设
 发版由 `CHANGELOG.md` 驱动，用的是 [Frit](https://github.com/whrss9527/frit) 里共用的发布流程：
 
 1. 在 `CHANGELOG.md` 最上面加一节新版本，比如 `## 0.46.0`，内容会放进发布说明，App 的“关于与更新”页显示的也是这一节；
-2. 推到 main（或者合并进 main）。build 通过后，release 工作流发现这个版本还没有 `v0.46.0` 标签，就打包通用版 `Stox.zip`、生成校验文件 `SHA256SUMS.txt`，打上标签并发布。已安装的 Stox 下一次检查时就会提示更新。
+2. 推到 main（或者合并进 main）。build 通过后，最后一步 release 发现这个版本还没有 `v0.46.0` 标签，就打包通用版 `Stox.zip`、生成校验文件 `SHA256SUMS.txt`，打上标签并发布。已安装的 Stox 下一次检查时就会提示更新。
 
 仓库的 Secrets 里配了 Developer ID 证书和公证凭据时，发布的包会用证书签名并通过苹果公证，用户下载后双击就能打开；没配时照旧临时签名。配置方法见 Frit 的 [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md)。
 
