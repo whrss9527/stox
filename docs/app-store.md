@@ -48,7 +48,7 @@ App Store 版的 entitlement 只有：
 - **App Store 版之间**：都用容器，正常同步。
 - **GitHub 版之间**：都用 iCloud 云盘文件夹，和以前一样。
 - **一台 GitHub 版、一台 App Store 版**：一个在 iCloud 云盘文件夹、一个在容器，**互相看不到**。沙盒里读不到 iCloud 云盘的其他文件夹，GitHub 版没有容器的 entitlement。用“备份到文件”搬一次，或者两台都换成同一个版本。
-- 以后如果给 GitHub 版也配上 iCloud 容器（Developer ID 的描述文件也能带 iCloud，要把描述文件放进 `Stox.app/Contents/embedded.provisionprofile` 再签名），它会自动改用容器，就能和 App Store 版互相同步了；这时原来 iCloud 云盘里的文件不再更新，可以删掉。
+- 以后如果给 GitHub 版也配上这个 iCloud 容器（要用带 iCloud 能力的 Developer ID 描述文件，放进 `Stox.app/Contents/embedded.provisionprofile` 再带同样的 iCloud entitlement 签名；做之前先确认 Developer ID 描述文件支持 iCloud Documents），代码不用改，它会自动改用容器，就能和 App Store 版互相同步了；这时原来 iCloud 云盘里的文件不再更新，第一次开启同步时用“合并”把两边合在一起即可。
 
 ad-hoc 签名（CI 的 App Store 版测试）带不了 iCloud 的 entitlement（没有描述文件的话系统不让启动），同步文件夹只能用 `STOX_SYNC_DIR` 指到容器里测试；真正的 iCloud 容器要在 TestFlight 或上架后的构建里验证，见下面的“先用 TestFlight 试一下”。
 
@@ -175,14 +175,15 @@ scripts/build-app-store.sh
 
 ### 13. 提交审核
 
-在 App Store Connect 的 macOS App 版本页（比如 “1.0 准备提交”）：
+在 App Store Connect 的 macOS App 版本页（新建的 App 默认是 “1.0 准备提交”）：
 
-1. 截图：至少一张 16:10 的截图（1280×800、1440×900、2560×1600 或 2880×1800），见 [app-store/screenshots.md](app-store/screenshots.md)。
-2. 推广文本、描述、关键词、支持网址：从 [app-store/metadata.md](app-store/metadata.md) 复制。
-3. 构建版本：点“+”选刚上传的构建。
-4. App 审核信息：不需要登录，“需要登录”不勾；备注从 [app-store/review-notes.md](app-store/review-notes.md) 复制；填联系人的姓名、电话、邮箱。
-5. 版本发布：选“手动发布此版本”或“自动发布”。
-6. 点“添加以供审核” → “提交至 App 审核”。
+1. 版本号：改成和上传的构建一样（比如 `0.46.0`，也就是 GitHub 版的版本号），不然选不到这个构建。两个版本的版本号保持一致最省事；如果想让 App Store 从 1.0 开始，运行工作流时在 `version` 里填 `1.0.0`，以后每次都要自己填，而且要比上一次的大。
+2. 截图：至少一张 16:10 的截图（1280×800、1440×900、2560×1600 或 2880×1800），见 [app-store/screenshots.md](app-store/screenshots.md)。
+3. 推广文本、描述、关键词、支持网址：从 [app-store/metadata.md](app-store/metadata.md) 复制。
+4. 构建版本：点“+”选刚上传的构建。
+5. App 审核信息：不需要登录，“需要登录”不勾；备注从 [app-store/review-notes.md](app-store/review-notes.md) 复制；填联系人的姓名、电话、邮箱。
+6. 版本发布：选“手动发布此版本”或“自动发布”。
+7. 点“添加以供审核” → “提交至 App 审核”。
 
 审核一般一两天。被拒时在“App 审核”里看原因，回复或修改后重新提交。
 
