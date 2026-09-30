@@ -72,7 +72,7 @@ public struct SyncContent: Equatable, Sendable {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let c = calendar.dateComponents([.year, .month, .day], from: date)
-        return String(format: "Stox 自选 %04d-%02d-%02d.json", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+        return String(format: L("Stox 自选 %04d-%02d-%02d.json"), c.year ?? 0, c.month ?? 0, c.day ?? 0)
     }
 
     /// 首次开启同步时的“合并”：自选以 iCloud 的为准（顺序和每一项的设置），本机独有的追加在后面；设置用 iCloud 的。
@@ -157,7 +157,7 @@ extension SyncDocument: Codable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         format = try container.decodeIfPresent(Int.self, forKey: .format) ?? SyncDocument.currentFormat
         updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .distantPast
-        device = try container.decodeIfPresent(String.self, forKey: .device) ?? "未知设备"
+        device = try container.decodeIfPresent(String.self, forKey: .device) ?? L("未知设备")
         content = try container.decode(SyncContent.self, forKey: .content)
     }
 
@@ -178,8 +178,8 @@ public enum SyncError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .unavailable: return "iCloud 云盘没有开启"
-        case .newerFormat: return "iCloud 里的数据来自更新版本的 Stox，请先把这台 Mac 上的 Stox 更新到最新版"
+        case .unavailable: return L("iCloud 云盘没有开启")
+        case .newerFormat: return L("iCloud 里的数据来自更新版本的 Stox，请先把这台 Mac 上的 Stox 更新到最新版")
         }
     }
 }

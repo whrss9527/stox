@@ -10,9 +10,9 @@ public struct Trade: Codable, Hashable, Sendable {
 
         public var title: String {
             switch self {
-            case .buy: return "买入"
-            case .sell: return "卖出"
-            case .dividend: return "分红"
+            case .buy: return L("买入")
+            case .sell: return L("卖出")
+            case .dividend: return L("分红")
             }
         }
     }
@@ -136,7 +136,7 @@ extension Portfolio {
             for trade in item.trades {
                 var kind = trade.side.title
                 if let bonus = trade.bonus, bonus > 0 {
-                    kind += "（每股送转 \(QuoteFormatter.plain(bonus))）"
+                    kind += L("（每股送转 %@）", QuoteFormatter.plain(bonus))
                 }
                 let line = [
                     trade.day,
@@ -154,7 +154,7 @@ extension Portfolio {
         }
         guard !rows.isEmpty else { return "" }
         let sorted = rows.sorted { ($0.day, $0.order) < ($1.day, $1.order) }
-        return (["日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t已实现盈亏"] + sorted.map(\.line)).joined(separator: "\n")
+        return ([L("日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t已实现盈亏")] + sorted.map(\.line)).joined(separator: "\n")
     }
 }
 

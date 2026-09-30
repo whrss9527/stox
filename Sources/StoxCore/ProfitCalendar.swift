@@ -22,7 +22,7 @@ public struct ProfitCalendar: Equatable, Sendable {
     public var cells: [Cell]
 
     /// 一周几天：周一到周日。
-    public static let weekdayTitles = ["一", "二", "三", "四", "五", "六", "日"]
+    public static let weekdayTitles = [L("一"), L("二"), L("三"), L("四"), L("五"), L("六"), L("日")]
 
     /// region 这个市场在 year 年 month 月的日历。
     public init(history: ProfitHistory, region: MarketRegion, year: Int, month: Int) {
@@ -63,8 +63,8 @@ public struct ProfitCalendar: Equatable, Sendable {
         recordedDays.compactMap { $0.dayProfit.map(abs) }.max()
     }
 
-    /// `2026年9月`
-    public var title: String { "\(year)年\(month)月" }
+    /// `2026年9月`，英文界面是 `September 2026`。
+    public var title: String { AppLanguage.monthTitle(year: year, month: month) }
 
     /// 往前、往后挪 offset 个月。
     public static func shift(year: Int, month: Int, by offset: Int) -> (year: Int, month: Int) {
@@ -138,8 +138,8 @@ public struct ProfitYear: Equatable, Sendable {
         recordedMonths.compactMap { $0.total.map(abs) }.max()
     }
 
-    /// `2026年`
-    public var title: String { "\(year)年" }
+    /// `2026年`，英文界面是 `2026`。
+    public var title: String { AppLanguage.isEnglish ? "\(year)" : "\(year)年" }  // l10n-ignore
 
     /// 某个市场有记录的最早、最晚的年份，翻页时用；没有记录时为 nil。
     public static func yearRange(of history: ProfitHistory, region: MarketRegion) -> ClosedRange<Int>? {

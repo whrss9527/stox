@@ -116,7 +116,7 @@ final class SyncManager: ObservableObject {
             // 云端没有文件、内容一样或者是空的：直接把本机的写上去。
             await finishEnable(push: true)
         } catch {
-            status = .error("读取 iCloud 失败：\(error.localizedDescription)")
+            status = .error(L("读取 iCloud 失败：%@", error.localizedDescription))
             Log.error("iCloud 同步：读取失败：\(error.localizedDescription)")
         }
     }
@@ -235,7 +235,7 @@ final class SyncManager: ObservableObject {
             status = .synced(document.updatedAt, document.device)
             Log.info("iCloud 同步：已写入本机的自选和设置（\(content.watchlist.count) 只）")
         } catch {
-            status = .error("写入 iCloud 失败：\(error.localizedDescription)")
+            status = .error(L("写入 iCloud 失败：%@", error.localizedDescription))
             Log.error("iCloud 同步：写入失败：\(error.localizedDescription)")
         }
     }
@@ -287,7 +287,7 @@ final class SyncManager: ObservableObject {
                 await push()
             }
         } catch {
-            status = .error("读取 iCloud 失败：\(error.localizedDescription)")
+            status = .error(L("读取 iCloud 失败：%@", error.localizedDescription))
             Log.error("iCloud 同步：读取失败：\(error.localizedDescription)")
         }
     }

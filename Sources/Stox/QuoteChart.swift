@@ -60,7 +60,7 @@ struct QuoteChartSection: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(period == .orderBook ? "买卖五档" : (period == .fundFlow ? "资金流向" : "\(period.title)走势"))
+        .accessibilityLabel(Self.chartName(period))
         .accessibilityValue(summary ?? "")
         .task(id: TrackID(symbol: item.symbol, period: period)) {
             switch period {
@@ -271,10 +271,29 @@ struct QuoteChartSection: View {
 
     private func tabHelp(_ period: ChartPeriod) -> String {
         switch period {
-        case .orderBook: return "买卖五档和内外盘（展开时也可以用 ← → 切换）"
-        case .fundFlow: return "资金流向：主力（超大单、大单）当天净流入多少，逐分钟累计（展开时也可以用 ← → 切换）"
-        default: return "\(period.title)走势（展开时也可以用 ← → 切换）"
+        case .orderBook: return L("买卖五档和内外盘（展开时也可以用 ← → 切换）")
+        case .fundFlow: return L("资金流向：主力（超大单、大单）当天净流入多少，逐分钟累计（展开时也可以用 ← → 切换）")
+        default: return Self.chartName(period) + L("（展开时也可以用 ← → 切换）")
         }
+    }
+
+    /// 图的名字，读屏和鼠标停在切换按钮上时用。英文里按钮上的字很短（Day、Week），这里写全。
+    static func chartName(_ period: ChartPeriod) -> String {
+        switch period {
+        case .intraday: return L("分时走势")
+        case .fiveDay: return L("五日走势")
+        case .day: return L("日K走势")
+        case .week: return L("周K走势")
+        case .month: return L("月K走势")
+        case .orderBook: return L("买卖五档")
+        case .fundFlow: return L("资金流向")
+        }
+    }
+
+    /// 读数里的成交量：`1.20万手`、`35.60万股`。
+    private static func volumeText(_ volume: Double, lots: Bool) -> String {
+        let number = QuoteFormatter.largeNumber(volume)
+        return lots ? L("%@手", number) : L("%@股", number)
     }
 
     /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”；分时图上是最新的成交均价，五档是委比，资金是主力净流入。
@@ -282,28 +301,27 @@ struct QuoteChartSection: View {
         if period == .fundFlow {
             // 上面一排放了七项，写短一点：主力净流入。
             guard let flow = store.fundFlows[item.symbol] else { return nil }
-            return "主力 " + QuoteFormatter.signedLargeNumber(flow.mainNetInflow)
+            return L("主力 ") + QuoteFormatter.signedLargeNumber(flow.mainNetInflow)
         }
         if period == .orderBook {
             guard let imbalance = quote.orderBook?.imbalance else { return nil }
-            return "委比 " + QuoteFormatter.percent(imbalance)
+            return L("委比 ") + QuoteFormatter.percent(imbalance)
         }
         if period == .intraday {
             guard settings.showMovingAverages, let average = intradaySeries?.latestAverage else { return nil }
-            return "均价 \(QuoteFormatter.price(average, decimals: quote.priceDecimals))"
+            return L("均价 %@", QuoteFormatter.price(average, decimals: quote.priceDecimals))
         }
         if period == .fiveDay {
             guard let series = fiveDaySeries, let last = fiveDayLast, let base = series.previousClose, base > 0 else { return nil }
-            return "近 \(series.days.count) 日 \(QuoteFormatter.percent((last - base) / base * 100))"
+            return L("近 %@ 日 %@", series.days.count, QuoteFormatter.percent((last - base) / base * 100))
         }
         guard let data = klineData, let change = data.totalChangePercent else { return nil }
-        let unit: String
+        let percent = QuoteFormatter.percent(change)
         switch data.period {
-        case .day: unit = "日"
-        case .week: unit = "周"
-        case .month: unit = "个月"
+        case .day: return L("近 %@ 日 %@", data.candles.count, percent)
+        case .week: return L("近 %@ 周 %@", data.candles.count, percent)
+        case .month: return L("近 %@ 个月 %@", data.candles.count, percent)
         }
-        return "近 \(data.candles.count) \(unit) \(QuoteFormatter.percent(change))"
     }
 
     /// 指着图时显示的读数。
@@ -314,7 +332,7 @@ struct QuoteChartSection: View {
         if period == .fundFlow {
             guard let point = hoveredFlow else { return nil }
             var text = String(format: "%02d:%02d  ", point.minute / 60, point.minute % 60)
-                + "主力净流入 " + QuoteFormatter.signedLargeNumber(point.mainNetInflow)
+                + L("主力净流入 ") + QuoteFormatter.signedLargeNumber(point.mainNetInflow)
             if let value = point.price {
                 text += "  " + price(value)
             }
@@ -333,7 +351,7 @@ struct QuoteChartSection: View {
                 text += "  " + QuoteFormatter.percent((point.price - reference) / reference * 100)
             }
             if settings.showMovingAverages, let average = point.average {
-                text += "  均价 " + price(average)
+                text += L("  均价 ") + price(average)
             }
             return text
         }
@@ -344,27 +362,27 @@ struct QuoteChartSection: View {
                 text += "  " + QuoteFormatter.percent((point.price - quote.previousClose) / quote.previousClose * 100)
             }
             if settings.showMovingAverages, let average = point.average {
-                text += "  均价 " + price(average)
+                text += L("  均价 ") + price(average)
             }
             // 分时接口里 A 股的量是手，科创板和港股、美股是股。
             if let volume = point.volume, volume > 0 {
-                text += "  量 " + QuoteFormatter.largeNumber(volume) + (region == .cn && !item.symbol.isStarMarket ? "手" : "股")
+                text += L("  量 ") + Self.volumeText(volume, lots: region == .cn && !item.symbol.isStarMarket)
             }
             return text
         }
         guard let data = klineData, let index = hoveredCandle(in: data) else { return nil }
         let candle = data.candles[index]
         let date = data.period == .month ? String(candle.date.prefix(7)) : candle.date
-        var text = "\(date) 开\(price(candle.open)) 高\(price(candle.high)) 低\(price(candle.low)) 收\(price(candle.close))"
+        var text = L("%@ 开%@ 高%@ 低%@ 收%@", date, price(candle.open), price(candle.high), price(candle.low), price(candle.close))
         if let change = data.changes[index] {
             text += " " + QuoteFormatter.percent(change)
         }
         // K 线接口里 A 股的成交量是手，科创板和港股、美股是股。
         if let volume = candle.volume, volume > 0 {
-            text += " 量" + QuoteFormatter.largeNumber(volume) + (region == .cn && !item.symbol.isStarMarket ? "手" : "股")
+            text += L(" 量") + Self.volumeText(volume, lots: region == .cn && !item.symbol.isStarMarket)
         }
         if let mark = tradeMarks(in: data).first(where: { $0.index == index }) {
-            text += mark.bought && mark.sold ? " 有买卖" : (mark.bought ? " 有买入" : " 有卖出")
+            text += mark.bought && mark.sold ? L(" 有买卖") : (mark.bought ? L(" 有买入") : L(" 有卖出"))
         }
         return text
     }
@@ -401,14 +419,14 @@ struct KlineChart: View {
                     }
                 }
             } else {
-                Text(data == nil ? "正在加载 K 线…" : "暂时没有 K 线数据")
+                Text(data == nil ? L("正在加载 K 线…") : L("暂时没有 K 线数据"))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(height: IntradayChart.height)
-        .accessibilityLabel("K 线走势")
+        .accessibilityLabel(L("K 线走势"))
     }
 
     private func legend(_ data: KlineChartData) -> some View {
@@ -519,7 +537,7 @@ struct KlineChart: View {
             line.addLine(to: CGPoint(x: size.width, y: costY))
             context.stroke(line, with: .color(Self.costColor), style: StrokeStyle(lineWidth: 1, dash: [4, 2]))
             let label = context.resolve(
-                Text("成本 " + QuoteFormatter.price(cost, decimals: decimals))
+                Text(L("成本 ") + QuoteFormatter.price(cost, decimals: decimals))
                     .font(.system(size: 8, weight: .medium).monospacedDigit())
                     .foregroundColor(Self.costColor)
             )

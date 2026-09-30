@@ -69,7 +69,7 @@ enum StackedTickerImage {
             return true
         }
         image.isTemplate = false
-        image.accessibilityDescription = blocks.map(\.text).joined(separator: "，")
+        image.accessibilityDescription = blocks.map(\.text).joined(separator: L("，"))
         return image
     }
 }

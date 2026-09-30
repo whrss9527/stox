@@ -5,6 +5,7 @@ build:
 
 test:
 	swift test
+	python3 scripts/check-localization.py
 
 # 生成 dist/Stox.app
 app:

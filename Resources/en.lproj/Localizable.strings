@@ -1,0 +1,730 @@
+/* 英文界面。键是代码里 L("…") 的中文原文，改了代码里的中文要同时改这里；scripts/check-localization.py 会检查。 */
+
+/* Stox/AlertLogPanel.swift */
+"还没有发过提醒" = "No alerts yet";
+"清空" = "Clear";
+"返回" = "Back";
+"返回（Esc）" = "Back (Esc)";
+"最近的提醒" = "Recent Alerts";
+"最多留 %@ 条，只在这台 Mac 上" = "Keeps the last %@, on this Mac only";
+"回到列表" = "Back to the list";
+"回到列表并展开这一只" = "Back to the list and expand this one";
+
+/* Stox/FundFlowView.swift */
+"暂无资金流向（开盘后才有）" = "No fund flow yet (available after the open)";
+"正在加载资金流向…" = "Loading fund flow…";
+"超大单" = "Extra large";
+"大单" = "Large";
+"中单" = "Medium";
+"小单" = "Small";
+"还没有资金流向的分时" = "No intraday fund flow yet";
+"主力净流入走势" = "Main net inflow chart";
+"主力净流入 " = "Main net inflow ";
+"主力流入 " = "Main inflow ";
+"流出 " = "Outflow ";
+"前 %@ 日 " = "Prior %@ days ";
+
+/* Stox/GroupEditorPanel.swift */
+"组名" = "Name";
+"比如 科技、长期持有" = "e.g. Tech, Long-term";
+"放进这个分组的" = "In this group";
+"已选 %@ 只" = "%@ selected";
+"解散分组" = "Delete Group";
+"取消" = "Cancel";
+"保存" = "Save";
+"分组“%@”" = "Group “%@”";
+"新建分组" = "New Group";
+"每只最多在一个分组里，放进来的会从原来的分组移出" = "Each symbol can be in one group only; adding it here moves it out of its old group";
+"先填一个组名。" = "Enter a group name first.";
+"至少勾上一只。" = "Select at least one.";
+"已经有“%@”这个分组了，保存后合在一起。" = "A group named “%@” already exists; saving merges them.";
+"组名最多 %@ 个字，保存时会截断成“%@”。" = "Group names can have up to %@ characters; it will be saved as “%@”.";
+"列表上方的筛选里会多出“%@”，右键它可以再编辑或解散。" = "“%@” will appear in the filters above the list; right-click it to edit or delete it.";
+
+/* Stox/Hotkey.swift */
+"键 %@" = "Key %@";
+
+/* Stox/HotkeyRecorder.swift */
+"按下组合键…" = "Press a shortcut…";
+"点击设置" = "Click to Set";
+
+/* Stox/IntradayChart.swift */
+"成本 " = "Cost ";
+"正在加载分时…" = "Loading intraday…";
+"今天还没有分时数据" = "No intraday data today yet";
+"分时走势" = "Intraday chart";
+"正在加载五日…" = "Loading 5-day chart…";
+"暂时没有五日数据" = "No 5-day data yet";
+"五日走势" = "5-day chart";
+
+/* Stox/MainMenu.swift */
+"关于 Stox" = "About Stox";
+"检查更新…" = "Check for Updates…";
+"设置…" = "Settings…";
+"隐藏 Stox" = "Hide Stox";
+"退出 Stox" = "Quit Stox";
+"编辑" = "Edit";
+"撤销" = "Undo";
+"重做" = "Redo";
+"剪切" = "Cut";
+"拷贝" = "Copy";
+"粘贴" = "Paste";
+"删除" = "Delete";
+"全选" = "Select All";
+"窗口" = "Window";
+"最小化" = "Minimize";
+"关闭窗口" = "Close Window";
+
+/* Stox/OrderBookView.swift */
+"买一" = "Bid 1";
+"买二" = "Bid 2";
+"买三" = "Bid 3";
+"买四" = "Bid 4";
+"买五" = "Bid 5";
+"卖一" = "Ask 1";
+"卖二" = "Ask 2";
+"卖三" = "Ask 3";
+"卖四" = "Ask 4";
+"卖五" = "Ask 5";
+"暂无挂单（开盘前或停牌）" = "No orders (before the open or suspended)";
+"%@，%@手" = "%@, %@ lots";
+"没有挂单" = "No orders";
+"外盘 " = "Buy vol ";
+"内盘 " = "Sell vol ";
+"委差 " = "Net bids ";
+
+/* Stox/PanelView.swift */
+"A股%@" = "CN %@";
+"港股%@" = "HK %@";
+"美股%@" = "US %@";
+"期货外汇%@" = "Futures & FX %@";
+"港股行情延时约 15 分钟" = "Hong Kong quotes are delayed by about 15 minutes";
+"刷新失败：%@" = "Refresh failed: %@";
+"取消钉住：点别处时自动关闭" = "Unpin: close when clicking elsewhere";
+"钉住：点别处时不关闭，可以拖到任何位置" = "Pin: stay open when clicking elsewhere and drag anywhere";
+"立即刷新（⌘R）" = "Refresh Now (⌘R)";
+"搜索代码、名称或拼音，回车添加" = "Search symbol, name or pinyin; Return to add";
+"还没有自选，在上面的搜索框里添加" = "Your watchlist is empty. Add symbols with the search field above";
+"添加常用指数" = "Add Major Indices";
+"、" = ", ";
+"%@ 只" = "%@ shown";
+"编辑分组…" = "Edit Group…";
+"解散“%@”分组" = "Delete Group “%@”";
+"分组“%@”，右键可以编辑或解散" = "Group “%@”. Right-click to edit or delete it";
+"搜索中…" = "Searching…";
+"搜索失败：%@" = "Search failed: %@";
+"没有找到相关证券" = "No matching securities";
+"认出 %@ 个代码" = "Symbols recognized: %@";
+"都已处理" = "All Done";
+"全部添加（%@）" = "Add All (%@)";
+"认不出：" = "Not recognized: ";
+"回车全部添加，会先查一次行情，只添加存在的代码。" = "Press Return to add them all. Quotes are checked first and only valid symbols are added.";
+"已添加" = "Added";
+"没有这个代码" = "Not found";
+"已更新到 %@" = "Updated to %@";
+"从 %@ 更新上来，自选和设置都还在" = "Updated from %@. Watchlist and settings kept";
+"自选和设置都还在" = "Watchlist and settings kept";
+"看看更新了什么" = "See What’s New";
+"几个小技巧" = "Tips";
+"右键单击菜单栏图标，在显示行情和只显示图标之间切换" = "Right-click the menu bar icon to switch between quotes and icon only";
+"%@ 在任何 App 里打开或关闭这个面板" = "%@ opens or closes this panel from any app";
+"右键单击一只可以固定到菜单栏、放进分组，或者填持仓和价格提醒" = "Right-click a symbol to pin it to the menu bar, add it to a group, or set holdings and price alerts";
+"点右边的色块，在涨跌幅、涨跌额和总市值之间切换" = "Click the colored pill to switch between % change, change and market cap";
+"一次粘贴多个代码，回车全部添加" = "Paste several symbols at once and press Return to add them all";
+"↑ ↓ 选择，回车添加或展开；展开后 ← → 切换分时和 K 线" = "↑ ↓ to select, Return to add or expand; ← → switch charts when expanded";
+"点右上角的图钉，面板就一直显示，可以拖到任何位置" = "Click the pin at the top right to keep the panel open and drag it anywhere";
+"不再显示" = "Don’t Show Again";
+"今日盈亏" = "Today’s P&L";
+"持仓盈亏" = "Total P&L";
+"市值" = "Mkt value";
+"持仓市值" = "Holdings value";
+"合计" = "Total";
+"只算列表上方选中的“%@”。" = "Only counts “%@” selected above the list. ";
+"按现价计算。人民币、港币、美元分别合计；合计一行按现在的汇率折成人民币" = "At current prices. CNY, HKD and USD are totaled separately; the Total row converts to CNY at current exchange rates";
+"持仓分布" = "Allocation";
+"看每只持仓占总市值多少" = "See each holding’s share of the total value";
+"几种货币都有时，要等取到汇率才能放在一起比。" = "With several currencies, allocation needs exchange rates to compare.";
+"%@：市值 %@" = "%@: value %@";
+"，持仓盈亏 %@" = ", total P&L %@";
+"其余 %@ 只" = "Others (%@)";
+"盈亏记录" = "P&L History";
+"看最近每个交易日赚了多少" = "See the P&L of recent trading days";
+"每个交易日收盘后记在这台 Mac 上，一整天没开机的日子没有。" = "Recorded on this Mac after each close; days the Mac was off are missing.";
+"日历" = "Calendar";
+"按月看每天赚了多少" = "See each day’s P&L by month";
+"最近一天 %@ %@" = "Latest: %@ %@";
+"本周 " = "This week ";
+"本月 " = "This month ";
+"收起%@" = "Hide %@";
+"今年已实现" = "Realized this year";
+"今年卖出的部分按当时的成本价算出的盈亏，加上记下的现金分红，来自编辑页里“记一笔”记下的卖出和分红" = "Profit on shares sold this year at their cost at the time, plus recorded cash dividends, from sales and dividends recorded with “Record” on the edit page";
+"按现在的汇率折成人民币：1 港币 = %@ 元，" = "Converted to CNY at current rates: 1 HKD = %@ CNY, ";
+"1 美元 = %@ 元。成本也按现在的汇率折算" = "1 USD = %@ CNY. Costs are converted at current rates too";
+"显示金额" = "Show Amounts";
+"隐藏金额：市值、盈亏金额和持有数量换成 ****，比例照常显示，给别人看屏幕时用" = "Hide amounts: values, P&L amounts and share counts become ****, percentages stay. Useful when sharing your screen";
+"隐藏金额" = "Hide Amounts";
+"查不到这个代码的行情" = "No quote for this symbol";
+"%@ · 查不到行情" = "%@ · No quote";
+"按代码添加" = "Add by symbol";
+"腾讯的行情接口暂时取不到，正在用新浪的行情；分时和 K 线要等腾讯恢复" = "Tencent quotes are unavailable, using Sina for now; intraday and candlestick charts return when Tencent recovers";
+"排序" = "Sort";
+"右边的色块显示" = "Pill Shows";
+"复制全部代码" = "Copy All Symbols";
+"复制持仓表格" = "Copy Holdings Table";
+"复制买卖记录" = "Copy Trades";
+"复制盈亏记录" = "Copy P&L History";
+"新建分组…" = "New Group…";
+"最近的提醒…" = "Recent Alerts…";
+"盈亏日历…" = "P&L Calendar…";
+"A 股涨跌榜…" = "A-Share Movers…";
+"排序：%@；色块显示%@" = "Sort: %@; pill shows %@";
+"设置（⌘,）" = "Settings (⌘,)";
+"退出 Stox（⌘Q）" = "Quit Stox (⌘Q)";
+"已复制 %@ 个代码，粘贴到搜索框就能全部加回来" = "Copied %@ symbols. Paste them into the search field to add them all back";
+"已复制 %@ 行持仓，可以直接粘贴到表格里" = "Copied %@ holdings, ready to paste into a spreadsheet";
+"已复制 %@ 笔买卖，可以直接粘贴到表格里" = "Copied %@ trades, ready to paste into a spreadsheet";
+"已复制 %@ 天的盈亏记录，可以直接粘贴到表格里" = "Copied %@ days of P&L, ready to paste into a spreadsheet";
+"还没有自选" = "No symbols yet";
+"正在获取行情…" = "Fetching quotes…";
+"休市中每分钟刷新" = "Closed, every 1 min";
+"每 %@ 秒刷新" = "Every %@ s";
+"%@ 更新 · 新浪行情 · %@" = "%@ · Sina · %@";
+"只看%@" = "Only %@";
+"拖动排序" = "Drag to sort";
+"%@ 更新 · %@ · %@" = "%@ · %@ · %@";
+
+/* Stox/ProfitCalendarPanel.swift */
+"还没有盈亏记录：填了持仓以后，每个交易日收盘后会记一笔" = "No P&L history yet. Once you enter holdings, one entry is recorded after each close";
+"盈亏日历" = "P&L Calendar";
+"每个交易日收盘后记下的今日盈亏，只在这台 Mac 上" = "Today’s P&L recorded after each close, on this Mac only";
+"按月或按年" = "By Month or Year";
+"月" = "Month";
+"年" = "Year";
+"按月看每天，或者按年看每个月" = "See each day by month, or each month by year";
+"货币" = "Currency";
+"上一个月" = "Previous Month";
+"下一个月" = "Next Month";
+"上一年" = "Previous Year";
+"下一年" = "Next Year";
+"，点一下看这个月每天的" = ". Click to see each day of this month";
+"记了 %@ 天，合计 " = "%@ day(s) recorded, total ";
+"没有记录" = "No records";
+"%@没有记录" = "No records in %@";
+"%@记了 %@ 天，合计 " = "%@: %@ day(s) recorded, total ";
+"全年 " = "Full year ";
+"赚 %@ 个月 · 亏 %@ 个月" = "%@ up · %@ down";
+"这一年没有记录" = "No records this year";
+"%@ 今日盈亏 " = "%@ P&L ";
+"%@ 没有记录" = "%@: no record";
+"%@ 日" = "Day %@";
+"今日盈亏 " = "Today’s P&L ";
+"赚 %@ 天 · 亏 %@ 天" = "%@ up · %@ down";
+"这个月没有记录" = "No records this month";
+
+/* Stox/QuoteChart.swift */
+"买卖五档和内外盘（展开时也可以用 ← → 切换）" = "Order book and buy/sell volume (use ← → to switch when expanded)";
+"资金流向：主力（超大单、大单）当天净流入多少，逐分钟累计（展开时也可以用 ← → 切换）" = "Fund flow: today’s cumulative net inflow of main funds (extra large and large orders), minute by minute (use ← → to switch when expanded)";
+"（展开时也可以用 ← → 切换）" = " (use ← → to switch when expanded)";
+"日K走势" = "Daily candlestick chart";
+"周K走势" = "Weekly candlestick chart";
+"月K走势" = "Monthly candlestick chart";
+"买卖五档" = "Order book";
+"资金流向" = "Fund flow";
+"%@手" = "%@ lots";
+"%@股" = "%@ shares";
+"主力 " = "Main ";
+"委比 " = "Bid ratio ";
+"均价 %@" = "Avg %@";
+"近 %@ 日 %@" = "%@D %@";
+"近 %@ 周 %@" = "%@W %@";
+"近 %@ 个月 %@" = "%@M %@";
+"  均价 " = "  Avg ";
+"  量 " = "  Vol ";
+"%@ 开%@ 高%@ 低%@ 收%@" = "%@ O %@ H %@ L %@ C %@";
+" 量" = " Vol ";
+" 有买卖" = " Bought & sold";
+" 有买入" = " Bought";
+" 有卖出" = " Sold";
+"正在加载 K 线…" = "Loading chart…";
+"暂时没有 K 线数据" = "No candlestick data yet";
+"K 线走势" = "Candlestick chart";
+
+/* Stox/QuoteRow.swift */
+"显示在菜单栏" = "Show in Menu Bar";
+"已设置价格提醒" = "Price alert set";
+"%@。点一下切换涨跌幅、涨跌额、总市值" = "%@. Click to switch between % change, change and market cap";
+"%@，%@" = "%@, %@";
+"，暂无行情" = ", no quote";
+"，现价 %@" = ", price %@";
+"，上涨 %@%" = ", up %@%";
+"，下跌 %@%" = ", down %@%";
+"，平盘" = ", unchanged";
+"，%@ %@，%@" = ", %@ %@, %@";
+"涨停" = "Limit up";
+"跌停" = "Limit down";
+"停牌" = "Halted";
+"不在菜单栏显示" = "Remove from Menu Bar";
+"持仓、提醒与简称…" = "Holdings, Alerts & Short Name…";
+"价格提醒与简称…" = "Price Alerts & Short Name…";
+"分组" = "Group";
+"移出分组" = "Remove from Group";
+"在%@中查看" = "View on %@";
+"复制代码" = "Copy Symbol";
+"移到最前" = "Move to Top";
+"单位净值" = "NAV";
+"累计净值" = "Cumulative NAV";
+"日涨跌" = "Day change";
+"日涨幅" = "Day %";
+"今开" = "Open";
+"最高" = "High";
+"最低" = "Low";
+"昨结" = "Prev settle";
+"昨收" = "Prev close";
+"涨跌" = "Change";
+"买价" = "Bid";
+"卖价" = "Ask";
+"52周高低" = "52W range";
+"振幅" = "Range";
+"成交量" = "Volume";
+"成交额" = "Turnover";
+"换手率" = "Turnover %";
+"市盈率" = "P/E";
+"52周最高" = "52W high";
+"52周最低" = "52W low";
+"市净率" = "P/B";
+"量比" = "Vol ratio";
+"持有" = "Shares";
+"%@份" = "%@ units";
+"成本" = "Cost";
+"场外基金的净值每个交易日晚上更新，白天看到的是上一个交易日的" = "Mutual fund NAVs update each trading evening; during the day you see the previous trading day’s";
+"持仓与提醒" = "Holdings & Alerts";
+"提醒" = "Alerts";
+"亏损" = "Loss";
+"净值每个交易日晚上更新" = "NAV updates each trading evening";
+"净值日期 " = "NAV date ";
+" · 美东 %@" = " · %@ ET";
+"北京时间 %@" = "Beijing %@";
+"A股时间 %@" = "Beijing %@";
+"港股时间 %@" = "HK %@";
+" · 延时约 15 分钟" = " · 15 min delay";
+"美股时间 %@" = "New York %@";
+"%@ %@，相对收盘 %@" = "%@ %@, %@ vs. close";
+"，美东时间 %@" = ", %@ ET";
+
+/* Stox/QuoteStore.swift */
+"没有取到行情数据" = "No quote data received";
+
+/* Stox/RankPanel.swift */
+"榜单" = "List";
+"不看新股" = "Hide New Listings";
+"新股上市首日（名字前面有 N）和注册制新股上市后前 5 天（有 C）没有涨跌幅限制，常常挤满涨幅榜" = "New listings on their first day (N before the name) and in their first 5 days under the registration system (C) have no price limits and often crowd the gainers list";
+"A 股涨跌榜" = "A-Share Movers";
+"申万一级行业" = "SW Level 1 industries";
+"沪深京全部 A 股" = "All A-shares";
+"%@ 更新" = "Updated %@";
+"取不到榜单：%@" = "Couldn’t load the list: %@";
+"正在加载…" = "Loading…";
+"榜上暂时没有" = "Nothing on the list yet";
+"领涨 %@ %@" = "Leader %@ %@";
+"%@已在自选里，点一下回到列表并展开" = "%@ is in your watchlist. Click to go back to the list and expand it";
+"把领涨的%@加到自选" = "Add leader %@ to the watchlist";
+"已在自选里，点一下回到列表并展开" = "In your watchlist. Click to go back to the list and expand it";
+"加到自选" = "Add to Watchlist";
+" · 成交 " = " · Turnover ";
+" · 换手 " = " · Turnover ";
+
+/* Stox/SettingsStore.swift */
+"红涨绿跌" = "Red Up, Green Down";
+"绿涨红跌" = "Green Up, Red Down";
+"不显示红绿" = "No Red or Green";
+"A 股、港股的习惯" = "As in A-share and Hong Kong markets";
+"美股的习惯" = "As in US markets";
+"全部使用系统默认颜色，不显眼" = "System text colors only, low-key";
+"自定义顺序" = "Custom Order";
+"涨幅从高到低" = "Gainers First";
+"跌幅从高到低" = "Losers First";
+"持仓盈亏从高到低" = "Total P&L First";
+"全部" = "All";
+"A股" = "A-shares";
+"港股" = "Hong Kong";
+"美股" = "US";
+"期货外汇" = "Futures & FX";
+"持仓" = "Holdings";
+"涨跌幅" = "% Change";
+"涨跌额" = "Change";
+"总市值" = "Market Cap";
+"分时" = "1D";
+"五日" = "5D";
+"日K" = "Day";
+"周K" = "Week";
+"月K" = "Month";
+"五档" = "Book";
+"资金" = "Flow";
+"跟随系统" = "System";
+"浅色" = "Light";
+"深色" = "Dark";
+
+/* Stox/SettingsWindow.swift */
+"通用" = "General";
+"显示" = "Display";
+"iCloud 同步" = "iCloud Sync";
+"关于与更新" = "About & Updates";
+"Stox 设置" = "Stox Settings";
+"刷新频率、快捷键、价格提醒和登录时启动" = "Refresh rate, shortcut, price alerts and launch at login";
+"行情刷新" = "Quote Refresh";
+"刷新间隔" = "Refresh interval";
+"%@ 秒" = "%@ seconds";
+"休市时降低刷新频率" = "Refresh less often when markets are closed";
+"自选涉及的市场都休市时改为每分钟刷新一次。打开面板时，数据不新鲜就会立即刷新。" = "When all markets in your watchlist are closed, refresh once a minute. Opening the panel refreshes stale data right away.";
+"快捷键" = "Keyboard Shortcut";
+"用快捷键打开或关闭行情面板" = "Open or close the panel with a shortcut";
+"恢复 ⌃⌥S" = "Reset to ⌃⌥S";
+"%@ 已经被其他程序占用，换一个组合试试" = "%@ is used by another app. Try a different combination";
+"点方框后按下新的组合键，至少包含 ⌃、⌥、⇧、⌘ 中的一个，按 Esc 取消。在任何 App 里都能用，不需要辅助功能权限。" = "Click the box and press a new shortcut with at least one of ⌃, ⌥, ⇧ or ⌘; press Esc to cancel. Works in any app and needs no Accessibility permission.";
+"价格提醒" = "Price Alerts";
+"到价时发送系统通知" = "Send notifications for price alerts";
+"在行情面板里右键某只证券，选“价格提醒与简称…”设置目标价、涨跌幅，填了持仓的还能设止盈止损。每个条件每个交易日最多提醒一次。" = "In the panel, right-click a symbol and choose “Price Alerts & Short Name…” to set target prices and % changes, or take-profit and stop-loss levels for holdings. Each condition alerts at most once per trading day.";
+"收盘后发一条今日盈亏小结" = "Send a P&L summary after the close";
+"有持仓的市场收盘后各发一次：今日盈亏、持仓盈亏和市值。美股在盘后开始时发。" = "Sent once per market with holdings after it closes: today’s P&L, total P&L and value. For US stocks it’s sent when after-hours trading starts.";
+"A 股涨停、跌停时提醒" = "Alert when A-shares hit limit up or down";
+"自选里的 A 股个股（不含指数）封涨停或跌停时发一条通知，开板再封板当天不再重复。" = "Notifies when an A-share stock in your watchlist (not indices) locks limit up or limit down, once per day even if it reopens and locks again.";
+"创 52 周新高、新低时提醒" = "Alert on new 52-week highs and lows";
+"自选里的证券（含指数）当天的最高价达到 52 周最高、或者最低价达到 52 周最低时发一条通知，每只每天最多一次。" = "Notifies when a security in your watchlist (including indices) reaches its 52-week high or low, at most once per symbol per day.";
+"异动提醒" = "Sudden move alert";
+"关闭" = "Off";
+"5 分钟内涨跌 %@%" = "%@% within 5 minutes";
+"交易时段里，自选里的证券相对最近 5 分钟的最低点涨了、或者相对最高点跌了超过这个幅度时提醒，同一只同一个方向 15 分钟内只提醒一次。" = "During trading hours, alerts when a security rises from its 5-minute low or falls from its 5-minute high by more than this, at most once per direction per symbol every 15 minutes.";
+"打开系统的通知设置" = "Open Notification Settings";
+"启动" = "Startup";
+"登录时自动启动" = "Launch at Login";
+"设置失败：%@" = "Couldn’t change the setting: %@";
+"菜单栏和行情面板里显示什么，涨跌用什么颜色，面板用深色还是浅色" = "What the menu bar and panel show, price colors, and light or dark panel";
+"外观" = "Appearance";
+"行情面板和设置窗口" = "Panel and Settings window";
+"菜单栏里的行情文字始终跟随系统的深浅色，保证看得清。" = "Quotes in the menu bar always follow the system appearance so they stay readable.";
+"菜单栏" = "Menu Bar";
+"只显示图标，隐藏行情" = "Show icon only, hide quotes";
+"右键单击菜单栏里的 Stox 可以随时在“显示行情”和“只显示图标”之间切换，左键单击照常打开行情面板。" = "Right-click Stox in the menu bar to switch between quotes and icon only at any time; left-click still opens the panel.";
+"休市时只显示图标" = "Show icon only when markets are closed";
+"菜单栏上的证券所在的市场都休市时只显示图标，开盘（包括美股盘前）后自动恢复，晚上不占地方。" = "Shows only the icon while the markets of the pinned symbols are all closed and brings quotes back at the open (including US pre-market), saving space at night.";
+"显示名称" = "Show name";
+"显示价格" = "Show price";
+"显示涨跌幅" = "Show % change";
+"排列方式" = "Layout";
+"固定了多只时轮流显示" = "Rotate when several are pinned";
+"在菜单栏显示盈亏" = "Show P&L in the menu bar";
+"显示哪种盈亏" = "P&L to show";
+"在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。上下两行时名称在左边，价格在上、涨跌幅在下，字小一些，同样的地方能放下更多只。轮流显示时每 5 秒换一只，适合刘海屏。盈亏只算填了持仓的证券，可以显示今日盈亏或者持仓盈亏，几种货币都有时按汇率折成人民币显示一个数，不参与轮流。" = "Right-click a symbol in the panel and choose “Show in Menu Bar” to pin it. With two lines, the name is on the left with the price above the % change in a smaller font, so more fit in the same space. Rotation switches every 5 seconds, handy with a notch. P&L only counts symbols with holdings and can show today’s or total P&L; with several currencies it’s converted to one CNY figure, and it doesn’t rotate.";
+"行情面板" = "Panel";
+"紧凑列表" = "Compact list";
+"每只一行：名称、代码、现价和色块排在一起，自选多时一屏能看到更多。持仓盈亏和盘前盘后价在展开后看。" = "One line per symbol: name, code, price and pill side by side, so more fit on screen. Total P&L and extended-hours prices show when expanded.";
+"列表里画当天的迷你分时" = "Show intraday sparklines in the list";
+"每一行现价左边画一条当天的走势，虚线是昨收。面板打开着的时候才去取，交易时段内两分钟取一轮，每只一个请求；紧凑列表、场外基金不画。" = "Draws today’s price line left of each price, with a dashed line at the previous close. Fetched only while the panel is open, every two minutes during trading, one request per symbol; not shown in the compact list or for mutual funds.";
+"价格变动时闪一下" = "Flash when prices change";
+"画均线和均价线" = "Show moving and average price lines";
+"日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。分时图和五日图上画成交均价（橙色），指数没有。" = "Daily, weekly and monthly charts show 5, 10 and 20-period moving averages of the close, with their values above the chart (for the hovered candle when pointing). Intraday and 5-day charts show the average trade price in orange, except for indices.";
+"画成本线和买卖点" = "Show cost line and trades";
+"填了持仓的，分时图和 K 线上成本价落在图里时画一条虚线；K 线上用 B、S 标出“记一笔”记过买入、卖出的那几根。" = "For holdings, draws a dashed line at your cost when it falls within the chart; candlestick charts mark buys and sells recorded with “Record” with B and S.";
+"美股盘前盘后价" = "US pre-market and after-hours prices";
+"美股个股不在常规交易时段时，代码旁边显示盘前或盘后的最新价相对收盘的涨跌，详情里有价格和成交时间。每只美股个股要多发一个请求。" = "Outside regular hours, shows the latest pre-market or after-hours change from the close next to US stock symbols, with the price and time in the details. Needs one extra request per US stock.";
+"给别人看屏幕时用：市值、盈亏金额和持有数量换成 ****，盈亏比例照常显示；菜单栏的今日盈亏换成比例，收盘小结和止盈止损的通知里也不写金额。持仓合计里“市值”旁边的小眼睛可以随时切换。编辑页和复制出来的表格照常是实际数字。" = "For sharing your screen: values, P&L amounts and share counts become **** while percentages stay; the menu bar shows today’s P&L as a percentage, and close summaries and take-profit or stop-loss notifications leave out amounts. Toggle it anytime with the eye next to “Mkt value” in the holdings total. The edit page and copied tables still show real numbers.";
+"涨跌颜色" = "Price Colors";
+"预览" = "Preview";
+"菜单栏、行情面板和提醒里的颜色都会跟着变。选“不显示红绿”时价格和涨跌幅都用系统默认的文字颜色，只靠正负号区分涨跌。" = "Applies to the menu bar, panel and alerts. With “No Red or Green”, prices and changes use the system text color and only the sign shows the direction.";
+"茅台" = "Moutai";
+"腾讯" = "Tencent";
+"通过 iCloud 云盘在多台 Mac 之间同步自选和设置" = "Sync your watchlist and settings across Macs with iCloud Drive";
+"同步" = "Sync";
+"通过 iCloud 同步自选和设置" = "Sync watchlist and settings with iCloud";
+"状态" = "Status";
+"立即同步" = "Sync Now";
+"在访达中显示" = "Show in Finder";
+"这台 Mac 没有打开 iCloud 云盘。到系统设置里点你的 Apple 账户，进入 iCloud 打开“iCloud 云盘”，再回来开启同步。" = "iCloud Drive is off on this Mac. In System Settings, click your Apple Account, open iCloud and turn on “iCloud Drive”, then come back to turn on sync.";
+"打开系统设置" = "Open System Settings";
+"备份到文件" = "Back Up to a File";
+"导出…" = "Export…";
+"导入…" = "Import…";
+"导入备份" = "Import Backup";
+"替换本机的自选和设置" = "Replace This Mac’s Watchlist and Settings";
+"只添加本机没有的" = "Only Add What’s Missing";
+"不开 iCloud 也能备份和搬到另一台 Mac：导出的是自选（含分组、持仓、提醒、备注）和下面说的那些设置，格式和 iCloud 里的同步文件一样。导入时可以替换本机的，或者只添加本机没有的。" = "Back up or move to another Mac without iCloud: the export contains your watchlist (with groups, holdings, alerts and notes) and the settings listed below, in the same format as the iCloud sync file. When importing, replace this Mac’s data or only add what’s missing.";
+"会同步什么" = "What Syncs";
+"自选列表的内容和顺序、每只的菜单栏固定、简称、备注、分组、持仓和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。" = "Your watchlist and its order, each symbol’s menu bar pin, short name, note, group, holdings and price alerts, plus settings such as refresh interval, menu bar content, price colors and alert switches.";
+"“只显示图标”、面板外观、快捷键、登录时启动、自动检查更新只和这台 Mac 有关，不同步。" = "“Icon only”, panel appearance, keyboard shortcut, launch at login and automatic update checks are specific to this Mac and don’t sync.";
+"怎么同步" = "How It Works";
+"文件放在 iCloud 云盘的 Stox 文件夹里。另一台 Mac 开启同步时会读到它，可以选择用 iCloud 的、用本机的，或者把两边的自选合并。之后任何一台的改动几秒内就会出现在其他 Mac 上，两台同时改动时以晚的为准。" = "The file lives in the Stox folder in iCloud Drive. When another Mac turns on sync, it can use the iCloud copy, use its own, or merge both watchlists. After that, changes on any Mac show up on the others within seconds; if two Macs change at once, the later change wins.";
+"第一次开启时系统可能会询问是否允许 Stox 访问 iCloud 云盘，需要允许。" = "The first time, macOS may ask whether Stox can access iCloud Drive. Allow it.";
+"iCloud 里已经有自选" = "iCloud Already Has a Watchlist";
+"用 iCloud 的替换本机的" = "Replace This Mac’s with iCloud’s";
+"合并两边的自选" = "Merge Both Watchlists";
+"用本机的覆盖 iCloud" = "Replace iCloud’s with This Mac’s";
+"备份里有 %@ 只自选，是 %@ 在 %@ 导出的。" = "The backup has %@ symbols, exported from %@ on %@.";
+"已把 %@ 只自选导出到“%@”。" = "Exported %@ symbols to “%@”.";
+"导出失败：%@" = "Export failed: %@";
+"读不了这个文件：%@" = "Couldn’t read this file: %@";
+"已换成备份里的 %@ 只自选。" = "Replaced with the %@ symbols from the backup.";
+"添加了 %@ 只本机没有的自选。" = "Added %@ symbols that were missing on this Mac.";
+"来自“%@”，更新于 %@，" = "From “%@”, updated %@, ";
+"有 %@ 只自选；本机现在有 %@ 只。要怎么处理？" = "with %@ symbols; this Mac has %@. What would you like to do?";
+"未开启" = "Off";
+"iCloud 云盘没有打开" = "iCloud Drive is off";
+"正在同步…" = "Syncing…";
+"已同步" = "Synced";
+"最近一次改动来自“%@”，%@" = "Last change from “%@”, %@";
+"打开隐私设置" = "Open Privacy Settings";
+"如果拒绝过访问 iCloud 云盘，在“文件和文件夹”里允许 Stox 访问。" = "If you denied access to iCloud Drive, allow Stox in “Files and Folders”.";
+"Stox 菜单栏行情" = "Stock quotes in your menu bar";
+"版本 %@" = "Version %@";
+"菜单栏里的股票行情：A 股、港股、美股，一键打开，一键关闭。" = "Stock quotes in the menu bar for A-shares, Hong Kong and US stocks. One click to open, one click to close.";
+"反馈问题" = "Report an Issue";
+"自动检查更新" = "Check for updates automatically";
+"启动后和之后每 6 小时检查一次 GitHub 上的新版本。有新版本时发通知，行情面板底部会出现“更新”按钮，点一下自动下载、校验、替换并重新启动，不会自动安装。" = "Checks GitHub for new versions at launch and every 6 hours. When one is available you get a notification and an “Update” button appears at the bottom of the panel; one click downloads, verifies, replaces and relaunches. Nothing installs automatically.";
+"行情数据来自腾讯财经公开接口，仅供参考，港股延时约 15 分钟。" = "Quotes come from Tencent Finance’s public API and are for reference only. Hong Kong quotes are delayed by about 15 minutes.";
+"打开日志" = "Open Log";
+
+/* Stox/Shell.swift */
+"%@ 执行超时" = "%@ timed out";
+"无法运行 %@：%@" = "Couldn’t run %@: %@";
+
+/* Stox/StackedTickerImage.swift */
+"，" = ", ";
+
+/* Stox/StatusItemController.swift */
+"Stox 行情\n左键：打开 / 关闭行情面板\n右键：隐藏 / 显示菜单栏行情" = "Stox\nClick: open / close the panel\nRight-click: hide / show menu bar quotes";
+"查询行情失败：%@" = "Couldn’t fetch quotes: %@";
+
+/* Stox/StockEditorPanel.swift */
+"菜单栏简称" = "Menu bar name";
+"不分组" = "No Group";
+"选一个已有的分组" = "Choose an existing group";
+"备注" = "Note";
+"比如关注的理由" = "e.g. why you’re watching it";
+"持有数量" = "Shares held";
+"没有持仓" = "No holding";
+"成本价" = "Cost price";
+"每股成本" = "Cost per share";
+"价格高于" = "Price above";
+"价格低于" = "Price below";
+"涨幅达到" = "Rise reaches";
+"跌幅达到" = "Fall reaches";
+"持仓盈利达到" = "Take profit at";
+"持仓亏损达到" = "Stop loss at";
+"删除自选" = "Remove from Watchlist";
+"这只证券已不在自选中" = "This security is no longer in your watchlist";
+"记一笔" = "Record";
+"数量" = "Shares";
+"价格" = "Price";
+"买入" = "Buy";
+"卖出" = "Sell";
+"按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量、按成本价算出赚了多少。记完检查一下，点保存才生效" = "Record a trade: buys recalculate the cost as a weighted average; sells only reduce shares and compute the profit against the cost. Check the result, then click Save to apply";
+"份" = "units";
+"股" = "shares";
+"分红送转" = "Dividend";
+"10股派" = "Per 10";
+"每份派" = "Cash per unit";
+"每股派" = "Cash per share";
+"送转" = "Bonus";
+"按公告填，比如“10 派 25 元”填 25，“10 送 4 股”在送转里填 4。现金分红从成本里扣掉，送转的股加到持有数量里，成本价跟着摊薄。点保存才生效" = "Enter as announced: for “25 per 10 shares” enter 25; for “4 bonus shares per 10” enter 4 under Bonus. Cash dividends reduce the cost, bonus shares are added to the holding, and the cost price is diluted. Click Save to apply";
+"按公告填每份派多少。现金分红从成本里扣掉，成本价跟着摊薄。点保存才生效" = "Enter the cash per unit as announced. Cash dividends reduce the cost and the cost price is diluted. Click Save to apply";
+"按公告填每股派多少。现金分红从成本里扣掉，成本价跟着摊薄。点保存才生效" = "Enter the cash per share as announced. Cash dividends reduce the cost and the cost price is diluted. Click Save to apply";
+"%@，到手 %@：持有 %@ %@，成本摊薄到 %@。点保存生效" = "%@, received %@: holding %@ %@, cost diluted to %@. Click Save to apply";
+"每份派 %@" = "%@ per unit";
+"每股派 %@" = "%@ per share";
+"10 派 %@" = "%@ per 10 shares";
+"送转 %@" = "%@ bonus shares per 10";
+"最近的买卖（共 %@ 笔）" = "Recent Trades (%@ total)";
+"最近的买卖" = "Recent Trades";
+"今年已实现 " = "Realized this year ";
+"今年卖出和分红一共赚了多少" = "Total profit from sales and dividends this year";
+"分红 " = "Dividend ";
+"删掉这条记录（不改持仓），保存后生效" = "Delete this record (holding unchanged); applies when you save";
+"买入 %@ %@ @ %@：持有 %@ %@，成本 %@。点保存生效" = "Bought %@ %@ @ %@: holding %@ %@, cost %@. Click Save to apply";
+"已实现 " = "realized ";
+"卖出 %@ %@ @ %@，%@：还剩 %@ %@，成本不变。点保存生效" = "Sold %@ %@ @ %@, %@: %@ %@ left, cost unchanged. Click Save to apply";
+"全部卖出 @ %@，%@。保存后清掉持仓，买卖记录还留着" = "Sold all @ %@, %@. Saving clears the holding and keeps the trade history";
+"留空表示不提醒。每个条件每个交易日最多提醒一次。" = "Leave empty for no alert. Each condition alerts at most once per trading day.";
+"现价 %@，" = "Price %@, ";
+"今日 %@。" = "today %@.";
+"持有数量和成本价要一起填写，数量大于 0，成本价不小于 0。" = "Enter both shares and cost price; shares must be above 0 and cost can’t be negative.";
+"填写后在列表和详情里显示持仓盈亏，面板上方按币种合计。只保存在本机和你的 iCloud 里。" = "Shows total P&L in the list and details, with totals per currency at the top of the panel. Stored only on this Mac and in your iCloud.";
+"按现价计算持仓盈亏。" = "Total P&L is calculated at the current price.";
+"按现价 %@，" = "At the current price %@, ";
+"市值 %@，持仓盈亏 %@" = "value %@, total P&L %@";
+"（%@）" = " (%@)";
+"。" = ".";
+"不提醒" = "No alert";
+
+/* Stox/SyncManager.swift */
+"读取 iCloud 失败：%@" = "Couldn’t read from iCloud: %@";
+"写入 iCloud 失败：%@" = "Couldn’t write to iCloud: %@";
+
+/* Stox/UpdateInstaller.swift */
+"“应用程序”" = "“Applications”";
+"个人的“应用程序”（~/Applications）" = "your personal “Applications” (~/Applications)";
+"读不到 Info.plist" = "can’t read Info.plist";
+"bundle identifier 是 %@" = "bundle identifier is %@";
+"版本是 %@，不是 %@" = "version is %@, not %@";
+"签名校验失败：%@" = "signature check failed: %@";
+"没有开发者签名" = "no developer signature";
+
+/* Stox/UpdateViews.swift */
+"查看更新内容" = "See What’s New";
+"更新" = "Update";
+"取消更新" = "Cancel Update";
+"重试" = "Retry";
+"正在下载 %@" = "Downloading %@";
+"正在校验 %@" = "Verifying %@";
+"正在安装 %@" = "Installing %@";
+"已更新到 %@，正在重新启动" = "Updated to %@, relaunching";
+"更新到 %@ 失败" = "Update to %@ failed";
+"有新版本 %@" = "Version %@ available";
+"马上就好，请不要退出" = "Almost done, please don’t quit";
+"程序会自动重新打开" = "Stox will reopen automatically";
+"下载 %@ 后自动安装并重新启动" = "Downloads %@, installs and relaunches";
+"点“更新”自动下载安装并重新启动" = "Click “Update” to download, install and relaunch";
+"已经是最新版本" = "Stox is up to date";
+"正在检查更新…" = "Checking for updates…";
+"已跳过 %@" = "Skipped %@";
+"仍然查看" = "Show Anyway";
+"正在下载 %@…" = "Downloading %@…";
+"正在校验 %@…" = "Verifying %@…";
+"正在安装 %@…" = "Installing %@…";
+"已更新到 %@，正在重新启动…" = "Updated to %@, relaunching…";
+"检查更新" = "Check for Updates";
+"还没有检查过更新" = "Never checked for updates";
+"上次检查：%@" = "Last checked: %@";
+"发布于 %@" = "Released %@";
+"到发布页下载" = "Download from Release Page";
+"跳过这个版本" = "Skip This Version";
+"立即更新" = "Update Now";
+"在浏览器里查看发布页" = "View Release Page in Browser";
+"点一下就行：下载" = "Just one click: downloads";
+"，校验后替换程序并自动重新启动，自选和设置都会保留。" = ", verifies, replaces the app and relaunches. Your watchlist and settings are kept.";
+"打开“App 管理”设置" = "Open “App Management” Settings";
+
+/* Stox/Updater.swift */
+"不是从 Stox.app 运行的，没法在程序里更新" = "Stox isn’t running from Stox.app, so it can’t update itself";
+"现在是从下载文件夹这类临时位置运行的，这次会装进%@" = "Stox is running from a temporary location such as Downloads; this update installs it into %@";
+"，旧的那份移到废纸篓" = " and moves the old copy to the Trash";
+"Stox 有新版本 %@" = "Stox %@ is available";
+"打开行情面板点“更新”，自动下载安装并重新启动" = "Open the panel and click “Update” to download, install and relaunch";
+"检查更新失败：%@" = "Couldn’t check for updates: %@";
+
+/* StoxCore/ExtendedHours.swift */
+"盘前" = "Pre";
+"盘后" = "After";
+
+/* StoxCore/Market.swift */
+"沪" = "SH";
+"深" = "SZ";
+"北" = "BJ";
+"港" = "HK";
+"美" = "US";
+"基" = "FD";
+"期" = "FU";
+"汇" = "FX";
+
+/* StoxCore/MarketClock.swift */
+"交易中" = "Open";
+"午休" = "Lunch";
+"休市" = "Closed";
+
+/* StoxCore/Portfolio.swift */
+"人民币" = "CNY";
+"港币" = "HKD";
+"美元" = "USD";
+"名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组" = "Name\tSymbol\tCurrency\tShares\tCost\tPrice\tValue\tTotal P&L\tP&L %\tToday’s P&L\tGroup";
+"涨得最多的是%@ %@" = "top gainer %@ %@";
+"跌得最多的是%@ %@" = "top loser %@ %@";
+"%@收盘 今日盈亏 %@" = "%@ closed · Today’s P&L %@";
+"持仓盈亏 %@" = "Total P&L %@";
+"今日 %@，" = "Today %@, ";
+"，市值 %@%@" = ", value %@ %@";
+
+/* StoxCore/PriceAlert.swift */
+"%@ 价格涨到 %@" = "%@ rose to %@";
+"%@ 价格跌到 %@" = "%@ fell to %@";
+"%@ 涨幅达到 %@%" = "%@ is up %@%";
+"%@ 跌幅达到 %@%" = "%@ is down %@%";
+"%@ 持仓盈利达到 %@%" = "%@ holding gain reached %@%";
+"%@ 持仓亏损达到 %@%" = "%@ holding loss reached %@%";
+"%@ 涨停" = "%@ hit limit up";
+"%@ 跌停" = "%@ hit limit down";
+"%@ 创 52 周新高" = "%@ hit a 52-week high";
+"%@ 创 52 周新低" = "%@ hit a 52-week low";
+"%@ %@ 分钟内拉升 %@%" = "%1$@ jumped %3$@% in %2$@ minutes";
+"%@ %@ 分钟内下跌 %@%" = "%1$@ dropped %3$@% in %2$@ minutes";
+"成本 %@，" = "cost %@, ";
+"今天最高 %@，" = "day high %@, ";
+"今天最低 %@，" = "day low %@, ";
+"涨跌 %@" = "change %@";
+
+/* StoxCore/ProfitCalendar.swift */
+"一" = "M";
+"二" = "T";
+"三" = "W";
+"四" = "T";
+"五" = "F";
+"六" = "S";
+"日" = "S";
+
+/* StoxCore/ProfitHistory.swift */
+"日期\t币种\t今日盈亏\t持仓盈亏\t市值" = "Date\tCurrency\tToday’s P&L\tTotal P&L\tValue";
+
+/* StoxCore/QuoteProvider.swift */
+"服务器返回 HTTP %@" = "The server returned HTTP %@";
+"服务器没有返回数据" = "The server returned no data";
+
+/* StoxCore/Rank.swift */
+"涨幅榜" = "Gainers";
+"跌幅榜" = "Losers";
+"行业" = "Industries";
+
+/* StoxCore/Sync.swift */
+"Stox 自选 %04d-%02d-%02d.json" = "Stox Watchlist %04d-%02d-%02d.json";
+"未知设备" = "Unknown device";
+"iCloud 云盘没有开启" = "iCloud Drive is off";
+"iCloud 里的数据来自更新版本的 Stox，请先把这台 Mac 上的 Stox 更新到最新版" = "The data in iCloud comes from a newer version of Stox. Update Stox on this Mac first";
+
+/* StoxCore/TencentSearchParser.swift */
+"指数" = "Index";
+"科创板" = "STAR";
+"创业板" = "ChiNext";
+"股票" = "Stock";
+"基金" = "Fund";
+"债券" = "Bond";
+"贵金属" = "Precious metal";
+"能源" = "Energy";
+"期货" = "Futures";
+"外汇" = "FX";
+
+/* StoxCore/Trade.swift */
+"分红" = "Dividend";
+"（每股送转 %@）" = " (bonus %@ per share)";
+"日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t已实现盈亏" = "Date\tName\tSymbol\tCurrency\tType\tShares\tPrice\tAmount\tRealized P&L";
+
+/* StoxCore/Update.swift */
+"还没有发布过版本" = "No versions have been released yet";
+"服务器返回了 %@" = "The server returned %@";
+"读不懂服务器返回的内容" = "Couldn’t understand the server’s response";
+"这个版本没有可以直接安装的附件，请到发布页手动下载" = "This version has no installable download. Please download it from the release page";
+"校验文件里没有这个附件的校验和" = "The checksum file has no checksum for this download";
+"下载的文件校验和不对，可能没下载完整或被篡改" = "The download’s checksum doesn’t match; it may be incomplete or tampered with";
+"解压失败：%@" = "Couldn’t unzip: %@";
+"压缩包里没有 Stox.app" = "The archive doesn’t contain Stox.app";
+"下载的程序不对：%@" = "The downloaded app is wrong: %@";
+"替换程序失败：%@" = "Couldn’t replace the app: %@";
+"已取消授权，程序没有改动" = "Authorization canceled; the app wasn’t changed";
+"macOS 不允许 Stox 替换自己。到“系统设置 → 隐私与安全性 → App 管理”里允许 Stox，再点重试" = "macOS doesn’t allow Stox to replace itself. Allow Stox in “System Settings → Privacy & Security → App Management”, then click Retry";
+"新版本不是同一个开发者签名的（应该是 %@），为了安全没有安装。可以到发布页确认后手动下载" = "The new version isn’t signed by the same developer (expected %@), so it wasn’t installed. You can verify and download it from the release page";
+"这个版本没有写更新内容" = "No release notes for this version";
+"还有 %@ 个更早的版本，见发布页" = "And %@ more on the release page";
+"- 还有 %@ 个更早的版本" = "- And %@ more";
+
+/* StoxCore/Watchlist.swift */
+"一行" = "One Line";
+"上下两行" = "Two Lines";
+"今日" = "Today";
+"天天基金" = "Eastmoney Fund";
+"新浪财经" = "Sina Finance";
+"雪球" = "Xueqiu";

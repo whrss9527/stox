@@ -5,11 +5,11 @@ public enum MarketPhase: Sendable, Equatable {
 
     public var displayName: String {
         switch self {
-        case .preMarket: return "盘前"
-        case .trading: return "交易中"
-        case .lunchBreak: return "午休"
-        case .afterHours: return "盘后"
-        case .closed: return "休市"
+        case .preMarket: return L("盘前")
+        case .trading: return L("交易中")
+        case .lunchBreak: return L("午休")
+        case .afterHours: return L("盘后")
+        case .closed: return L("休市")
         }
     }
 

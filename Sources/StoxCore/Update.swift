@@ -73,21 +73,21 @@ public enum UpdateError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .server(let code): return code == 404 ? "还没有发布过版本" : "服务器返回了 \(code)"
-        case .badResponse: return "读不懂服务器返回的内容"
-        case .noArchive: return "这个版本没有可以直接安装的附件，请到发布页手动下载"
-        case .checksumsMissing: return "校验文件里没有这个附件的校验和"
-        case .checksumMismatch: return "下载的文件校验和不对，可能没下载完整或被篡改"
-        case .extract(let text): return "解压失败：\(text)"
-        case .appNotFound: return "压缩包里没有 Stox.app"
-        case .wrongApp(let text): return "下载的程序不对：\(text)"
+        case .server(let code): return code == 404 ? L("还没有发布过版本") : L("服务器返回了 %@", code)
+        case .badResponse: return L("读不懂服务器返回的内容")
+        case .noArchive: return L("这个版本没有可以直接安装的附件，请到发布页手动下载")
+        case .checksumsMissing: return L("校验文件里没有这个附件的校验和")
+        case .checksumMismatch: return L("下载的文件校验和不对，可能没下载完整或被篡改")
+        case .extract(let text): return L("解压失败：%@", text)
+        case .appNotFound: return L("压缩包里没有 Stox.app")
+        case .wrongApp(let text): return L("下载的程序不对：%@", text)
         case .notInstallable(let text): return text
-        case .install(let text): return "替换程序失败：\(text)"
-        case .cancelledByUser: return "已取消授权，程序没有改动"
+        case .install(let text): return L("替换程序失败：%@", text)
+        case .cancelledByUser: return L("已取消授权，程序没有改动")
         case .appManagement:
-            return "macOS 不允许 Stox 替换自己。到“系统设置 → 隐私与安全性 → App 管理”里允许 Stox，再点重试"
+            return L("macOS 不允许 Stox 替换自己。到“系统设置 → 隐私与安全性 → App 管理”里允许 Stox，再点重试")
         case .wrongSigner(let team):
-            return "新版本不是同一个开发者签名的（应该是 \(team)），为了安全没有安装。可以到发布页确认后手动下载"
+            return L("新版本不是同一个开发者签名的（应该是 %@），为了安全没有安装。可以到发布页确认后手动下载", team)
         }
     }
 }
@@ -313,9 +313,9 @@ public enum InstallLocation {
 
 /// 发布说明的整理：App 里只显示这个版本更新了什么，安装步骤和 GitHub 自动生成的列表不显示。
 public enum ReleaseNotesText {
-    static let highlightsHeading = "## 更新内容"
+    static let highlightsHeading = "## 更新内容"  // l10n-ignore
     /// 这些标题下面的内容不显示。
-    static let skippedHeadings = ["## 安装", "## What's Changed", "## New Contributors"]
+    static let skippedHeadings = ["## 安装", "## What's Changed", "## New Contributors"]  // l10n-ignore
 
     public static func highlights(_ notes: String) -> String {
         let lines = notes.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
@@ -346,10 +346,10 @@ public enum ReleaseNotesText {
         let shown = releases.prefix(max(limit, 1))
         var parts = shown.map { release -> String in
             let text = release.highlights
-            return "**\(release.version)**\n" + (text.isEmpty ? "这个版本没有写更新内容" : text)
+            return "**\(release.version)**\n" + (text.isEmpty ? L("这个版本没有写更新内容") : text)
         }
         if releases.count > shown.count {
-            parts.append("还有 \(releases.count - shown.count) 个更早的版本，见发布页")
+            parts.append(L("还有 %@ 个更早的版本，见发布页", releases.count - shown.count))
         }
         return parts.joined(separator: "\n\n")
     }
@@ -358,13 +358,13 @@ public enum ReleaseNotesText {
     /// 没有冒号就到第一个逗号、句号或分号；这样也超过 maxLength 个字时截断，加上省略号。
     public static func headline(_ text: String, maxLength: Int = 36) -> String {
         let text = text.trimmingCharacters(in: .whitespaces)
-        for stops in [["：", ":"], ["，", "。", "；"]] as [[Character]] {
+        for stops in [["：", ":"], ["，", "。", "；"]] as [[Character]] {  // l10n-ignore
             if let index = text.firstIndex(where: { stops.contains($0) }), index > text.startIndex,
                text.distance(from: text.startIndex, to: index) <= maxLength {
                 return String(text[..<index])
             }
         }
-        return text.count > maxLength ? String(text.prefix(maxLength)) + "…" : text
+        return text.count > maxLength ? String(text.prefix(maxLength)) + "…" : text  // l10n-ignore
     }
 
     /// 每个版本只取更新内容第一条的开头一句，“已更新到 x.y.z”里一行一个版本：`0.37.0 盈亏日历`。
@@ -381,10 +381,10 @@ public enum ReleaseNotesText {
                     if text.hasPrefix("- ") || text.hasPrefix("* ") { text.removeFirst(2) }
                     return text
                 } ?? ""
-            return "- **\(release.version)** " + (first.isEmpty ? "这个版本没有写更新内容" : headline(first))
+            return "- **\(release.version)** " + (first.isEmpty ? L("这个版本没有写更新内容") : headline(first))
         }
         if releases.count > shown.count {
-            lines.append("- 还有 \(releases.count - shown.count) 个更早的版本")
+            lines.append(L("- 还有 %@ 个更早的版本", releases.count - shown.count))
         }
         return lines
     }

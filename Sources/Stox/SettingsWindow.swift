@@ -14,10 +14,10 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: return "通用"
-        case .display: return "显示"
-        case .sync: return "iCloud 同步"
-        case .about: return "关于与更新"
+        case .general: return L("通用")
+        case .display: return L("显示")
+        case .sync: return L("iCloud 同步")
+        case .about: return L("关于与更新")
         }
     }
 
@@ -82,7 +82,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let root = SettingsRootView(navigation: navigation, settings: settings, store: store, updater: updater, sync: sync)
         let hosting = NSHostingController(rootView: root)
         let window = NSWindow(contentViewController: hosting)
-        window.title = "Stox 设置"
+        window.title = L("Stox 设置")
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -210,66 +210,66 @@ struct GeneralPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "通用", subtitle: "刷新频率、快捷键、价格提醒和登录时启动")
+            PageHeader(title: L("通用"), subtitle: L("刷新频率、快捷键、价格提醒和登录时启动"))
             Form {
-                Section("行情刷新") {
-                    Picker("刷新间隔", selection: $settings.refreshInterval) {
+                Section(L("行情刷新")) {
+                    Picker(L("刷新间隔"), selection: $settings.refreshInterval) {
                         ForEach(SettingsStore.intervalOptions, id: \.self) { seconds in
-                            Text("\(Int(seconds)) 秒").tag(seconds)
+                            Text(L("%@ 秒", Int(seconds))).tag(seconds)
                         }
                     }
-                    Toggle("休市时降低刷新频率", isOn: $settings.slowWhenIdle)
-                    FormNote("自选涉及的市场都休市时改为每分钟刷新一次。打开面板时，数据不新鲜就会立即刷新。")
+                    Toggle(L("休市时降低刷新频率"), isOn: $settings.slowWhenIdle)
+                    FormNote(L("自选涉及的市场都休市时改为每分钟刷新一次。打开面板时，数据不新鲜就会立即刷新。"))
                 }
-                Section("快捷键") {
-                    Toggle("用快捷键打开或关闭行情面板", isOn: $settings.hotKeyEnabled)
+                Section(L("快捷键")) {
+                    Toggle(L("用快捷键打开或关闭行情面板"), isOn: $settings.hotKeyEnabled)
                     HStack {
                         HotkeyRecorder(binding: $settings.toggleHotkey)
                             .frame(width: 160, height: 28)
-                        Button("恢复 ⌃⌥S") { settings.toggleHotkey = .defaultToggle }
+                        Button(L("恢复 ⌃⌥S")) { settings.toggleHotkey = .defaultToggle }
                             .disabled(settings.toggleHotkey == .defaultToggle)
                     }
                     .disabled(!settings.hotKeyEnabled)
                     if settings.hotKeyEnabled, settings.hotkeyUnavailable {
-                        Label("\(settings.toggleHotkey.display) 已经被其他程序占用，换一个组合试试", systemImage: "exclamationmark.triangle")
+                        Label(L("%@ 已经被其他程序占用，换一个组合试试", settings.toggleHotkey.display), systemImage: "exclamationmark.triangle")
                             .font(.caption)
                             .foregroundStyle(.orange)
                     }
-                    FormNote("点方框后按下新的组合键，至少包含 ⌃、⌥、⇧、⌘ 中的一个，按 Esc 取消。在任何 App 里都能用，不需要辅助功能权限。")
+                    FormNote(L("点方框后按下新的组合键，至少包含 ⌃、⌥、⇧、⌘ 中的一个，按 Esc 取消。在任何 App 里都能用，不需要辅助功能权限。"))
                 }
-                Section("价格提醒") {
-                    Toggle("到价时发送系统通知", isOn: $settings.alertsEnabled)
-                    FormNote("在行情面板里右键某只证券，选“价格提醒与简称…”设置目标价、涨跌幅，填了持仓的还能设止盈止损。每个条件每个交易日最多提醒一次。")
-                    Toggle("收盘后发一条今日盈亏小结", isOn: $settings.closeSummary)
+                Section(L("价格提醒")) {
+                    Toggle(L("到价时发送系统通知"), isOn: $settings.alertsEnabled)
+                    FormNote(L("在行情面板里右键某只证券，选“价格提醒与简称…”设置目标价、涨跌幅，填了持仓的还能设止盈止损。每个条件每个交易日最多提醒一次。"))
+                    Toggle(L("收盘后发一条今日盈亏小结"), isOn: $settings.closeSummary)
                         .onChange(of: settings.closeSummary) { enabled in
                             if enabled { Notifier.shared.requestAuthorization() }
                         }
-                    FormNote("有持仓的市场收盘后各发一次：今日盈亏、持仓盈亏和市值。美股在盘后开始时发。")
-                    Toggle("A 股涨停、跌停时提醒", isOn: $settings.limitAlerts)
+                    FormNote(L("有持仓的市场收盘后各发一次：今日盈亏、持仓盈亏和市值。美股在盘后开始时发。"))
+                    Toggle(L("A 股涨停、跌停时提醒"), isOn: $settings.limitAlerts)
                         .onChange(of: settings.limitAlerts) { enabled in
                             if enabled { Notifier.shared.requestAuthorization() }
                         }
-                    FormNote("自选里的 A 股个股（不含指数）封涨停或跌停时发一条通知，开板再封板当天不再重复。")
-                    Toggle("创 52 周新高、新低时提醒", isOn: $settings.yearHighLowAlerts)
+                    FormNote(L("自选里的 A 股个股（不含指数）封涨停或跌停时发一条通知，开板再封板当天不再重复。"))
+                    Toggle(L("创 52 周新高、新低时提醒"), isOn: $settings.yearHighLowAlerts)
                         .onChange(of: settings.yearHighLowAlerts) { enabled in
                             if enabled { Notifier.shared.requestAuthorization() }
                         }
-                    FormNote("自选里的证券（含指数）当天的最高价达到 52 周最高、或者最低价达到 52 周最低时发一条通知，每只每天最多一次。")
-                    Picker("异动提醒", selection: $settings.rapidMoveThreshold) {
+                    FormNote(L("自选里的证券（含指数）当天的最高价达到 52 周最高、或者最低价达到 52 周最低时发一条通知，每只每天最多一次。"))
+                    Picker(L("异动提醒"), selection: $settings.rapidMoveThreshold) {
                         ForEach(SettingsStore.rapidMoveOptions, id: \.self) { value in
-                            Text(value == 0 ? "关闭" : "5 分钟内涨跌 \(Int(value))%").tag(value)
+                            Text(value == 0 ? L("关闭") : L("5 分钟内涨跌 %@%", Int(value))).tag(value)
                         }
                     }
                     .onChange(of: settings.rapidMoveThreshold) { value in
                         if value > 0 { Notifier.shared.requestAuthorization() }
                     }
-                    FormNote("交易时段里，自选里的证券相对最近 5 分钟的最低点涨了、或者相对最高点跌了超过这个幅度时提醒，同一只同一个方向 15 分钟内只提醒一次。")
-                    Button("打开系统的通知设置") {
+                    FormNote(L("交易时段里，自选里的证券相对最近 5 分钟的最低点涨了、或者相对最高点跌了超过这个幅度时提醒，同一只同一个方向 15 分钟内只提醒一次。"))
+                    Button(L("打开系统的通知设置")) {
                         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!)
                     }
                 }
-                Section("启动") {
-                    Toggle("登录时自动启动", isOn: launchAtLoginBinding)
+                Section(L("启动")) {
+                    Toggle(L("登录时自动启动"), isOn: launchAtLoginBinding)
                         .disabled(!LoginItem.isAvailable)
                     if let loginItemError {
                         Text(loginItemError)
@@ -291,7 +291,7 @@ struct GeneralPage: View {
                     try LoginItem.setEnabled(enabled)
                     loginItemError = nil
                 } catch {
-                    loginItemError = "设置失败：\(error.localizedDescription)"
+                    loginItemError = L("设置失败：%@", error.localizedDescription)
                 }
                 launchAtLogin = LoginItem.isEnabled
             }
@@ -307,67 +307,67 @@ struct DisplayPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "显示", subtitle: "菜单栏和行情面板里显示什么，涨跌用什么颜色，面板用深色还是浅色")
+            PageHeader(title: L("显示"), subtitle: L("菜单栏和行情面板里显示什么，涨跌用什么颜色，面板用深色还是浅色"))
             Form {
-                Section("外观") {
-                    Picker("行情面板和设置窗口", selection: $settings.appearance) {
+                Section(L("外观")) {
+                    Picker(L("行情面板和设置窗口"), selection: $settings.appearance) {
                         ForEach(AppearanceMode.allCases) { mode in
                             Text(mode.title).tag(mode)
                         }
                     }
                     .pickerStyle(.segmented)
-                    FormNote("菜单栏里的行情文字始终跟随系统的深浅色，保证看得清。")
+                    FormNote(L("菜单栏里的行情文字始终跟随系统的深浅色，保证看得清。"))
                 }
-                Section("菜单栏") {
-                    Toggle("只显示图标，隐藏行情", isOn: $settings.hideTicker)
-                    FormNote("右键单击菜单栏里的 Stox 可以随时在“显示行情”和“只显示图标”之间切换，左键单击照常打开行情面板。")
-                    Toggle("休市时只显示图标", isOn: $settings.hideTickerWhenClosed)
+                Section(L("菜单栏")) {
+                    Toggle(L("只显示图标，隐藏行情"), isOn: $settings.hideTicker)
+                    FormNote(L("右键单击菜单栏里的 Stox 可以随时在“显示行情”和“只显示图标”之间切换，左键单击照常打开行情面板。"))
+                    Toggle(L("休市时只显示图标"), isOn: $settings.hideTickerWhenClosed)
                         .disabled(settings.hideTicker)
-                    FormNote("菜单栏上的证券所在的市场都休市时只显示图标，开盘（包括美股盘前）后自动恢复，晚上不占地方。")
-                    Toggle("显示名称", isOn: $settings.showName)
+                    FormNote(L("菜单栏上的证券所在的市场都休市时只显示图标，开盘（包括美股盘前）后自动恢复，晚上不占地方。"))
+                    Toggle(L("显示名称"), isOn: $settings.showName)
                         .disabled(settings.hideTicker)
-                    Toggle("显示价格", isOn: $settings.showPrice)
+                    Toggle(L("显示价格"), isOn: $settings.showPrice)
                         .disabled(settings.hideTicker)
-                    Toggle("显示涨跌幅", isOn: $settings.showPercent)
+                    Toggle(L("显示涨跌幅"), isOn: $settings.showPercent)
                         .disabled(settings.hideTicker)
-                    Picker("排列方式", selection: $settings.tickerLayout) {
+                    Picker(L("排列方式"), selection: $settings.tickerLayout) {
                         ForEach(TickerLayout.allCases) { layout in
                             Text(layout.title).tag(layout)
                         }
                     }
                     .pickerStyle(.segmented)
                     .disabled(settings.hideTicker)
-                    Toggle("固定了多只时轮流显示", isOn: $settings.rotateTicker)
+                    Toggle(L("固定了多只时轮流显示"), isOn: $settings.rotateTicker)
                         .disabled(settings.hideTicker)
-                    Toggle("在菜单栏显示盈亏", isOn: $settings.showDayProfit)
+                    Toggle(L("在菜单栏显示盈亏"), isOn: $settings.showDayProfit)
                         .disabled(settings.hideTicker)
-                    Picker("显示哪种盈亏", selection: $settings.menuBarProfit) {
+                    Picker(L("显示哪种盈亏"), selection: $settings.menuBarProfit) {
                         ForEach(MenuBarProfit.allCases) { kind in
                             Text(kind.title).tag(kind)
                         }
                     }
                     .pickerStyle(.segmented)
                     .disabled(settings.hideTicker || !settings.showDayProfit)
-                    FormNote("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。上下两行时名称在左边，价格在上、涨跌幅在下，字小一些，同样的地方能放下更多只。轮流显示时每 5 秒换一只，适合刘海屏。盈亏只算填了持仓的证券，可以显示今日盈亏或者持仓盈亏，几种货币都有时按汇率折成人民币显示一个数，不参与轮流。")
+                    FormNote(L("在行情面板里右键某只证券，选“显示在菜单栏”就能把它固定到菜单栏。上下两行时名称在左边，价格在上、涨跌幅在下，字小一些，同样的地方能放下更多只。轮流显示时每 5 秒换一只，适合刘海屏。盈亏只算填了持仓的证券，可以显示今日盈亏或者持仓盈亏，几种货币都有时按汇率折成人民币显示一个数，不参与轮流。"))
                 }
-                Section("行情面板") {
-                    Toggle("紧凑列表", isOn: $settings.compactRows)
-                    FormNote("每只一行：名称、代码、现价和色块排在一起，自选多时一屏能看到更多。持仓盈亏和盘前盘后价在展开后看。")
-                    Toggle("列表里画当天的迷你分时", isOn: $settings.showSparklines)
+                Section(L("行情面板")) {
+                    Toggle(L("紧凑列表"), isOn: $settings.compactRows)
+                    FormNote(L("每只一行：名称、代码、现价和色块排在一起，自选多时一屏能看到更多。持仓盈亏和盘前盘后价在展开后看。"))
+                    Toggle(L("列表里画当天的迷你分时"), isOn: $settings.showSparklines)
                         .disabled(settings.compactRows)
-                    FormNote("每一行现价左边画一条当天的走势，虚线是昨收。面板打开着的时候才去取，交易时段内两分钟取一轮，每只一个请求；紧凑列表、场外基金不画。")
-                    Toggle("价格变动时闪一下", isOn: $settings.flashOnChange)
-                    Toggle("画均线和均价线", isOn: $settings.showMovingAverages)
-                    FormNote("日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。分时图和五日图上画成交均价（橙色），指数没有。")
-                    Toggle("画成本线和买卖点", isOn: $settings.showCostAndTrades)
-                    FormNote("填了持仓的，分时图和 K 线上成本价落在图里时画一条虚线；K 线上用 B、S 标出“记一笔”记过买入、卖出的那几根。")
-                    Toggle("美股盘前盘后价", isOn: $settings.showExtendedHours)
-                    FormNote("美股个股不在常规交易时段时，代码旁边显示盘前或盘后的最新价相对收盘的涨跌，详情里有价格和成交时间。每只美股个股要多发一个请求。")
-                    Toggle("隐藏金额", isOn: $settings.hideAmounts)
-                    FormNote("给别人看屏幕时用：市值、盈亏金额和持有数量换成 ****，盈亏比例照常显示；菜单栏的今日盈亏换成比例，收盘小结和止盈止损的通知里也不写金额。持仓合计里“市值”旁边的小眼睛可以随时切换。编辑页和复制出来的表格照常是实际数字。")
+                    FormNote(L("每一行现价左边画一条当天的走势，虚线是昨收。面板打开着的时候才去取，交易时段内两分钟取一轮，每只一个请求；紧凑列表、场外基金不画。"))
+                    Toggle(L("价格变动时闪一下"), isOn: $settings.flashOnChange)
+                    Toggle(L("画均线和均价线"), isOn: $settings.showMovingAverages)
+                    FormNote(L("日 K、周 K、月 K 上画 5、10、20 根的收盘价均线，图的上方写着均线的值，鼠标指着时是那一根的。分时图和五日图上画成交均价（橙色），指数没有。"))
+                    Toggle(L("画成本线和买卖点"), isOn: $settings.showCostAndTrades)
+                    FormNote(L("填了持仓的，分时图和 K 线上成本价落在图里时画一条虚线；K 线上用 B、S 标出“记一笔”记过买入、卖出的那几根。"))
+                    Toggle(L("美股盘前盘后价"), isOn: $settings.showExtendedHours)
+                    FormNote(L("美股个股不在常规交易时段时，代码旁边显示盘前或盘后的最新价相对收盘的涨跌，详情里有价格和成交时间。每只美股个股要多发一个请求。"))
+                    Toggle(L("隐藏金额"), isOn: $settings.hideAmounts)
+                    FormNote(L("给别人看屏幕时用：市值、盈亏金额和持有数量换成 ****，盈亏比例照常显示；菜单栏的今日盈亏换成比例，收盘小结和止盈止损的通知里也不写金额。持仓合计里“市值”旁边的小眼睛可以随时切换。编辑页和复制出来的表格照常是实际数字。"))
                 }
-                Section("涨跌颜色") {
-                    Picker("涨跌颜色", selection: $settings.colorConvention) {
+                Section(L("涨跌颜色")) {
+                    Picker(L("涨跌颜色"), selection: $settings.colorConvention) {
                         ForEach(ColorConvention.allCases) { convention in
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(convention.title)
@@ -380,10 +380,10 @@ struct DisplayPage: View {
                     }
                     .pickerStyle(.radioGroup)
                     .labelsHidden()
-                    LabeledContent("预览") {
+                    LabeledContent(L("预览")) {
                         ColorPreview(convention: settings.colorConvention)
                     }
-                    FormNote("菜单栏、行情面板和提醒里的颜色都会跟着变。选“不显示红绿”时价格和涨跌幅都用系统默认的文字颜色，只靠正负号区分涨跌。")
+                    FormNote(L("菜单栏、行情面板和提醒里的颜色都会跟着变。选“不显示红绿”时价格和涨跌幅都用系统默认的文字颜色，只靠正负号区分涨跌。"))
                 }
             }
             .formStyle(.grouped)
@@ -398,8 +398,8 @@ struct ColorPreview: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            sample(name: "茅台", price: "1492.50", change: "+1.25%", direction: .up)
-            sample(name: "腾讯", price: "480.20", change: "-0.83%", direction: .down)
+            sample(name: L("茅台"), price: "1492.50", change: "+1.25%", direction: .up)
+            sample(name: L("腾讯"), price: "480.20", change: "-0.83%", direction: .down)
         }
         .font(.system(size: 12.5).monospacedDigit())
         .padding(.horizontal, 10)
@@ -431,19 +431,19 @@ struct SyncPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "iCloud 同步", subtitle: "通过 iCloud 云盘在多台 Mac 之间同步自选和设置")
+            PageHeader(title: L("iCloud 同步"), subtitle: L("通过 iCloud 云盘在多台 Mac 之间同步自选和设置"))
             Form {
-                Section("同步") {
-                    Toggle("通过 iCloud 同步自选和设置", isOn: toggle)
+                Section(L("同步")) {
+                    Toggle(L("通过 iCloud 同步自选和设置"), isOn: toggle)
                         .disabled(!sync.available && !sync.enabled)
-                    LabeledContent("状态") { statusView }
+                    LabeledContent(L("状态")) { statusView }
                     if sync.enabled, sync.available {
                         HStack {
-                            Button("立即同步") {
+                            Button(L("立即同步")) {
                                 Task { await sync.syncNow() }
                             }
                             .disabled(sync.status == .syncing)
-                            Button("在访达中显示") {
+                            Button(L("在访达中显示")) {
                                 if let url = sync.fileURL, FileManager.default.fileExists(atPath: url.path) {
                                     NSWorkspace.shared.activateFileViewerSelecting([url])
                                 } else if let folder = sync.folderURL {
@@ -453,47 +453,47 @@ struct SyncPage: View {
                         }
                     }
                     if !sync.available {
-                        FormNote("这台 Mac 没有打开 iCloud 云盘。到系统设置里点你的 Apple 账户，进入 iCloud 打开“iCloud 云盘”，再回来开启同步。")
-                        Button("打开系统设置") {
+                        FormNote(L("这台 Mac 没有打开 iCloud 云盘。到系统设置里点你的 Apple 账户，进入 iCloud 打开“iCloud 云盘”，再回来开启同步。"))
+                        Button(L("打开系统设置")) {
                             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preferences.AppleIDPrefPane")!)
                         }
                     }
                 }
-                Section("备份到文件") {
+                Section(L("备份到文件")) {
                     HStack {
-                        Button("导出…", action: exportBackup)
+                        Button(L("导出…"), action: exportBackup)
                             .disabled(store.items.isEmpty)
-                        Button("导入…", action: chooseBackup)
+                        Button(L("导入…"), action: chooseBackup)
                     }
-                    .confirmationDialog("导入备份", isPresented: importingPresented, titleVisibility: .visible) {
-                        Button("替换本机的自选和设置") { applyBackup(replace: true) }
-                        Button("只添加本机没有的") { applyBackup(replace: false) }
-                        Button("取消", role: .cancel) { importing = nil }
+                    .confirmationDialog(L("导入备份"), isPresented: importingPresented, titleVisibility: .visible) {
+                        Button(L("替换本机的自选和设置")) { applyBackup(replace: true) }
+                        Button(L("只添加本机没有的")) { applyBackup(replace: false) }
+                        Button(L("取消"), role: .cancel) { importing = nil }
                     } message: {
                         Text(importMessage)
                     }
                     if let backupMessage {
                         FormNote(backupMessage)
                     }
-                    FormNote("不开 iCloud 也能备份和搬到另一台 Mac：导出的是自选（含分组、持仓、提醒、备注）和下面说的那些设置，格式和 iCloud 里的同步文件一样。导入时可以替换本机的，或者只添加本机没有的。")
+                    FormNote(L("不开 iCloud 也能备份和搬到另一台 Mac：导出的是自选（含分组、持仓、提醒、备注）和下面说的那些设置，格式和 iCloud 里的同步文件一样。导入时可以替换本机的，或者只添加本机没有的。"))
                 }
-                Section("会同步什么") {
-                    FormNote("自选列表的内容和顺序、每只的菜单栏固定、简称、备注、分组、持仓和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。")
-                    FormNote("“只显示图标”、面板外观、快捷键、登录时启动、自动检查更新只和这台 Mac 有关，不同步。")
+                Section(L("会同步什么")) {
+                    FormNote(L("自选列表的内容和顺序、每只的菜单栏固定、简称、备注、分组、持仓和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。"))
+                    FormNote(L("“只显示图标”、面板外观、快捷键、登录时启动、自动检查更新只和这台 Mac 有关，不同步。"))
                 }
-                Section("怎么同步") {
-                    FormNote("文件放在 iCloud 云盘的 Stox 文件夹里。另一台 Mac 开启同步时会读到它，可以选择用 iCloud 的、用本机的，或者把两边的自选合并。之后任何一台的改动几秒内就会出现在其他 Mac 上，两台同时改动时以晚的为准。")
-                    FormNote("第一次开启时系统可能会询问是否允许 Stox 访问 iCloud 云盘，需要允许。")
+                Section(L("怎么同步")) {
+                    FormNote(L("文件放在 iCloud 云盘的 Stox 文件夹里。另一台 Mac 开启同步时会读到它，可以选择用 iCloud 的、用本机的，或者把两边的自选合并。之后任何一台的改动几秒内就会出现在其他 Mac 上，两台同时改动时以晚的为准。"))
+                    FormNote(L("第一次开启时系统可能会询问是否允许 Stox 访问 iCloud 云盘，需要允许。"))
                 }
             }
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
         }
-        .confirmationDialog("iCloud 里已经有自选", isPresented: pendingPresented, titleVisibility: .visible) {
-            Button("用 iCloud 的替换本机的") { sync.resolve(.useCloud) }
-            Button("合并两边的自选") { sync.resolve(.merge) }
-            Button("用本机的覆盖 iCloud") { sync.resolve(.useLocal) }
-            Button("取消", role: .cancel) { sync.cancelEnable() }
+        .confirmationDialog(L("iCloud 里已经有自选"), isPresented: pendingPresented, titleVisibility: .visible) {
+            Button(L("用 iCloud 的替换本机的")) { sync.resolve(.useCloud) }
+            Button(L("合并两边的自选")) { sync.resolve(.merge) }
+            Button(L("用本机的覆盖 iCloud")) { sync.resolve(.useLocal) }
+            Button(L("取消"), role: .cancel) { sync.cancelEnable() }
         } message: {
             Text(pendingMessage)
         }
@@ -524,7 +524,7 @@ struct SyncPage: View {
     private var importMessage: String {
         guard let importing else { return "" }
         let time = importing.updatedAt.formatted(date: .abbreviated, time: .shortened)
-        return "备份里有 \(importing.content.watchlist.count) 只自选，是 \(importing.device) 在 \(time) 导出的。"
+        return L("备份里有 %@ 只自选，是 %@ 在 %@ 导出的。", importing.content.watchlist.count, importing.device, time)
     }
 
     private func exportBackup() {
@@ -535,9 +535,9 @@ struct SyncPage: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             try sync.backupData().write(to: url, options: .atomic)
-            backupMessage = "已把 \(store.items.count) 只自选导出到“\(url.lastPathComponent)”。"
+            backupMessage = L("已把 %@ 只自选导出到“%@”。", store.items.count, url.lastPathComponent)
         } catch {
-            backupMessage = "导出失败：\(error.localizedDescription)"
+            backupMessage = L("导出失败：%@", error.localizedDescription)
         }
     }
 
@@ -551,7 +551,7 @@ struct SyncPage: View {
             importing = try SyncDocument.decode(Data(contentsOf: url))
             backupMessage = nil
         } catch {
-            backupMessage = "读不了这个文件：\(error.localizedDescription)"
+            backupMessage = L("读不了这个文件：%@", error.localizedDescription)
         }
     }
 
@@ -560,37 +560,37 @@ struct SyncPage: View {
         let before = store.items.count
         sync.importBackup(importing.content, replace: replace)
         backupMessage = replace
-            ? "已换成备份里的 \(store.items.count) 只自选。"
-            : "添加了 \(store.items.count - before) 只本机没有的自选。"
+            ? L("已换成备份里的 %@ 只自选。", store.items.count)
+            : L("添加了 %@ 只本机没有的自选。", store.items.count - before)
         self.importing = nil
     }
 
     private var pendingMessage: String {
         guard let remote = sync.pending else { return "" }
-        return "来自“\(remote.device)”，更新于 \(Self.dateFormatter.string(from: remote.updatedAt))，"
-            + "有 \(remote.content.watchlist.count) 只自选；本机现在有 \(store.items.count) 只。要怎么处理？"
+        return L("来自“%@”，更新于 %@，", remote.device, Self.dateFormatter.string(from: remote.updatedAt))
+            + L("有 %@ 只自选；本机现在有 %@ 只。要怎么处理？", remote.content.watchlist.count, store.items.count)
     }
 
     @ViewBuilder
     private var statusView: some View {
         switch sync.status {
         case .off:
-            Text("未开启")
+            Text(L("未开启"))
                 .foregroundStyle(.secondary)
         case .unavailable:
-            Label("iCloud 云盘没有打开", systemImage: "exclamationmark.triangle")
+            Label(L("iCloud 云盘没有打开"), systemImage: "exclamationmark.triangle")
                 .foregroundStyle(.orange)
         case .syncing:
             HStack(spacing: 6) {
                 ProgressView()
                     .controlSize(.small)
-                Text("正在同步…")
+                Text(L("正在同步…"))
                     .foregroundStyle(.secondary)
             }
         case .synced(let date, let device):
             VStack(alignment: .trailing, spacing: 2) {
-                Label("已同步", systemImage: "checkmark.icloud")
-                Text("最近一次改动来自“\(device)”，\(Self.relative(date))")
+                Label(L("已同步"), systemImage: "checkmark.icloud")
+                Text(L("最近一次改动来自“%@”，%@", device, Self.relative(date)))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -599,11 +599,11 @@ struct SyncPage: View {
                 Label(message, systemImage: "xmark.icloud")
                     .foregroundStyle(.orange)
                     .multilineTextAlignment(.trailing)
-                Button("打开隐私设置") {
+                Button(L("打开隐私设置")) {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
                 }
                 .controlSize(.small)
-                Text("如果拒绝过访问 iCloud 云盘，在“文件和文件夹”里允许 Stox 访问。")
+                Text(L("如果拒绝过访问 iCloud 云盘，在“文件和文件夹”里允许 Stox 访问。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -612,7 +612,7 @@ struct SyncPage: View {
 
     private static let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = AppLanguage.locale
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         return formatter
@@ -620,7 +620,7 @@ struct SyncPage: View {
 
     private static func relative(_ date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.locale = AppLanguage.locale
         formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
     }
@@ -635,7 +635,7 @@ struct AboutPage: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: "关于与更新", subtitle: "Stox 菜单栏行情")
+            PageHeader(title: L("关于与更新"), subtitle: L("Stox 菜单栏行情"))
             ScrollView {
                 VStack(spacing: 16) {
                     aboutCard
@@ -654,9 +654,9 @@ struct AboutPage: View {
                 .shadow(color: .black.opacity(0.2), radius: 12, y: 6)
             Text("Stox")
                 .font(.system(size: 20, weight: .bold))
-            Text("版本 \(AppInfo.version)")
+            Text(L("版本 %@", AppInfo.version))
                 .foregroundStyle(.secondary)
-            Text("菜单栏里的股票行情：A 股、港股、美股，一键打开，一键关闭。")
+            Text(L("菜单栏里的股票行情：A 股、港股、美股，一键打开，一键关闭。"))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -664,7 +664,7 @@ struct AboutPage: View {
                 .frame(maxWidth: 360)
             HStack(spacing: 10) {
                 Button("GitHub") { NSWorkspace.shared.open(AppInfo.repositoryURL) }
-                Button("反馈问题") { NSWorkspace.shared.open(AppInfo.issuesURL) }
+                Button(L("反馈问题")) { NSWorkspace.shared.open(AppInfo.issuesURL) }
             }
             Divider()
                 .padding(.horizontal, 40)
@@ -677,13 +677,13 @@ struct AboutPage: View {
 
     private var optionsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Toggle("自动检查更新", isOn: $settings.autoCheckUpdates)
-            FormNote("启动后和之后每 6 小时检查一次 GitHub 上的新版本。有新版本时发通知，行情面板底部会出现“更新”按钮，点一下自动下载、校验、替换并重新启动，不会自动安装。")
+            Toggle(L("自动检查更新"), isOn: $settings.autoCheckUpdates)
+            FormNote(L("启动后和之后每 6 小时检查一次 GitHub 上的新版本。有新版本时发通知，行情面板底部会出现“更新”按钮，点一下自动下载、校验、替换并重新启动，不会自动安装。"))
             Divider()
             HStack {
-                FormNote("行情数据来自腾讯财经公开接口，仅供参考，港股延时约 15 分钟。")
+                FormNote(L("行情数据来自腾讯财经公开接口，仅供参考，港股延时约 15 分钟。"))
                 Spacer()
-                Button("打开日志") {
+                Button(L("打开日志")) {
                     if FileManager.default.fileExists(atPath: Log.fileURL.path) {
                         NSWorkspace.shared.activateFileViewerSelecting([Log.fileURL])
                     } else {

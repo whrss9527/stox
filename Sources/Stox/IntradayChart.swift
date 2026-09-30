@@ -44,7 +44,7 @@ struct IntradayChart: View {
                             path.addLine(to: CGPoint(x: proxy.size.width, y: costY))
                         }
                         .stroke(KlineChart.costColor, style: StrokeStyle(lineWidth: 1, dash: [4, 2]))
-                        Text("成本 " + QuoteFormatter.price(cost, decimals: decimals))
+                        Text(L("成本 ") + QuoteFormatter.price(cost, decimals: decimals))
                             .font(.system(size: 8, weight: .medium).monospacedDigit())
                             .foregroundStyle(KlineChart.costColor)
                             .padding(.horizontal, 2)
@@ -72,14 +72,14 @@ struct IntradayChart: View {
                     }
                 }
             } else {
-                Text(series == nil ? "正在加载分时…" : "今天还没有分时数据")
+                Text(series == nil ? L("正在加载分时…") : L("今天还没有分时数据"))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(height: Self.height)
-        .accessibilityLabel("分时走势")
+        .accessibilityLabel(L("分时走势"))
     }
 
     struct ChartPaths {
@@ -245,14 +245,14 @@ struct FiveDayChart: View {
                     }
                 }
             } else {
-                Text(series == nil ? "正在加载五日…" : "暂时没有五日数据")
+                Text(series == nil ? L("正在加载五日…") : L("暂时没有五日数据"))
                     .font(.system(size: 10))
                     .foregroundStyle(.tertiary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .frame(height: IntradayChart.height)
-        .accessibilityLabel("五日走势")
+        .accessibilityLabel(L("五日走势"))
     }
 
     /// 坐标换算。纵轴包含第一天的昨收（画均价线时也包含均价），和分时图一样至少留出 0.4% 的范围。

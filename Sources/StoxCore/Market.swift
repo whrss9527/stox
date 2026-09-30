@@ -18,14 +18,14 @@ public enum Market: String, Codable, CaseIterable, Sendable {
     /// 列表里显示的单字市场标签。
     public var label: String {
         switch self {
-        case .sh: return "沪"
-        case .sz: return "深"
-        case .bj: return "北"
-        case .hk: return "港"
-        case .us: return "美"
-        case .jj: return "基"
-        case .hf: return "期"
-        case .wh: return "汇"
+        case .sh: return L("沪")
+        case .sz: return L("深")
+        case .bj: return L("北")
+        case .hk: return L("港")
+        case .us: return L("美")
+        case .jj: return L("基")
+        case .hf: return L("期")
+        case .wh: return L("汇")
         }
     }
 }
@@ -37,10 +37,10 @@ public enum MarketRegion: String, Codable, CaseIterable, Sendable {
 
     public var displayName: String {
         switch self {
-        case .cn: return "A股"
-        case .hk: return "港股"
-        case .us: return "美股"
-        case .global: return "期货外汇"
+        case .cn: return L("A股")
+        case .hk: return L("港股")
+        case .us: return L("美股")
+        case .global: return L("期货外汇")
         }
     }
 

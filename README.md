@@ -1,266 +1,278 @@
 <div align="center">
-  <img src="docs/icon.png" width="128" height="128" alt="Stox 图标">
+  <img src="docs/icon.png" width="128" height="128" alt="Stox icon">
   <h1>Stox</h1>
-  <p><strong>一眼看盘，一键隐身</strong></p>
-  <p>住在 macOS 菜单栏里的股票行情。原生 Swift，玻璃质感，开源免费。</p>
+  <p><strong>Quotes at a glance, gone in a click</strong></p>
+  <p>Stock quotes that live in the macOS menu bar. Native Swift, glass design, free and open source.</p>
   <p>
-    <a href="https://github.com/whrss9527/stox/releases/latest"><img alt="最新版本" src="https://img.shields.io/github/v/release/whrss9527/stox?include_prereleases&label=release&color=FA4D45"></a>
+    <a href="https://github.com/whrss9527/stox/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/whrss9527/stox?include_prereleases&label=release&color=FA4D45"></a>
     <img alt="macOS 13+" src="https://img.shields.io/badge/macOS-13%2B-111827?logo=apple&logoColor=white">
     <img alt="Liquid Glass" src="https://img.shields.io/badge/UI-Liquid%20Glass-7C6CFF">
     <a href="LICENSE"><img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-2563EB"></a>
   </p>
   <p>
-    <a href="https://github.com/whrss9527/stox/releases/latest"><b>下载</b></a> ·
-    <a href="CHANGELOG.md">更新日志</a> ·
-    <a href="docs/DESIGN.md">设计说明</a>
+    <a href="https://github.com/whrss9527/stox/releases/latest"><b>Download</b></a> ·
+    <a href="CHANGELOG.md">Changelog</a> ·
+    <a href="docs/DESIGN.md">Design notes</a> ·
+    <a href="README.zh-CN.md">简体中文</a>
   </p>
 </div>
 
 ### **Stox** /stɒks/
 
-念起来就是 **stocks**。
+Say it out loud and it's **stocks**.
 
-把 **stocks** 六个字母压缩成四个，读音却几乎不变。
+Six letters squeezed into four, and it still sounds the same.
 
-行情也一样，压缩成菜单栏里小小的一格：抬眼看一眼，就知道发生了什么；不想被打扰时，右键一点，只留下一个安静的图标。
+The quotes get the same treatment: squeezed into one small spot in the menu bar. Glance up and you know what happened; when you don't want to be disturbed, one right-click leaves just a quiet icon.
 
-**Stox** 就是把股票行情压缩到最小，但又始终触手可及。
+**Stox** is stock quotes compressed to the minimum, but always within reach.
 
 <p align="center">
-  <img src="docs/images/detail.jpg" width="32%" alt="展开详情：分时和均价线">
-  <img src="docs/images/kline.jpg" width="32%" alt="日 K 和均线">
-  <img src="docs/images/holdings.jpg" width="32%" alt="持仓与盈亏">
+  <img src="docs/images/detail.jpg" width="32%" alt="Expanded detail: intraday chart and average price line">
+  <img src="docs/images/kline.jpg" width="32%" alt="Daily candlesticks with moving averages">
+  <img src="docs/images/holdings.jpg" width="32%" alt="Holdings and P&L">
 </p>
 
 <details>
-<summary><b>更多截图</b></summary>
+<summary><b>More screenshots</b></summary>
 
 <p>
-  <img src="docs/images/panel.jpg" width="300" alt="自选列表和迷你分时">
-  <img src="docs/images/orderbook.jpg" width="300" alt="买卖五档">
+  <img src="docs/images/panel.jpg" width="300" alt="Watchlist with intraday sparklines">
+  <img src="docs/images/orderbook.jpg" width="300" alt="Order book">
 </p>
 <p>
-  <img src="docs/images/fundflow.jpg" width="300" alt="资金流向">
-  <img src="docs/images/editor.jpg" width="300" alt="持仓、买卖记录和分红">
+  <img src="docs/images/fundflow.jpg" width="300" alt="Fund flow">
+  <img src="docs/images/editor.jpg" width="300" alt="Holdings, trades and dividends">
 </p>
 <p>
-  <img src="docs/images/calendar.jpg" width="300" alt="盈亏日历">
-  <img src="docs/images/rank.jpg" width="300" alt="A 股涨跌榜">
+  <img src="docs/images/calendar.jpg" width="300" alt="P&L calendar">
+  <img src="docs/images/rank.jpg" width="300" alt="A-share movers">
 </p>
 <p>
-  <img src="docs/images/search.jpg" width="300" alt="搜索添加">
-  <img src="docs/images/neutral.jpg" width="300" alt="不显示红绿">
+  <img src="docs/images/search.jpg" width="300" alt="Search and add">
+  <img src="docs/images/neutral.jpg" width="300" alt="No red or green">
 </p>
 <p>
-  <img src="docs/images/settings.jpg" width="604" alt="设置窗口">
+  <img src="docs/images/settings.jpg" width="604" alt="Settings window">
 </p>
 
-上面三张是展开详情（分时和均价线）、日 K 和均线、持仓与盈亏；这里依次是自选列表（每一行带着当天的迷你分时）、A 股的买卖五档、A 股的资金流向、编辑页的持仓和买卖记录、盈亏日历、A 股涨跌榜、搜索添加、“不显示红绿”配色和设置窗口。截图由 CI 在 macOS 15 上启动打包好的 App 自动截取，数据是 2026-09-28、29 的实时行情。
+The three at the top show the expanded detail (intraday chart and average price line), daily candlesticks with moving averages, and holdings with P&L. Here, in order: the watchlist (each row with today's sparkline), an A-share order book, A-share fund flow, holdings and trades on the edit page, the P&L calendar, the A-share movers, search and add, the "No Red or Green" colors and the Settings window. The screenshots are taken automatically by CI, which launches the packaged app on macOS 15 with live quotes from 2026-09-28 and 29. They show the Chinese interface; Stox switches to English when your system language is English.
 
 </details>
 
-## 亮点
+## Highlights
 
-- **一眼看盘**：左键点一下菜单栏图标，玻璃面板就出来；再点一下、点别处或按 Esc 就收起。
-- **一键隐身**：右键点一下，菜单栏只剩个图标，旁边有人也不怕。
-- **三地行情都有**：A 股、港股、美股，外加指数、ETF、场外基金、国际期货和外汇；分时、K 线、五档、资金流向都能看。
-- **持仓和盈亏**：填上持仓，今日盈亏、持仓盈亏自动算好，还有盈亏日历。
-- **该提醒时提醒**：到价、涨跌幅、止盈止损、涨停跌停、创新高新低，都会发通知。
-- **轻**：压缩包约 3.6MB，内存约 30MB；不用注册，也不用 API Key。
+- **Quotes at a glance**: click the menu bar icon and the glass panel appears; click again, click elsewhere or press Esc and it's gone.
+- **Gone in a click**: right-click and only the icon is left in the menu bar, so nobody looking over your shoulder sees your stocks.
+- **Three markets**: China A-shares, Hong Kong and US stocks, plus indices, ETFs, mutual funds, international futures and FX; intraday and candlestick charts, order book and fund flow.
+- **Holdings and P&L**: enter your holdings and today's and total P&L are worked out for you, with a P&L calendar.
+- **Alerts when they matter**: price targets, % change, take profit and stop loss, limit up and down, new highs and lows, all as notifications.
+- **Light**: about 3.6 MB zipped and about 30 MB of memory; no sign-up and no API key.
+- **English or Chinese**: the interface follows your system language.
 
-## 安装
+## Install
 
-需要 macOS 13 Ventura 或更新版本，Apple 芯片和 Intel 都支持。
+Requires macOS 13 Ventura or later, on Apple silicon or Intel.
 
-### 方式一：下载构建好的 App
+### Option 1: download the app
 
-1. 在仓库的 [Releases](https://github.com/whrss9527/stox/releases) 页面下载最新版本的 `Stox.zip`。想试用未发布的最新代码，可以在 [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) 页面最近一次成功的构建里下载 `Stox-app`。
-2. 解压后把 `Stox.app` 拖进“应用程序”文件夹。
-3. 发布说明里写着“已用 Developer ID 签名并通过苹果公证”的版本，双击就能打开。更早的版本使用临时签名，第一次打开会被系统拦截，任选一种方式放行：
-   - 在终端执行 `xattr -dr com.apple.quarantine /Applications/Stox.app`，然后正常打开；
-   - 或者先双击一次，再到“系统设置 → 隐私与安全性”里点“仍要打开”。
-4. 以后的新版本不用再手动下载：Stox 每 6 小时检查一次，有新版本时点面板底部的“更新”即可，也可以在设置的“关于与更新”里手动检查。
+1. Download the latest `Stox.zip` from [Releases](https://github.com/whrss9527/stox/releases). To try the latest unreleased code, download `Stox-app` from the most recent successful build on the [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) page.
+2. Unzip it and drag `Stox.app` into Applications.
+3. Versions whose release notes say they are signed with a Developer ID and notarized by Apple open with a double-click. Earlier versions are ad-hoc signed and blocked on first launch; allow them either way:
+   - run `xattr -dr com.apple.quarantine /Applications/Stox.app` in Terminal, then open it normally;
+   - or double-click it once, then click "Open Anyway" in System Settings → Privacy & Security.
+4. No need to download new versions by hand: Stox checks every 6 hours, and when there's a new version you click "Update" at the bottom of the panel. You can also check manually under About & Updates in Settings.
 
-从 0.1.0 升级到 0.2.0 需要手动下载一次，0.2.0 起支持一键更新。
+Upgrading from 0.1.0 to 0.2.0 takes one manual download; one-click updates work from 0.2.0 on.
 
-### 方式二：从源码构建
+### Option 2: build from source
 
-需要 Xcode 16 或更新版本。
+Requires Xcode 16 or later.
 
 ```bash
 git clone https://github.com/whrss9527/stox.git
 cd stox
-make install      # 编译、打包成 Stox.app、复制到“应用程序”并启动
+make install      # build, package Stox.app, copy it to Applications and launch it
 ```
 
-其他命令：
+Other commands:
 
 ```bash
-make run          # 只打包到 dist/Stox.app 并运行
-make test         # 运行单元测试
-UNIVERSAL=1 make app   # 打包 Apple 芯片 + Intel 通用版
+make run          # only package to dist/Stox.app and run it
+make test         # run the unit tests
+UNIVERSAL=1 make app   # package a universal build for Apple silicon and Intel
 ```
 
-本机编译的 App 不会被 Gatekeeper 拦截。
+An app you build yourself is not blocked by Gatekeeper.
 
-## 功能
+## Features
 
-### 面板和菜单栏
+### Panel and menu bar
 
-- **一键开关**：左键单击菜单栏图标打开 / 关闭面板；点面板外或按 Esc 也会关闭；全局快捷键在任何 App 里都能呼出，默认 ⌃⌥S，可以在设置里改成别的组合。
-- **一键隐藏**：右键单击菜单栏图标，在“显示行情”和“只显示图标”之间切换，不想被别人看到行情时点一下就行。
-- **钉住成悬浮窗**：点面板右上角的图钉，面板就一直显示，点别处也不关，可以拖到屏幕上任何位置，下次打开还在那里。
-- **菜单栏行情**：把任意几只股票“显示在菜单栏”，等宽数字不跳动；可以排成一行，也可以排成上下两行（名称在左边，价格在上、涨跌幅在下，字小一些，同样的地方能放下更多只）；多只时可以轮播，适合刘海屏；也可以设成休市时只显示图标。
-- **涨跌颜色**：红涨绿跌、绿涨红跌，或者“不显示红绿”，全部用系统默认的文字颜色，低调不显眼。面板可以单独设成浅色或深色。
-- **玻璃风格**：面板和设置窗口透出后面的桌面，和 [Proxi](https://github.com/whrss9527/proxi) 保持一致；用 Xcode 26 编译、运行在 macOS 26 上时使用系统的 Liquid Glass。
-- **键盘操作**：↑ ↓ 在搜索结果或自选里选择，回车添加或展开，展开后 ← → 切换分时和 K 线，配合全局快捷键可以完全不碰鼠标。
+- **Open and close in one click**: left-click the menu bar icon to open or close the panel; clicking outside it or pressing Esc closes it too. A global shortcut, ⌃⌥S by default and changeable in Settings, toggles it from any app.
+- **Hide in one click**: right-click the menu bar icon to switch between quotes and icon only, whenever you don't want others to see your quotes.
+- **Pin as a floating window**: click the pin at the top right and the panel stays open even when you click elsewhere; drag it anywhere and it reopens there next time.
+- **Menu bar quotes**: show any number of symbols in the menu bar with monospaced digits that don't jump around, on one line or on two (name on the left, price above % change in a smaller font, so more fit in the same space). Rotate through several, handy with a notch, or show just the icon while markets are closed.
+- **Price colors**: red up and green down, green up and red down, or "No Red or Green", which uses the system text color everywhere for a low-key look. The panel can be set to light or dark on its own.
+- **Glass design**: the panel and Settings window let the desktop show through, matching [Proxi](https://github.com/whrss9527/proxi); built with Xcode 26 and running on macOS 26, it uses the system's Liquid Glass.
+- **Keyboard control**: ↑ ↓ move through search results or the watchlist, Return adds or expands, and ← → switch charts when expanded. With the global shortcut you never need the mouse.
 
-### 行情和图表
+### Quotes and charts
 
-- **覆盖三地市场**：沪深北 A 股、港股、美股，以及上证指数、恒生指数、纳斯达克等指数和 ETF；美股个股在盘前盘后显示盘前盘后价（设置里可以关掉）。也能加场外基金，看每天的单位净值和涨跌、算持仓盈亏；还能加伦敦金、纽约原油这些国际期货和贵金属，以及美元人民币等外汇和美元指数，搜“黄金”“原油”“美元”就有，工作日全天都有行情，国际期货还有当天的分时（外汇没有走势图，都不能填持仓）。
-- **搜索添加**：输入代码、中文名或拼音首字母（`600519`、`腾讯`、`gzmt`、`aapl`），搜索结果直接带着现价和涨跌幅，回车添加第一条；一次粘贴多个代码（`600519 00700 AAPL`）可以批量添加。底部的排序菜单里能一键复制全部代码，粘贴到另一台 Mac 的搜索框就能全部加回来；也能复制持仓表格、买卖记录和盈亏记录，直接粘贴到 Numbers、Excel。
-- **自选管理**：拖动排序（只看某个分组时也能拖），或者按涨幅、跌幅排序；可以给自选分组（右键选“分组”），列表上方可以只看某个分组、A 股、港股、美股或者有持仓的；每一行现价左边画着当天的迷你分时（设置里可以关）；自选多时可以切成每只一行的紧凑列表；点右边的色块在涨跌幅、涨跌额、总市值之间切换；价格变动时轻轻闪一下；单击展开详情，看今开、最高、最低、成交额、换手率、市盈率、市值、52 周最高最低，A 股还有涨停价、跌停价、市净率和量比；右键可固定到菜单栏、设置持仓和提醒、在雪球查看、删除。
-- **分时和 K 线**：展开后可以在分时、五日、日 K、周 K、月 K 之间切换，K 线是前复权的最近 60 根，带 5、10、20 根的均线和成交量，个股的分时图、五日图上有均价线，分时图、五日图下面有成交量，图下面标着时间或日期；鼠标移到图上显示那一分钟的价格、均价和成交量，或那一根的开高低收、成交量和均线值。A 股个股还可以切到“五档”，看买一到买五、卖一到卖五的挂单，以及委比、委差和外盘内盘；切到“资金”看主力当天净流入的逐分钟累计，以及超大单、大单、中单、小单各自的净流入。填了持仓的在图上画成本线，K 线上用 B、S 标出记过的买卖。
-- **A 股涨跌榜**：排序菜单里的“A 股涨跌榜…”列出沪深京 A 股的涨幅榜、跌幅榜和成交额前 20 只，以及申万一级行业的涨跌排行和各自的领涨股，开着时每 30 秒刷新，可以不看新股；点一只加到自选。
-- **行情源自动切换**：腾讯的行情接口取不到时自动改用新浪财经的行情，恢复后自动切回，面板底部会标出“新浪行情”。
+- **Three markets**: Shanghai, Shenzhen and Beijing A-shares, Hong Kong and US stocks, indices such as the SSE Composite, Hang Seng and Nasdaq, and ETFs. US stocks show pre-market and after-hours prices outside regular hours (you can turn this off). Add mutual funds to see each day's NAV and change and track holdings. Add international futures and precious metals such as London gold and NYMEX crude, plus FX pairs such as USD/CNY and the US Dollar Index: search "gold", "oil" or "usd" (or 黄金, 原油, 美元). They quote around the clock on weekdays and futures have today's intraday chart (FX has no chart, and neither can hold positions).
+- **Search and add**: type a code, a Chinese name or its pinyin initials (`600519`, `腾讯`, `gzmt`, `aapl`); results show the price and % change right away, and Return adds the first one. Paste several codes at once (`600519 00700 AAPL`) to add them in a batch. The sort menu at the bottom copies all your codes, which you can paste into the search field on another Mac to add them all back, and it copies your holdings table, trades and P&L history for pasting into Numbers or Excel.
+- **Watchlist**: drag to reorder (also while a group is filtered), or sort by gain or loss. Put symbols into groups (right-click, Group), and filter the list by a group, A-shares, Hong Kong, US or holdings. Each row draws today's sparkline next to the price (you can turn it off); switch to a compact list with one line per symbol for long watchlists. Click the colored pill on the right to switch between % change, change and market cap; prices flash briefly when they change. Click a row to expand the details: open, high, low, turnover, turnover rate, P/E, market cap and 52-week high and low, plus limit up and down prices, P/B and volume ratio for A-shares. Right-click to pin to the menu bar, set holdings and alerts, view on Xueqiu or delete.
+- **Intraday and candlestick charts**: expanded, switch between 1D, 5D, daily, weekly and monthly. Candlesticks show the latest 60 forward-adjusted bars with 5, 10 and 20-period moving averages and volume; stock intraday and 5-day charts show the average price line and volume, with times or dates along the bottom. Hover to read the price, average and volume of that minute, or the open, high, low, close, volume and moving averages of that bar. A-share stocks can also switch to the order book (five bid and ask levels, bid ratio, bid−ask difference and buy and sell volume) and to fund flow (the cumulative net inflow of main funds today, minute by minute, and the net inflow of extra large, large, medium and small orders). With holdings, a cost line is drawn on the chart and recorded buys and sells are marked B and S on the candlesticks.
+- **A-share movers**: "A-Share Movers…" in the sort menu lists the top 20 gainers, losers and turnover among all Shanghai, Shenzhen and Beijing A-shares, plus the SW level 1 industries with their leaders. It refreshes every 30 seconds while open and can hide new listings; click one to add it to your watchlist.
+- **Automatic failover**: when Tencent's quote API is unavailable, Stox switches to Sina Finance quotes and switches back when Tencent recovers; the bottom of the panel shows "Sina quotes" meanwhile.
 
-### 持仓和提醒
+### Holdings and alerts
 
-- **持仓与盈亏**：给每只填上持有数量和成本价，列表里显示持仓盈亏比例，展开后看持仓盈亏和今日盈亏，列表上方按人民币、港币、美元分别合计（只看某个分组或市场时只算这些），几种货币都有时再按汇率折成人民币合计一行，还可以展开看每只占总市值多少，以及最近每个交易日赚了多少（本周、本月合计），也能打开盈亏日历按月看每天的今日盈亏，或者按年看每个月赚了多少；也可以在菜单栏显示今日盈亏或者持仓盈亏。买卖之后在编辑页“记一笔”，买入自动按加权平均重新算成本价，卖出记下这一笔赚了多少，分红送转也能记（成本价自动摊薄），合计卡片下面写着今年已实现的盈亏，今天的买卖也会算进今日盈亏；打开“收盘小结”后，有持仓的市场收盘时发一条今日盈亏通知。给别人看屏幕时，点合计里“市值”旁边的小眼睛把金额和持有数量换成 ****，只留比例，菜单栏和通知里也一样。
-- **备注**：给每只写一句备注，比如关注的理由，展开后显示，也跟着 iCloud 同步。
-- **价格提醒**：价格高于 / 低于、涨幅 / 跌幅达到阈值时发系统通知；填了持仓的还能按持仓盈亏比例止盈止损；还可以打开 A 股涨停、跌停提醒，创 52 周新高、新低提醒和 5 分钟异动提醒。每个条件每个交易日最多提醒一次，点通知直接展开那一只；错过的通知可以在“最近的提醒”里翻看。
+- **Holdings and P&L**: enter the shares and cost price of each holding. The list shows the total P&L %, the details show total and today's P&L, and the top of the list totals CNY, HKD and USD separately (only for the selected group or market when filtered); with several currencies, one more row converts everything to CNY at current rates. Expand it to see each holding's share of the total value and the P&L of recent trading days (with this week and this month), open the P&L calendar to see each day by month or each month by year, or show today's or total P&L in the menu bar. After you trade, use "Record" on the edit page: buys recalculate the cost as a weighted average, sells record the profit of that trade, and dividends and bonus shares can be recorded too (diluting the cost). The total card shows this year's realized P&L, and today's trades count toward today's P&L. With "close summary" on, you get a notification with today's P&L when a market you hold closes. When sharing your screen, click the eye next to "Value" in the total to turn amounts and share counts into **** and keep only percentages, in the menu bar and notifications too.
+- **Notes**: write a note for each symbol, such as why you're watching it; it shows in the details and syncs through iCloud.
+- **Price alerts**: get a notification when the price goes above or below a target or the % change reaches a threshold; with holdings, set take-profit and stop-loss levels on your total P&L %. You can also turn on alerts for A-shares hitting limit up or down, new 52-week highs and lows, and sudden 5-minute moves. Each condition alerts at most once per trading day, clicking the notification expands that symbol, and missed alerts are kept in "Recent Alerts".
 
-### 同步、更新和其他
+### Sync, updates and more
 
-- **iCloud 同步和备份**：自选、每只的提醒和简称、刷新和颜色这些设置，通过 iCloud 云盘在多台 Mac 之间同步；不开 iCloud 也可以导出成文件备份，再在另一台 Mac 上导入。
-- **检查更新、一键更新**：发现新版本时面板底部出现“更新”按钮，点一下自动下载、校验、替换并重新启动；隔了几个版本才更新时，会列出中间每个版本更新了什么。
-- **省电**：休市和午休时自动降到每分钟刷新一次，节假日根据行情时间自动识别；电脑睡眠时停止请求。
-- **其他**：登录时自动启动；设置在独立的窗口里，从面板底部的齿轮按钮打开。
+- **iCloud sync and backup**: your watchlist, each symbol's alerts and short name, and settings such as refresh and colors sync between Macs through iCloud Drive; without iCloud you can export them to a file and import it on another Mac.
+- **Update checks and one-click updates**: when a new version is out, an "Update" button appears at the bottom of the panel; one click downloads, verifies, replaces and relaunches. If you skipped a few versions, it lists what changed in each of them.
+- **Power saving**: refreshes only once a minute while markets are closed or at lunch, recognizes holidays from the quotes, and stops requesting while the Mac sleeps.
+- **More**: launch at login; Settings has its own window, opened with the gear at the bottom of the panel; the interface is in English or Simplified Chinese, following your system language.
 
-行情来自腾讯财经公开接口（取不到时用新浪财经），免费、无需注册和 API Key。港股行情延时约 15 分钟。数据仅供参考，不构成投资建议。
+Quotes come from Tencent Finance's public API (Sina Finance as a fallback): free, with no sign-up or API key. Hong Kong quotes are delayed by about 15 minutes. The data is for reference only and is not investment advice. Stock names come from the quote API and are shown in Chinese; the changelog and release notes are written in Chinese.
 
-## 使用
+## Usage
 
-| 操作 | 效果 |
+| Action | Result |
 |---|---|
-| 左键单击菜单栏图标 | 打开 / 关闭面板 |
-| 右键单击菜单栏图标（或 Control + 单击） | 菜单栏在“显示行情”和“只显示图标”之间切换 |
-| ⌃⌥S（可在设置里改） | 在任何 App 里打开 / 关闭面板 |
-| Esc | 清空搜索 → 返回列表 → 关闭面板 |
-| 面板底部的齿轮 / 电源按钮 | 打开设置窗口 / 退出 Stox |
-| 单击一行 | 展开 / 收起详情和走势图 |
-| ↑ ↓ | 搜索时选择搜索结果，否则选择自选里的一行 |
-| 回车 | 添加选中的搜索结果（没选时添加第一条）；展开 / 收起选中的一行 |
-| ← → | 展开时切换分时、五日、日 K、周 K、月 K（A 股还有五档和资金） |
-| 拖动一行 | 调整顺序 |
-| 右键单击一行 | 显示在菜单栏、持仓提醒与简称、在雪球查看、复制代码、删除 |
-| 单击一行右边的色块 | 在涨跌幅、涨跌额、总市值之间切换 |
-| 面板底部的排序按钮 | 自定义顺序、涨幅或跌幅从高到低、持仓盈亏从高到低，色块显示什么，复制代码、持仓表格、买卖记录和盈亏记录，新建分组，最近的提醒，盈亏日历，A 股涨跌榜 |
-| ⌘R / ⌘, / ⌘Q | 面板打开时：刷新 / 设置 / 退出 |
+| Left-click the menu bar icon | Open / close the panel |
+| Right-click the menu bar icon (or Control-click) | Switch the menu bar between quotes and icon only |
+| ⌃⌥S (changeable in Settings) | Open / close the panel from any app |
+| Esc | Clear the search → back to the list → close the panel |
+| Gear / power button at the bottom of the panel | Open Settings / quit Stox |
+| Click a row | Expand / collapse details and charts |
+| ↑ ↓ | Select a search result while searching, otherwise a row in the watchlist |
+| Return | Add the selected search result (the first one if none is selected); expand / collapse the selected row |
+| ← → | When expanded, switch between 1D, 5D, daily, weekly and monthly (plus order book and fund flow for A-shares) |
+| Drag a row | Reorder |
+| Right-click a row | Show in menu bar, holdings, alerts and short name, view on Xueqiu, copy symbol, delete |
+| Click the pill on the right of a row | Switch between % change, change and market cap |
+| Sort button at the bottom of the panel | Custom order, top gainers, top losers or highest total P&L first; what the pill shows; copy symbols, holdings table, trades and P&L history; new group; recent alerts; P&L calendar; A-share movers |
+| ⌘R / ⌘, / ⌘Q | While the panel is open: refresh / Settings / quit |
 
-搜索框也接受直接输入代码，多个代码用空格、逗号或换行分开时会列出来，回车后先查一次行情，把存在的代码一起加进自选：
+The search field also takes codes directly. Separate several codes with spaces, commas or new lines and they're listed; press Return to check their quotes once and add all that exist to your watchlist:
 
-| 输入 | 识别为 |
+| Input | Recognized as |
 |---|---|
-| `600519`、`sh600519`、`600519.SS` | 沪市 贵州茅台 |
-| `000001`、`000001.SZ` | 深市 平安银行（上证指数请输入 `sh000001`） |
-| `920819`、`bj920819` | 北交所 |
-| `700`、`00700`、`0700.HK` | 港股 腾讯控股 |
-| `hkHSI` | 恒生指数 |
-| `AAPL`、`brk.b` | 美股 |
-| `us.IXIC`、`us.DJI`、`us.INX` | 纳斯达克、道琼斯、标普 500 |
+| `600519`, `sh600519`, `600519.SS` | Shanghai: Kweichow Moutai |
+| `000001`, `000001.SZ` | Shenzhen: Ping An Bank (for the SSE Composite, enter `sh000001`) |
+| `920819`, `bj920819` | Beijing Stock Exchange |
+| `700`, `00700`, `0700.HK` | Hong Kong: Tencent |
+| `hkHSI` | Hang Seng Index |
+| `AAPL`, `brk.b` | US stocks |
+| `us.IXIC`, `us.DJI`, `us.INX` | Nasdaq, Dow Jones, S&P 500 |
 
-### iCloud 同步
+### iCloud sync
 
-在设置窗口的“iCloud 同步”页打开开关即可，需要这台 Mac 已经打开 iCloud 云盘。同步的是自选列表（顺序、菜单栏固定、简称、持仓、价格提醒、分组）和刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关；“只显示图标”、面板外观、快捷键、登录时启动这些只和本机有关的设置不同步。
+Turn on the switch on the iCloud Sync page of Settings; iCloud Drive must be on for this Mac. What syncs: the watchlist (order, menu bar pins, short names, holdings, price alerts, groups) and the refresh interval, menu bar content, price colors and alert switches. Settings that only concern this Mac, such as icon only, panel appearance, keyboard shortcut and launch at login, don't sync.
 
-数据保存在 iCloud 云盘的 `Stox/sync.json` 里。另一台 Mac 第一次开启时，如果 iCloud 里已经有自选，可以选择用 iCloud 的、用本机的，或者把两边合并。之后任何一台的改动几秒内就会出现在其他 Mac 上；改完马上退出也不要紧，下次启动时会先把本机的改动写上去。多台 Mac 同步持仓时，请把它们都更新到 0.3.0 或更新版本，同步分组时都更新到 0.19.0 或更新版本，旧版本写入时会丢掉这些内容。
+The data is stored in `Stox/sync.json` in iCloud Drive. When another Mac turns on sync for the first time and iCloud already has a watchlist, you can use iCloud's, use this Mac's, or merge both. After that, changes on any Mac show up on the others within seconds; quitting right after a change is fine, because the next launch writes the local changes first. When syncing holdings across Macs, update all of them to 0.3.0 or later, and to 0.19.0 or later for groups; older versions drop these when they write.
 
-### 更新
+### Updates
 
-<img src="docs/images/update.jpg" width="300" alt="面板底部的更新条" align="right">
+<img src="docs/images/update.jpg" width="300" alt="The update bar at the bottom of the panel" align="right">
 
-每个版本改了什么见 [更新日志](CHANGELOG.md)。Stox 启动后和之后每 6 小时检查一次 [GitHub Releases](https://github.com/whrss9527/stox/releases)，发现新版本时发一条通知，面板底部出现“更新”按钮。点一下会下载 `Stox.zip`，用发布附带的 SHA-256 校验，确认是同一个 App 并且签名完整后替换程序并重新启动，自选和设置都会保留。从“下载”文件夹直接运行时，新版本会装进“应用程序”，旧的那份移到废纸篓。不想自动检查可以在“关于与更新”页关掉。
+See the [changelog](CHANGELOG.md) (in Chinese) for what changed in each version. Stox checks [GitHub Releases](https://github.com/whrss9527/stox/releases) at launch and every 6 hours after; when a new version is out, it sends a notification and an "Update" button appears at the bottom of the panel. One click downloads `Stox.zip`, verifies it against the SHA-256 published with the release, confirms it's the same app with an intact signature, replaces the app and relaunches, keeping your watchlist and settings. If you run it straight from Downloads, the new version is installed into Applications and the old copy goes to the Trash. You can turn off automatic checks on the About & Updates page.
 
 <br clear="right">
 
-## 开发
+## Development
 
 ```
 Sources/
-  StoxCore/   与界面无关的逻辑：代码解析、腾讯行情与搜索解析、交易时段、提醒、格式化、同步文件格式与合并规则、
-              发布信息解析与安装位置判断（Linux 上也能编译测试）
-  Stox/       菜单栏 App：NSStatusItem + 玻璃面板（NSPanel）+ SwiftUI，设置窗口、iCloud 同步、更新
-  StoxCLI/    命令行调试工具 stox-cli
-Tests/StoxCoreTests/   单元测试，使用真实接口返回作为样本
+  StoxCore/   UI-independent logic: symbol parsing, Tencent quote and search parsing, trading hours, alerts,
+              formatting, sync file format and merge rules, release info and install location (builds and tests on Linux)
+  Stox/       The menu bar app: NSStatusItem + glass panel (NSPanel) + SwiftUI, Settings window, iCloud sync, updates
+  StoxCLI/    The stox-cli debugging tool
+Resources/             Info.plist, and the English (en.lproj) and Simplified Chinese (zh-Hans.lproj) interface strings
+Tests/StoxCoreTests/   Unit tests, using real API responses as samples
 scripts/
-  build-app.sh         编译并组装、签名 Stox.app
-  make-icon.swift      生成 App 图标
-  check-datasources.sh 打印行情接口的原始返回，排查格式变化
-  ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新
+  build-app.sh           Build, assemble and sign Stox.app
+  make-icon.swift        Generate the app icon
+  check-datasources.sh   Print raw quote API responses to spot format changes
+  check-localization.py  Check that the English and Simplified Chinese strings are complete and consistent
+  ci-e2e.sh              CI end-to-end tests: launch, screenshots, iCloud sync, one-click update
 ```
 
-用命令行检查数据源：
+### Interface languages
+
+User-visible text is written in Chinese as `L("中文原文", arguments…)` (see `Sources/StoxCore/AppLanguage.swift`). The Chinese source is the key in `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings`, which `scripts/build-app.sh` copies into the app. Arguments use `%@` placeholders, and translations can reorder them with `%1$@`, `%2$@`. When you add or change text, update both tables and run `python3 scripts/check-localization.py` (`make test` runs it too); CI runs it on every push. To try the English interface without changing your system language:
+
+```bash
+dist/Stox.app/Contents/MacOS/Stox --show-panel -AppleLanguages '(en)'
+```
+
+Check the data sources from the command line:
 
 ```bash
 swift run stox-cli quote sh600519 700 AAPL us.IXIC
 swift run stox-cli search 茅台
 swift run stox-cli raw hk00700
-swift run stox-cli kline usAAPL week      # 最近几根 K 线（day、week、month）
-swift run stox-cli book sh600519          # A 股的买卖五档和内外盘
-swift run stox-cli rank gainers 10        # A 股涨跌榜（gainers、losers、turnover、industries）
-swift run stox-cli sina sh600519 700 AAPL # 备用的新浪行情
-swift run stox-cli latest-release 0.1.0   # GitHub 上的最新发布，以及能不能一键更新
+swift run stox-cli kline usAAPL week      # the latest candles (day, week, month)
+swift run stox-cli book sh600519          # A-share order book and buy/sell volume
+swift run stox-cli rank gainers 10        # A-share movers (gainers, losers, turnover, industries)
+swift run stox-cli sina sh600519 700 AAPL # the fallback Sina quotes
+swift run stox-cli latest-release 0.1.0   # the latest GitHub release and whether it can be installed in one click
 ```
 
-调试界面时，可以让 App 启动后直接打开面板或设置窗口，并在终端打印菜单栏文字和窗口位置：
+When working on the UI, you can have the app open the panel or Settings window right after launch and print the menu bar text and window positions in the terminal:
 
 ```bash
-dist/Stox.app/Contents/MacOS/Stox --show-panel                    # 自选列表
-dist/Stox.app/Contents/MacOS/Stox --show-panel --expand sh600519  # 展开某只证券的详情
-dist/Stox.app/Contents/MacOS/Stox --show-panel --search 腾讯       # 预填搜索词
-dist/Stox.app/Contents/MacOS/Stox --show-settings display         # 设置窗口：general、display、sync、about
-dist/Stox.app/Contents/MacOS/Stox --check-update --show-panel     # 先检查一次更新
+dist/Stox.app/Contents/MacOS/Stox --show-panel                    # the watchlist
+dist/Stox.app/Contents/MacOS/Stox --show-panel --expand sh600519  # expand the details of a symbol
+dist/Stox.app/Contents/MacOS/Stox --show-panel --search 腾讯       # prefill the search field
+dist/Stox.app/Contents/MacOS/Stox --show-settings display         # Settings: general, display, sync, about
+dist/Stox.app/Contents/MacOS/Stox --check-update --show-panel     # check for updates first
 ```
 
-测试同步和更新时可以用环境变量换掉真实的 iCloud 云盘和 GitHub：
+To test sync and updates, environment variables replace the real iCloud Drive and GitHub:
 
-| 环境变量 | 作用 |
+| Environment variable | Effect |
 |---|---|
-| `STOX_SYNC_DIR=/tmp/fake-icloud` | 同步文件放在这个文件夹，而不是 iCloud 云盘/Stox |
-| `STOX_UPDATE_URL=http://127.0.0.1:8765/latest.json` | 从这里读取“最新发布”，格式同 GitHub 的 releases 接口 |
-| `STOX_TEST_TRANSLOCATED=1` | 当作从只读的临时位置运行，更新会装进“应用程序” |
+| `STOX_SYNC_DIR=/tmp/fake-icloud` | Put the sync file in this folder instead of iCloud Drive/Stox |
+| `STOX_UPDATE_URL=http://127.0.0.1:8765/latest.json` | Read the "latest release" from here, in the format of GitHub's releases API |
+| `STOX_TEST_TRANSLOCATED=1` | Act as if running from a read-only temporary location, so updates install into Applications |
 
-CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设置窗口并截图；用假的 iCloud 云盘文件夹测试同步；用本地的假发布把程序真正更新到 9.9.9 并确认重新启动。
+CI launches the packaged app on macOS: it opens the panel, details, search and Settings window and takes screenshots (in Chinese, then a few in English); tests sync with a fake iCloud Drive folder; and really updates the app to 9.9.9 from a local fake release and confirms it relaunches.
 
-### 发布新版本
+### Releasing a new version
 
-发版由 `CHANGELOG.md` 驱动，用的是 [Frit](https://github.com/whrss9527/frit) 里共用的发布流程：
+Releases are driven by `CHANGELOG.md`, using the shared release workflow in [Frit](https://github.com/whrss9527/frit):
 
-1. 在 `CHANGELOG.md` 最上面加一节新版本，比如 `## 0.46.0`，内容会放进发布说明，App 的“关于与更新”页显示的也是这一节；
-2. 推到 main（或者合并进 main）。build 通过后，最后一步 release 发现这个版本还没有 `v0.46.0` 标签，就打包通用版 `Stox.zip`、生成校验文件 `SHA256SUMS.txt`，打上标签并发布。已安装的 Stox 下一次检查时就会提示更新。
+1. Add a section for the new version at the top of `CHANGELOG.md`, such as `## 0.46.0`. It goes into the release notes, and the About & Updates page in the app shows this section too.
+2. Push to main (or merge into main). After the build passes, the final release job sees that there is no `v0.46.0` tag yet, packages a universal `Stox.zip`, generates the `SHA256SUMS.txt` checksum file, tags and publishes it. Installed copies of Stox offer the update at their next check.
 
-仓库的 Secrets 里配了 Developer ID 证书和公证凭据时，发布的包会用证书签名并通过苹果公证，用户下载后双击就能打开；没配时照旧临时签名。配置方法见 Frit 的 [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md)。
+When the repository secrets hold a Developer ID certificate and notarization credentials, the release is signed with the certificate and notarized by Apple, so users can open it with a double-click; otherwise it's ad-hoc signed as before. See Frit's [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md) for the setup.
 
-也可以在 Actions 页面手动运行 release：不填标签就发 `CHANGELOG.md` 最上面的版本；勾选 overwrite 可以用原标签的代码重新打包、替换附件。
+You can also run the release workflow by hand on the Actions page: leave the tag empty to release the version at the top of `CHANGELOG.md`, or check overwrite to rebuild from the existing tag and replace the assets.
 
-设计取舍见 [docs/DESIGN.md](docs/DESIGN.md)。
+See [docs/DESIGN.md](docs/DESIGN.md) (in Chinese) for the design decisions.
 
-## 许可证
+## License
 
 Copyright © 2026 whrss9527
 
-Stox 是自由软件，以 [GNU 通用公共许可证第 3 版（GPL-3.0）](LICENSE) 发布：可以自由使用、研究、修改和分享；分发 Stox 或修改后的版本时，需要以同样的许可证提供源代码。
+Stox is free software, released under the [GNU General Public License v3.0 (GPL-3.0)](LICENSE): you may use, study, modify and share it freely; if you distribute Stox or a modified version, you must provide the source code under the same license.
 
-「Stox」这个名字和 Stox 的图标不在 GPL 授权范围内（GPL-3.0 第 7 条 e 项）。介绍 Stox、分享未经修改的副本时可以使用；分发修改后的版本时，请换用自己的名字和图标。
+The name "Stox" and the Stox icon are not licensed under the GPL (GPL-3.0 section 7(e)). You may use them to talk about Stox and to share unmodified copies; if you distribute a modified version, please use your own name and icon.
 
-贡献需接受 [CONTRIBUTING.md](CONTRIBUTING.md) 里的贡献者协议。
+Contributions are subject to the contributor agreement in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
 <div align="center">
-  <p><b>同样住在菜单栏里</b></p>
-  <a href="https://github.com/whrss9527/pop"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/pop.svg" width="30%" alt="Pop：长按右键，一划即达"></a>
-  <a href="https://github.com/whrss9527/meno"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/meno.svg" width="30%" alt="Meno：安静的菜单栏，由玻璃打造"></a>
-  <a href="https://github.com/whrss9527/proxi"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/proxi.svg" width="30%" alt="Proxi：一个开关，管好所有代理"></a>
+  <p><b>Also living in the menu bar</b></p>
+  <a href="https://github.com/whrss9527/pop"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/pop.svg" width="30%" alt="Pop: long-press right-click, one swipe away"></a>
+  <a href="https://github.com/whrss9527/meno"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/meno.svg" width="30%" alt="Meno: a calm menu bar, made with glass"></a>
+  <a href="https://github.com/whrss9527/proxi"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/proxi.svg" width="30%" alt="Proxi: one switch for all your proxies"></a>
 </div>
