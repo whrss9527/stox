@@ -210,6 +210,7 @@ A 股涨跌榜来自腾讯的榜单接口 `proxy.finance.qq.com/cgi/cgi-bin/rank
 - 两台 Mac 同时改动时 iCloud 会留下冲突版本：比较所有版本的写入时间，晚的胜出，写回去并清掉其他版本。
 - 第一次开启时 iCloud 里已经有自选，就问用户：用 iCloud 的、用本机的，或者合并（以 iCloud 的顺序和每只的设置为准，本机独有的追加在后面）。
 - 读不懂的条目跳过而不是整份失败；更新版本的 Stox 写的新格式读不懂时报错，而不是用本机数据覆盖它。
+- App Store 版在沙盒里，读不到 iCloud 云盘里的其他文件夹，改用 App 自己的 iCloud 容器 `iCloud.io.github.whrss9527.stox`（`容器/Documents/sync.json`，格式不变）。位置由 `SyncLocation.resolve` 决定：`STOX_SYNC_DIR` > 签名里有容器的 entitlement 时的容器 > iCloud 云盘/Stox。有没有 entitlement 用 `SecTaskCopyValueForEntitlement` 看，没有时不碰容器的接口，GitHub 版的行为不变；容器地址在后台线程上用 `FileManager.url(forUbiquityContainerIdentifier:)` 要（第一次可能要几秒），要到之前同步先等着。两个版本之间不互通，详见 [app-store.md](app-store.md)。
 
 ### 备份到文件
 
@@ -222,6 +223,10 @@ A 股涨跌榜来自腾讯的榜单接口 `proxy.finance.qq.com/cgi/cgi-bin/rank
 - 替换时先把新程序挪到同一个文件夹里的隐藏名字，旧的挪开，再改名，失败就换回去。文件夹没有写权限（标准账户装在“应用程序”里）时用系统的授权对话框以管理员身份做同样的事；被 macOS 的“App 管理”保护拦住时提示去系统设置里允许。
 - 从“下载”文件夹直接打开的 App 会被系统搬到只读的临时位置运行（App Translocation）。这时更新装进“应用程序”（没有写权限时装进 `~/Applications`），旧的那份移到废纸篓，从新位置重新打开。
 - 自选和设置在 UserDefaults 里，和程序文件无关，更新后都保留。
+
+### App Store 版
+
+App Store 版编译时加 `-D APP_STORE`（`STOX_FLAVOR=appstore scripts/build-app.sh`，用单独的编译目录 `.build/appstore`）：`Updater`、`UpdateInstaller`、更新条、“检查更新”菜单、“自动检查更新”开关、`Shell` 都不编译进去，“已更新到 x.y.z”的卡片也不显示（不去 GitHub 取更新内容），更新交给 App Store（审核指南 2.4.5）。其他功能相同，沙盒里的 entitlement 只有联网、用户选择的文件（备份到文件）和 iCloud。上架步骤见 [app-store.md](app-store.md)。
 
 ## 12. 发布说明
 
@@ -246,6 +251,7 @@ A 股涨跌榜来自腾讯的榜单接口 `proxy.finance.qq.com/cgi/cgi-bin/rank
 - **行情源切换测试**：用 `STOX_QUOTE_ENDPOINT` 把腾讯的行情地址指向一个连不上的端口，确认自动改用新浪、列表照常有行情。
 - **启动测试**：CI 启动打包好的 App，分别打开自选列表、展开详情（分时、A 股日 K、美股月 K）、搜索结果、设置窗口的各页，以及右键切换后的“只显示图标”，并用 `--keys` 模拟方向键和回车，检查选中和展开的是不是预期的那一只；进程中途退出就判定失败，同时记录内存占用。每个页面都会截图并作为构建产物上传；提交信息带 `[screenshots]` 时，截图还会以检查注释的形式发布，可以通过 GitHub API 取回。
 - **iCloud 同步测试**：用 `STOX_SYNC_DIR` 指向一个假的 iCloud 云盘文件夹，里面放好“另一台 Mac”写的文件。确认启动时拉取并应用（包括“不显示红绿”），运行中文件被替换后几秒内收到改动，文件被删后把本机的写回去；再模拟本机改完没来得及写上去就退出，确认下次启动时写上去而不是被覆盖。
+- **App Store 版测试**：另一个任务用 ad-hoc 签名打一个带沙盒的 App Store 版（`ADHOC=1 scripts/build-app-store.sh`，去掉要描述文件的 iCloud entitlement），确认程序里没有更新相关的类型，启动后在沙盒里运行、取得到行情、面板和设置窗口打得开、同步文件写得进容器，并做 1440×900 的 App Store 截图。
 - **一键更新测试**：用打包好的程序造一个 9.9.9 版本，放在本地 HTTP 服务器上当作最新发布（`STOX_UPDATE_URL`）。确认发现新版本，原地下载、校验、替换并以 9.9.9 重新启动；再模拟从临时位置运行，确认装进“应用程序”、旧的移到废纸篓、新程序没有隔离标记。
 - **数据源巡检**：`datasources` 工作流每周打印一次接口原始返回。
 

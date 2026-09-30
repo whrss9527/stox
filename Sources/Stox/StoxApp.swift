@@ -17,7 +17,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let settings = SettingsStore()
     private lazy var store = QuoteStore(settings: settings)
-    private let updater = Updater()
+    #if !APP_STORE
+    private let updater = Updater.shared
+    #endif
     private lazy var sync = SyncManager(store: store, settings: settings)
     private var statusController: StatusItemController?
     private var hotKey: HotKey?
@@ -26,10 +28,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installSignalHandlers()
-        MainMenu.install(updater: updater)
-        let controller = StatusItemController(store: store, settings: settings, updater: updater, sync: sync)
+        MainMenu.install()
+        let controller = StatusItemController(store: store, settings: settings, sync: sync)
         statusController = controller
-        SettingsWindowController.shared.configure(settings: settings, store: store, updater: updater, sync: sync)
+        SettingsWindowController.shared.configure(settings: settings, store: store, sync: sync)
 
         Notifier.shared.setUp()
         Notifier.shared.onOpen = { [weak self] route in
@@ -49,18 +51,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.onCloseSummary = { note in
             Notifier.shared.postSummary(note)
         }
+        #if !APP_STORE
         updater.notify = { title, body in
             Notifier.shared.postUpdate(title: title, body: body)
         }
         updater.onRelaunch = {
             NSApp.terminate(nil)
         }
+        #endif
 
         store.start()
         sync.start()
+        #if !APP_STORE
         updater.startAutomaticChecks { [weak self] in
             self?.settings.autoCheckUpdates ?? false
         }
+        #endif
 
         settings.$hotKeyEnabled.combineLatest(settings.$toggleHotkey)
             .removeDuplicates { $0 == $1 }
@@ -137,8 +143,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///        [--rank]                                           直接打开 A 股涨跌榜
     ///        [--export-backup 路径] [--import-backup 路径]       启动时导出备份，或者用备份替换自选（不问）
     ///   Stox --show-settings [general|display|sync|about]      打开设置窗口并打印窗口位置
-    ///   Stox --check-update                                    先检查一次更新再打开上面两者
-    ///   Stox --install-update                                  检查并直接安装新版本
+    ///   Stox --check-update                                    先检查一次更新再打开上面两者（只有 GitHub 版）
+    ///   Stox --install-update                                  检查并直接安装新版本（只有 GitHub 版）
     private func handleLaunchArguments() {
         let arguments = ProcessInfo.processInfo.arguments
         func value(after flag: String) -> String? {
@@ -148,9 +154,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let showPanel = arguments.contains("--show-panel")
         let showSettings = arguments.contains("--show-settings")
+        #if APP_STORE
+        let checkUpdate = false
+        let installUpdate = false
+        #else
         let checkUpdate = arguments.contains("--check-update")
         let installUpdate = arguments.contains("--install-update")
+        #endif
         guard showPanel || showSettings || checkUpdate || installUpdate else { return }
+        // CI 用：是哪个版本、是不是在沙盒里运行（沙盒里系统会设 APP_SANDBOX_CONTAINER_ID）。
+        let sandboxed = ProcessInfo.processInfo.environment["APP_SANDBOX_CONTAINER_ID"] != nil
+        print("STOX_DIAG flavor=\(AppInfo.flavor) sandboxed=\(sandboxed) sync_container=\(CloudFile.hasContainerEntitlement)")
+        fflush(stdout)
         let page = value(after: "--show-settings").flatMap(SettingsPage.init(rawValue:))
         let expand = value(after: "--expand").flatMap { Symbol($0) }
         let search = value(after: "--search")
@@ -184,6 +199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 4_000_000_000)
             guard let self else { return }
+            #if !APP_STORE
             if installUpdate {
                 await self.updater.checkAndInstall()
                 return
@@ -191,6 +207,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if checkUpdate {
                 await self.updater.check(manual: true)
             }
+            #endif
             if showSettings {
                 SettingsWindowController.shared.show(page: page ?? .general)
                 try? await Task.sleep(nanoseconds: 2_000_000_000)

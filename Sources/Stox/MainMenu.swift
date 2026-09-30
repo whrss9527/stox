@@ -5,13 +5,14 @@ import StoxCore
 /// 设置窗口打开期间程序临时切成普通 App，这时屏幕顶端也会显示它。
 enum MainMenu {
     @MainActor
-    static func install(updater: Updater) {
-        MenuActions.shared.updater = updater
+    static func install() {
         let mainMenu = NSMenu()
 
         let appMenu = NSMenu(title: "Stox")
         appMenu.addItem(withTitle: L("关于 Stox"), action: #selector(MenuActions.showAbout(_:)), keyEquivalent: "").target = MenuActions.shared
+        #if !APP_STORE
         appMenu.addItem(withTitle: L("检查更新…"), action: #selector(MenuActions.checkForUpdates(_:)), keyEquivalent: "").target = MenuActions.shared
+        #endif
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: L("设置…"), action: #selector(MenuActions.showSettings(_:)), keyEquivalent: ",").target = MenuActions.shared
         appMenu.addItem(.separator())
@@ -52,8 +53,6 @@ enum MainMenu {
 final class MenuActions: NSObject {
     static let shared = MenuActions()
 
-    weak var updater: Updater?
-
     @objc func showSettings(_ sender: Any?) {
         SettingsWindowController.shared.show(page: nil)
     }
@@ -62,9 +61,10 @@ final class MenuActions: NSObject {
         SettingsWindowController.shared.show(page: .about)
     }
 
+    #if !APP_STORE
     @objc func checkForUpdates(_ sender: Any?) {
         SettingsWindowController.shared.show(page: .about)
-        guard let updater else { return }
-        Task { await updater.check(manual: true) }
+        Task { await Updater.shared.check(manual: true) }
     }
+    #endif
 }

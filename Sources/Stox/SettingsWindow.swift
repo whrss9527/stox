@@ -17,7 +17,12 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: return L("通用")
         case .display: return L("显示")
         case .sync: return L("iCloud 同步")
-        case .about: return L("关于与更新")
+        case .about:
+            #if APP_STORE
+            return L("关于")
+            #else
+            return L("关于与更新")
+            #endif
         }
     }
 
@@ -45,14 +50,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     private var window: NSWindow?
     private var settings: SettingsStore?
     private var store: QuoteStore?
-    private var updater: Updater?
     private var sync: SyncManager?
     private var appearanceSubscription: AnyCancellable?
 
-    func configure(settings: SettingsStore, store: QuoteStore, updater: Updater, sync: SyncManager) {
+    func configure(settings: SettingsStore, store: QuoteStore, sync: SyncManager) {
         self.settings = settings
         self.store = store
-        self.updater = updater
         self.sync = sync
         appearanceSubscription = settings.$appearance.sink { [weak self] mode in
             self?.window?.appearance = mode.nsAppearance
@@ -78,8 +81,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 
     private func makeWindow() -> NSWindow? {
-        guard let settings, let store, let updater, let sync else { return nil }
-        let root = SettingsRootView(navigation: navigation, settings: settings, store: store, updater: updater, sync: sync)
+        guard let settings, let store, let sync else { return nil }
+        let root = SettingsRootView(navigation: navigation, settings: settings, store: store, sync: sync)
         let hosting = NSHostingController(rootView: root)
         let window = NSWindow(contentViewController: hosting)
         window.title = L("Stox 设置")
@@ -117,7 +120,6 @@ struct SettingsRootView: View {
     @ObservedObject var navigation: SettingsNavigation
     let settings: SettingsStore
     let store: QuoteStore
-    let updater: Updater
     let sync: SyncManager
 
     var body: some View {
@@ -159,7 +161,7 @@ struct SettingsRootView: View {
         case .general: GeneralPage(settings: settings)
         case .display: DisplayPage(settings: settings)
         case .sync: SyncPage(sync: sync, store: store)
-        case .about: AboutPage(settings: settings, updater: updater)
+        case .about: AboutPage(settings: settings)
         }
     }
 }
@@ -429,9 +431,18 @@ struct SyncPage: View {
     /// 导出、导入之后的结果说明。
     @State private var backupMessage: String?
 
+    /// App Store 版的同步文件在 App 自己的 iCloud 容器里，不在 iCloud 云盘的文件夹里。
+    private var subtitle: String {
+        #if APP_STORE
+        return L("通过 iCloud 在多台 Mac 之间同步自选和设置")
+        #else
+        return L("通过 iCloud 云盘在多台 Mac 之间同步自选和设置")
+        #endif
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: L("iCloud 同步"), subtitle: L("通过 iCloud 云盘在多台 Mac 之间同步自选和设置"))
+            PageHeader(title: L("iCloud 同步"), subtitle: subtitle)
             Form {
                 Section(L("同步")) {
                     Toggle(L("通过 iCloud 同步自选和设置"), isOn: toggle)
@@ -479,11 +490,20 @@ struct SyncPage: View {
                 }
                 Section(L("会同步什么")) {
                     FormNote(L("自选列表的内容和顺序、每只的菜单栏固定、简称、备注、分组、持仓和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。"))
+                    #if APP_STORE
+                    FormNote(L("“只显示图标”、面板外观、快捷键、登录时启动只和这台 Mac 有关，不同步。"))
+                    #else
                     FormNote(L("“只显示图标”、面板外观、快捷键、登录时启动、自动检查更新只和这台 Mac 有关，不同步。"))
+                    #endif
                 }
                 Section(L("怎么同步")) {
+                    #if APP_STORE
+                    FormNote(L("文件放在 Stox 在 iCloud 里自己的空间，在 iCloud 云盘里看不到。另一台 Mac 开启同步时会读到它，可以选择用 iCloud 的、用本机的，或者把两边的自选合并。之后任何一台的改动几秒内就会出现在其他 Mac 上，两台同时改动时以晚的为准。"))
+                    FormNote(L("从 GitHub 下载的 Stox 通过 iCloud 云盘的 Stox 文件夹同步，和这里不互通。换用这个版本时，用上面的“备份到文件”把自选搬过来。"))
+                    #else
                     FormNote(L("文件放在 iCloud 云盘的 Stox 文件夹里。另一台 Mac 开启同步时会读到它，可以选择用 iCloud 的、用本机的，或者把两边的自选合并。之后任何一台的改动几秒内就会出现在其他 Mac 上，两台同时改动时以晚的为准。"))
                     FormNote(L("第一次开启时系统可能会询问是否允许 Stox 访问 iCloud 云盘，需要允许。"))
+                    #endif
                 }
             }
             .formStyle(.grouped)
@@ -599,6 +619,7 @@ struct SyncPage: View {
                 Label(message, systemImage: "xmark.icloud")
                     .foregroundStyle(.orange)
                     .multilineTextAlignment(.trailing)
+                #if !APP_STORE
                 Button(L("打开隐私设置")) {
                     NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")!)
                 }
@@ -606,6 +627,7 @@ struct SyncPage: View {
                 Text(L("如果拒绝过访问 iCloud 云盘，在“文件和文件夹”里允许 Stox 访问。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                #endif
             }
         }
     }
@@ -631,11 +653,10 @@ struct SyncPage: View {
 @MainActor
 struct AboutPage: View {
     @ObservedObject var settings: SettingsStore
-    let updater: Updater
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: L("关于与更新"), subtitle: L("Stox 菜单栏行情"))
+            PageHeader(title: SettingsPage.about.title, subtitle: L("Stox 菜单栏行情"))
             ScrollView {
                 VStack(spacing: 16) {
                     aboutCard
@@ -666,9 +687,11 @@ struct AboutPage: View {
                 Button("GitHub") { NSWorkspace.shared.open(AppInfo.repositoryURL) }
                 Button(L("反馈问题")) { NSWorkspace.shared.open(AppInfo.issuesURL) }
             }
+            #if !APP_STORE
             Divider()
                 .padding(.horizontal, 40)
-            UpdateSection(updater: updater)
+            UpdateSection(updater: Updater.shared)
+            #endif
         }
         .frame(maxWidth: .infinity)
         .padding(24)
@@ -677,9 +700,11 @@ struct AboutPage: View {
 
     private var optionsCard: some View {
         VStack(alignment: .leading, spacing: 10) {
+            #if !APP_STORE
             Toggle(L("自动检查更新"), isOn: $settings.autoCheckUpdates)
             FormNote(L("启动后和之后每 6 小时检查一次 GitHub 上的新版本。有新版本时发通知，行情面板底部会出现“更新”按钮，点一下自动下载、校验、替换并重新启动，不会自动安装。"))
             Divider()
+            #endif
             HStack {
                 FormNote(L("行情数据来自腾讯财经公开接口，仅供参考，港股延时约 15 分钟。"))
                 Spacer()

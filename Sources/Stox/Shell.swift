@@ -1,6 +1,9 @@
 import Foundation
 import StoxCore
 
+// 运行系统命令（只有一键更新用到）只在 GitHub 版里有，App Store 版不编译（见 Updater.swift 的 AppInfo.flavor）。
+#if !APP_STORE
+
 struct ShellResult {
     let output: String
     let status: Int32
@@ -88,3 +91,4 @@ private final class Flag: @unchecked Sendable {
         lock.unlock()
     }
 }
+#endif

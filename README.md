@@ -105,6 +105,15 @@ UNIVERSAL=1 make app   # package a universal build for Apple silicon and Intel
 
 An app you build yourself is not blocked by Gatekeeper.
 
+### GitHub edition and App Store edition
+
+The same code builds two editions with the same features. They differ in how they are distributed and updated:
+
+- **GitHub edition** (the two options above): signed with Developer ID and notarized, with one-click updates. iCloud sync keeps its file in the `Stox` folder in iCloud Drive.
+- **App Store edition** (coming soon): runs in the sandbox and is updated by the App Store, so it has no one-click update or “Check for Updates”. iCloud sync keeps its file in the app’s own iCloud container. It starts with fresh settings; to move over from the GitHub edition, use “Back Up to a File” on the iCloud Sync page of Settings, then “Import Backup” in the App Store edition. The two editions don’t see each other’s iCloud sync, so install only one of them on a Mac.
+
+See [docs/app-store.md](docs/app-store.md) (in Chinese) for how to build and submit it.
+
 ## Features
 
 ### Panel and menu bar
@@ -176,7 +185,7 @@ The search field also takes codes directly. Separate several codes with spaces, 
 
 Turn on the switch on the iCloud Sync page of Settings; iCloud Drive must be on for this Mac. What syncs: the watchlist (order, menu bar pins, short names, holdings, price alerts, groups) and the refresh interval, menu bar content, price colors and alert switches. Settings that only concern this Mac, such as icon only, panel appearance, keyboard shortcut and launch at login, don't sync.
 
-The data is stored in `Stox/sync.json` in iCloud Drive. When another Mac turns on sync for the first time and iCloud already has a watchlist, you can use iCloud's, use this Mac's, or merge both. After that, changes on any Mac show up on the others within seconds; quitting right after a change is fine, because the next launch writes the local changes first. When syncing holdings across Macs, update all of them to 0.3.0 or later, and to 0.19.0 or later for groups; older versions drop these when they write.
+The data is stored in `Stox/sync.json` in iCloud Drive (the App Store edition stores it in the app’s own iCloud container, and the two editions don’t share it). When another Mac turns on sync for the first time and iCloud already has a watchlist, you can use iCloud's, use this Mac's, or merge both. After that, changes on any Mac show up on the others within seconds; quitting right after a change is fine, because the next launch writes the local changes first. When syncing holdings across Macs, update all of them to 0.3.0 or later, and to 0.19.0 or later for groups; older versions drop these when they write.
 
 ### Updates
 
@@ -197,11 +206,12 @@ Sources/
 Resources/             Info.plist, and the English (en.lproj) and Simplified Chinese (zh-Hans.lproj) interface strings
 Tests/StoxCoreTests/   Unit tests, using real API responses as samples
 scripts/
-  build-app.sh           Build, assemble and sign Stox.app
+  build-app.sh           Build, assemble and sign Stox.app (the App Store edition with STOX_FLAVOR=appstore)
+  build-app-store.sh     App Store edition: sign with the sandbox and provisioning profile, package Stox-AppStore.pkg for upload
   make-icon.swift        Generate the app icon
   check-datasources.sh   Print raw quote API responses to spot format changes
   check-localization.py  Check that the English and Simplified Chinese strings are complete and consistent
-  ci-e2e.sh              CI end-to-end tests: launch, screenshots, iCloud sync, one-click update
+  ci-e2e.sh              CI end-to-end tests: launch, screenshots, iCloud sync, one-click update, the App Store edition in the sandbox
 ```
 
 ### Interface languages
@@ -255,6 +265,8 @@ Releases are driven by `CHANGELOG.md`, using the shared release workflow in [Fri
 When the repository secrets hold a Developer ID certificate and notarization credentials, the release is signed with the certificate and notarized by Apple, so users can open it with a double-click; otherwise it's ad-hoc signed as before. See Frit's [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md) for the setup.
 
 You can also run the release workflow by hand on the Actions page: leave the tag empty to release the version at the top of `CHANGELOG.md`, or check overwrite to rebuild from the existing tag and replace the assets.
+
+The App Store edition is not released automatically. After a GitHub release, run the app-store workflow by hand on the Actions page to build, sign and upload it to App Store Connect, then submit it for review there; see [docs/app-store.md](docs/app-store.md) (in Chinese).
 
 See [docs/DESIGN.md](docs/DESIGN.md) (in Chinese) for the design decisions.
 

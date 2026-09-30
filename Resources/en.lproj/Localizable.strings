@@ -369,6 +369,7 @@
 "显示" = "Display";
 "iCloud 同步" = "iCloud Sync";
 "关于与更新" = "About & Updates";
+"关于" = "About";
 "Stox 设置" = "Stox Settings";
 "刷新频率、快捷键、价格提醒和登录时启动" = "Refresh rate, shortcut, price alerts and launch at login";
 "行情刷新" = "Quote Refresh";
@@ -434,6 +435,7 @@
 "茅台" = "Moutai";
 "腾讯" = "Tencent";
 "通过 iCloud 云盘在多台 Mac 之间同步自选和设置" = "Sync your watchlist and settings across Macs with iCloud Drive";
+"通过 iCloud 在多台 Mac 之间同步自选和设置" = "Sync your watchlist and settings across Macs with iCloud";
 "同步" = "Sync";
 "通过 iCloud 同步自选和设置" = "Sync watchlist and settings with iCloud";
 "状态" = "Status";
@@ -451,9 +453,12 @@
 "会同步什么" = "What Syncs";
 "自选列表的内容和顺序、每只的菜单栏固定、简称、备注、分组、持仓和价格提醒，以及刷新间隔、菜单栏显示内容、涨跌颜色、提醒开关这些设置。" = "Your watchlist and its order, each symbol’s menu bar pin, short name, note, group, holdings and price alerts, plus settings such as refresh interval, menu bar content, price colors and alert switches.";
 "“只显示图标”、面板外观、快捷键、登录时启动、自动检查更新只和这台 Mac 有关，不同步。" = "“Icon only”, panel appearance, keyboard shortcut, launch at login and automatic update checks are specific to this Mac and don’t sync.";
+"“只显示图标”、面板外观、快捷键、登录时启动只和这台 Mac 有关，不同步。" = "“Icon only”, panel appearance, keyboard shortcut and launch at login are specific to this Mac and don’t sync.";
 "怎么同步" = "How It Works";
 "文件放在 iCloud 云盘的 Stox 文件夹里。另一台 Mac 开启同步时会读到它，可以选择用 iCloud 的、用本机的，或者把两边的自选合并。之后任何一台的改动几秒内就会出现在其他 Mac 上，两台同时改动时以晚的为准。" = "The file lives in the Stox folder in iCloud Drive. When another Mac turns on sync, it can use the iCloud copy, use its own, or merge both watchlists. After that, changes on any Mac show up on the others within seconds; if two Macs change at once, the later change wins.";
 "第一次开启时系统可能会询问是否允许 Stox 访问 iCloud 云盘，需要允许。" = "The first time, macOS may ask whether Stox can access iCloud Drive. Allow it.";
+"文件放在 Stox 在 iCloud 里自己的空间，在 iCloud 云盘里看不到。另一台 Mac 开启同步时会读到它，可以选择用 iCloud 的、用本机的，或者把两边的自选合并。之后任何一台的改动几秒内就会出现在其他 Mac 上，两台同时改动时以晚的为准。" = "The file lives in Stox’s own iCloud storage, which you won’t see in iCloud Drive. When another Mac turns on sync, it can use the iCloud copy, use its own, or merge both watchlists. After that, changes on any Mac show up on the others within seconds; if two Macs change at once, the later change wins.";
+"从 GitHub 下载的 Stox 通过 iCloud 云盘的 Stox 文件夹同步，和这里不互通。换用这个版本时，用上面的“备份到文件”把自选搬过来。" = "Stox downloaded from GitHub syncs through the Stox folder in iCloud Drive and doesn’t see this data. To switch to this edition, move your watchlist over with Back Up to a File above.";
 "iCloud 里已经有自选" = "iCloud Already Has a Watchlist";
 "用 iCloud 的替换本机的" = "Replace This Mac’s with iCloud’s";
 "合并两边的自选" = "Merge Both Watchlists";

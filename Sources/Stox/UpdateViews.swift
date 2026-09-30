@@ -2,6 +2,9 @@ import AppKit
 import SwiftUI
 import StoxCore
 
+// 面板里的更新条和“关于与更新”里的更新只在 GitHub 版里有，App Store 版不编译（见 Updater.swift 的 AppInfo.flavor）。
+#if !APP_STORE
+
 /// 面板里的更新条：有新版本时出现，一键更新，显示进度和结果。
 @MainActor
 struct UpdateBanner: View {
@@ -352,3 +355,4 @@ struct ReleaseNotes: View {
         return AttributedString(cleaned)
     }
 }
+#endif

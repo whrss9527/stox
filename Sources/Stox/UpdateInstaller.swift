@@ -3,6 +3,9 @@ import Foundation
 import Security
 import StoxCore
 
+// 一键更新的下载、校验、替换和重新启动只在 GitHub 版里有，App Store 版不编译（见 Updater.swift 的 AppInfo.flavor）。
+#if !APP_STORE
+
 extension Checksums {
     /// 分块读文件算 SHA-256，返回小写十六进制。
     static func sha256(of url: URL) throws -> String {
@@ -372,3 +375,4 @@ private final class DownloadDelegate: NSObject, URLSessionDownloadDelegate {
         }
     }
 }
+#endif
