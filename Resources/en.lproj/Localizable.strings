@@ -370,7 +370,12 @@
 "关于与更新" = "About & Updates";
 "关于" = "About";
 "Stox 设置" = "Stox Settings";
-"刷新频率、快捷键、价格提醒和登录时启动" = "Refresh rate, shortcut, price alerts and launch at login";
+"界面语言、刷新频率、快捷键、价格提醒和登录时启动" = "Language, refresh rate, shortcut, price alerts and launch at login";
+"界面语言" = "Language";
+"重新启动 Stox 后生效" = "Takes effect after Stox relaunches";
+"立即重新启动" = "Relaunch Now";
+"重新启动失败：%@" = "Couldn't relaunch: %@";
+"跟随系统时，系统语言是中文就显示中文，其他语言都显示英文。只影响这台 Mac，不会同步。" = "With System, Stox is in Chinese when your Mac's language is Chinese and in English otherwise. Applies to this Mac only and isn't synced.";
 "行情刷新" = "Quote Refresh";
 "刷新间隔" = "Refresh interval";
 "%@ 秒" = "%@ seconds";

@@ -56,7 +56,7 @@ The quotes get the same treatment: squeezed into one small spot in the menu bar.
   <img src="docs/images/settings.jpg" width="604" alt="Settings window">
 </p>
 
-The three at the top show the expanded detail (intraday chart and average price line), daily candlesticks with moving averages, and holdings with P&L. Here, in order: the watchlist (each row with today's sparkline), an A-share order book, A-share fund flow, holdings and trades on the edit page, the P&L calendar, the A-share movers, search and add, the "No Red or Green" colors and the Settings window. The screenshots are taken automatically by CI, which launches the packaged app on macOS 15 with live quotes from 2026-09-28 and 29. They show the Chinese interface; Stox switches to English when your system language is English.
+The three at the top show the expanded detail (intraday chart and average price line), daily candlesticks with moving averages, and holdings with P&L. Here, in order: the watchlist (each row with today's sparkline), an A-share order book, A-share fund flow, holdings and trades on the edit page, the P&L calendar, the A-share movers, search and add, the "No Red or Green" colors and the Settings window. The screenshots are taken automatically by CI, which launches the packaged app on macOS 15 with live quotes from 2026-09-28 and 29. They show the Chinese interface; Stox is in English when your system language isn't Chinese, and you can pick the language in Settings.
 
 </details>
 
@@ -68,7 +68,7 @@ The three at the top show the expanded detail (intraday chart and average price 
 - **Holdings and P&L**: enter your holdings and today's and total P&L are worked out for you, with a P&L calendar.
 - **Alerts when they matter**: price targets, % change, take profit and stop loss, limit up and down, new highs and lows, all as notifications.
 - **Light**: about 3.6 MB zipped and about 30 MB of memory; no sign-up and no API key.
-- **English or Chinese**: the interface follows your system language.
+- **English or Chinese**: the interface follows your system language, or pick one in Settings → General.
 
 ## Install
 
@@ -146,7 +146,7 @@ See [docs/app-store.md](docs/app-store.md) (in Chinese) for how to build and sub
 - **iCloud sync and backup**: your watchlist, each symbol's alerts and short name, and settings such as refresh and colors sync between Macs through iCloud Drive; without iCloud you can export them to a file and import it on another Mac.
 - **Update checks and one-click updates**: when a new version is out, an "Update" button appears at the bottom of the panel; one click downloads, verifies, replaces and relaunches. If you skipped a few versions, it lists what changed in each of them.
 - **Power saving**: refreshes only once a minute while markets are closed or at lunch, recognizes holidays from the quotes, and stops requesting while the Mac sleeps.
-- **More**: launch at login; Settings has its own window, opened with the gear at the bottom of the panel; the interface is in English or Simplified Chinese, following your system language.
+- **More**: launch at login; Settings has its own window, opened with the gear at the bottom of the panel; the interface is in English or Simplified Chinese, following your system language unless you choose one under Settings → General → Language (Stox relaunches to switch).
 
 Quotes come from Tencent Finance's public API (Sina Finance as a fallback): free, with no sign-up or API key. Hong Kong quotes are delayed by about 15 minutes. The data is for reference only and is not investment advice. Stock names come from the quote API and are shown in Chinese; the changelog and release notes are written in Chinese.
 

@@ -108,7 +108,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         }
         let screenHeight = NSScreen.screens.first?.frame.height ?? 0
         let frame = window.frame
-        print("STOX_DIAG settings_page=\(navigation.page.rawValue)")
+        print("STOX_DIAG settings_page=\(navigation.page.rawValue) english=\(AppLanguage.isEnglish) interface_language=\(LanguageSetting.current.rawValue)")
         print("STOX_DIAG capture_frame=\(Int(frame.minX)) \(Int(screenHeight - frame.maxY)) \(Int(frame.width)) \(Int(frame.height))")
         fflush(stdout)
     }
@@ -209,11 +209,38 @@ struct GeneralPage: View {
     @ObservedObject var settings: SettingsStore
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?
+    @State private var language = LanguageSetting.current
+    @State private var relaunchError: String?
 
     var body: some View {
         VStack(spacing: 0) {
-            PageHeader(title: L("通用"), subtitle: L("刷新频率、快捷键、价格提醒和登录时启动"))
+            PageHeader(title: L("通用"), subtitle: L("界面语言、刷新频率、快捷键、价格提醒和登录时启动"))
             Form {
+                Section {
+                    Picker(L("界面语言"), selection: languageBinding) {
+                        ForEach(InterfaceLanguage.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    if language != LanguageSetting.atLaunch {
+                        HStack {
+                            Label(L("重新启动 Stox 后生效"), systemImage: "arrow.clockwise")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                            Spacer()
+                            Button(L("立即重新启动")) {
+                                relaunchError = nil
+                                LanguageSetting.relaunch { relaunchError = L("重新启动失败：%@", $0) }
+                            }
+                        }
+                        if let relaunchError {
+                            Text(relaunchError)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                    FormNote(L("跟随系统时，系统语言是中文就显示中文，其他语言都显示英文。只影响这台 Mac，不会同步。"))
+                }
                 Section(L("行情刷新")) {
                     Picker(L("刷新间隔"), selection: $settings.refreshInterval) {
                         ForEach(SettingsStore.intervalOptions, id: \.self) { seconds in
@@ -283,6 +310,16 @@ struct GeneralPage: View {
             .formStyle(.grouped)
             .scrollContentBackground(.hidden)
         }
+    }
+
+    private var languageBinding: Binding<InterfaceLanguage> {
+        Binding(
+            get: { language },
+            set: { value in
+                LanguageSetting.set(value)
+                language = LanguageSetting.current
+            }
+        )
     }
 
     private var launchAtLoginBinding: Binding<Bool> {
