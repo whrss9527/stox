@@ -197,43 +197,59 @@ jobs:
       - name: Sandbox launch test
         run: scripts/ci-e2e.sh appstore
       - name: App Store screenshots
-        # App Store 要 16:10 的截图（这里做 1440x900）。界面是什么语言就是什么语言的截图。
+        # 商店截图：英文界面的五个场景（菜单栏、K 线、持仓、环球市场、盈亏日历），持仓和盈亏记录都是编的，
+        # 合成 1280x800 的 shots/app-store/1-menu-bar.png … 5-calendar.png，再按 App Store 的要求检查尺寸和张数。
+        # app-store.yml 上架时用 main 上最近一次成功的 build 里的这几张（app-store-screenshots）。
+        # 行情接口偶尔取不到时这一步会失败，不挡住发版：五张都截好了才放进 shots/app-store，失败时上架就不动商店里的截图。
         if: always()
         continue-on-error: true
         run: |
-          mkdir -p shots/app-store
-          for name in appstore-panel appstore-detail; do
-            [ -f "shots/$name-full.png" ] || continue
-            frame=$(grep -o 'panel_frame=[0-9 -]*' "shots/$name.log" | tail -1 | cut -d= -f2)
-            [ -n "$frame" ] || continue
-            swift scripts/app-store-screenshot.swift "shots/$name-full.png" "shots/app-store/$name-1440x900.png" $frame 1440 900
-          done
-          ls -la shots/app-store
+          scripts/ci-e2e.sh appstore-shots
+          python3 scripts/app-store-connect.py check --screenshots shots/app-store
       - uses: actions/upload-artifact@v5
         if: always()
         continue-on-error: true
         with:
           name: app-store-screenshots
           path: shots/
-      # 提交信息里带 [screenshots] 时，把 App Store 截图缩小后以注释形式发布，和上面的 macOS app 一样可以通过 API 取回。
-      - name: Pick App Store screenshot
+      # 提交信息里带 [screenshots] 时，把五张商店截图缩成 560 宽的 JPEG，以注释形式发布，和上面的 macOS app 一样可以通过 API 取回。
+      # 一个任务最多 50 条注释：五张一共不超过 40 段，压不下来就降低质量。
+      - name: Pick App Store screenshots
         if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
         run: |
-          sips -s format jpeg -s formatOptions 45 -Z 720 shots/app-store/appstore-panel-1440x900.png --out shots/appstore-store-preview.jpg
-          echo appstore-store > shots/annotate.txt
+          dir=shots/app-store-previews
+          rm -rf "$dir"
+          mkdir -p "$dir"
+          names=$(cd shots/app-store && ls *.png | sed 's/\.png$//')
+          echo $names | tee "$dir/annotate.txt"
+          for quality in 45 40 35 30 25; do
+            chunks=0
+            for name in $names; do
+              sips -s format jpeg -s formatOptions "$quality" --resampleWidth 560 "shots/app-store/$name.png" --out "$dir/$name-preview.jpg" > /dev/null
+              size=$(stat -f %z "$dir/$name-preview.jpg")
+              chunks=$(( chunks + ((size + 2) / 3 * 4 + 3999) / 4000 ))
+            done
+            echo "质量 $quality：$chunks 段"
+            [ "$chunks" -le 40 ] && break
+          done
+          ls -la "$dir"
       - name: App Store screenshot annotations (1)
         if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
-        run: scripts/ci-annotate-image.sh 1
+        run: scripts/ci-annotate-image.sh 1 shots/app-store-previews
       - name: App Store screenshot annotations (2)
         if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
-        run: scripts/ci-annotate-image.sh 2
+        run: scripts/ci-annotate-image.sh 2 shots/app-store-previews
       - name: App Store screenshot annotations (3)
         if: always() && contains(github.event.head_commit.message, '[screenshots')
         continue-on-error: true
-        run: scripts/ci-annotate-image.sh 3
+        run: scripts/ci-annotate-image.sh 3 shots/app-store-previews
+      - name: App Store screenshot annotations (4)
+        if: always() && contains(github.event.head_commit.message, '[screenshots')
+        continue-on-error: true
+        run: scripts/ci-annotate-image.sh 4 shots/app-store-previews
 
   release:
     name: Release

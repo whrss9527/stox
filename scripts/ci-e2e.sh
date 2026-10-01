@@ -6,6 +6,8 @@
 #   scripts/ci-e2e.sh update   本地假发布 9.9.9：发现新版本、原地更新、从临时位置运行时装进“应用程序”
 #   scripts/ci-e2e.sh appstore App Store 版（dist/appstore/Stox.app，ad-hoc 签名带沙盒）：在沙盒里运行、取到行情、
 #                              打开面板和设置、同步文件写得进去，没有一键更新的代码
+#   scripts/ci-e2e.sh appstore-shots  App Store 版的五张商店截图（英文界面），合成到 shots/app-store/*.png。
+#                              会把 Dock 设成自动隐藏、换掉桌面图片，只在 CI 上用
 #
 # 截图（*-full.png）、App 输出（*.log，含 STOX_DIAG 诊断行）都放在 shots/ 下，后面的步骤负责裁剪。
 set -euo pipefail
@@ -14,7 +16,7 @@ cd "$(dirname "$0")/.."
 APP="$PWD/dist/Stox.app"
 DOMAIN="io.github.whrss9527.stox"
 SUPPORT="$HOME/Library/Application Support/Stox"
-if [[ "${1:-}" == "appstore" ]]; then
+if [[ "${1:-}" == appstore* ]]; then
   # 沙盒里的 App 的家目录是它的容器：设置、日志都在容器里。
   APP="$PWD/dist/appstore/Stox.app"
   CONTAINER="$HOME/Library/Containers/$DOMAIN/Data"
@@ -48,9 +50,9 @@ log_has() {
   grep -qF -- "$1" "$LOG" 2>/dev/null
 }
 
-# 直接写本机保存的自选列表（JSON），模拟用户在界面里改过。
+# 直接写本机保存的自选列表（JSON），模拟用户在界面里改过。第二个参数是别的设置域（比如沙盒容器里的）。
 write_watchlist() {
-  defaults write "$DOMAIN" watchlist.v1 -data "$(printf '%s' "$1" | xxd -p | tr -d '\n')"
+  defaults write "${2:-$DOMAIN}" watchlist.v1 -data "$(printf '%s' "$1" | xxd -p | tr -d '\n')"
 }
 
 # 启动一次（直接运行 .app 里的二进制，环境变量才能传进去），14 秒后记下内存、截屏、退出。
@@ -748,13 +750,195 @@ appstore_test() {
   defaults delete "$prefs" 2>/dev/null || true
 }
 
+# App Store 的商店截图：英文界面的五个场景，各合成一张 1280x800 的图，放在 shots/app-store/<序号>-<名字>.png（文件名决定顺序）。
+# 每个场景先清空沙盒容器里的设置，再写上这个场景要的：不显示使用提示、绿涨红跌（英文用户的习惯），自选、持仓和盈亏记录都是编的。
+# 桌面换成这张图的渐变，面板的毛玻璃透出来的颜色和合成的背景一致。行情、迷你分时、K 线没到齐就重新启动再截，最多三次；
+# 三次都不行、面板放不下、列表被压矮要滚动时失败，说明是哪一张、缺什么。
+STORE_TOOL=""
+STORE_PREFS=""
+STORE_OUT=""
+# 列表没被压矮（430 是 WatchlistView.defaultMaxHeight），列表上方的卡片也没放进滚动区：一行都不用滚。
+STORE_LIST_FITS='late panel_frame=.* list_max=430 .*cards_max=none'
+
+# 清空容器里的设置，写上每个场景都要的。
+store_reset() {
+  defaults delete "$STORE_PREFS" 2>/dev/null || true
+  defaults write "$STORE_PREFS" tips.dismissed -bool true
+  defaults write "$STORE_PREFS" colorConvention -string greenUp
+}
+
+# 数据到齐了没有：$1 是日志，后面是要有的诊断信息（正则）；sparklines>=N 是打开面板 6 秒后至少有 N 条迷你分时。
+# 缺的写到 $WORK/store-missing.txt。
+store_ready() {
+  local log="$1" need missing="" want got
+  shift
+  for need in "$@"; do
+    if [[ "$need" == sparklines\>=* ]]; then
+      want="${need#sparklines>=}"
+      got=$(sed -nE 's/.*STOX_DIAG late flow=[^ ]* sparklines=([0-9]+).*/\1/p' "$log" | tail -1)
+      (( ${got:-0} >= want )) || missing="$missing [迷你分时 ${got:-0} 条，要 $want 条]"
+    elif ! grep -Eq -- "$need" "$log"; then
+      missing="$missing [$need]"
+    fi
+  done
+  printf '%s' "$missing" > "$WORK/store-missing.txt"
+  [[ -z "$missing" ]]
+}
+
+# 美股的现价乘以一个比例，当作编的持仓成本；取不到现价时用给的固定成本。$WORK/store-quotes.txt 是腾讯行情接口的返回。
+# 用法: store_cost 代码 比例 固定成本
+store_cost() {
+  awk -F'~' -v key="v_$1=" -v ratio="$2" -v fallback="$3" '
+    index($0, key) { p = $4 + 0; if (p <= 0) p = $5 + 0 }
+    END { if (p > 0) printf "%.2f", p * ratio; else print fallback }' "$WORK/store-quotes.txt"
+}
+
+# 截一个场景，合成 $STORE_OUT/<名字>.png（都成了以后再换进 shots/app-store）。
+# 用法: store_scene 名字 主题 标题 说明 要有的诊断信息... -- 启动参数...
+store_scene() {
+  local name="$1" theme="$2" title="$3" subtitle="$4" needs=() attempt frame
+  shift 4
+  while [[ $# -gt 0 && "$1" != "--" ]]; do
+    needs+=("$1")
+    shift
+  done
+  shift
+  local shot="store-$name"
+  "$STORE_TOOL" --wallpaper --theme "$theme" "$WORK/wallpaper-$theme.png" || echo "换不了桌面图片，面板的毛玻璃会透出原来的桌面"
+  sleep 2
+  for attempt in 1 2 3; do
+    run_case "$shot" --show-panel "$@" -AppleLanguages '(en)'
+    store_ready "shots/$shot.log" "${needs[@]}" && break
+    (( attempt < 3 )) || fail "App Store 截图 $name：试了三次还是不行，缺$(cat "$WORK/store-missing.txt")"
+    echo "App Store 截图 $name：第 $attempt 次缺$(cat "$WORK/store-missing.txt")，重新启动再截"
+  done
+  check_fits "$shot"
+  frame=$(grep -o 'panel_frame=[0-9 -]*' "shots/$shot.log" | tail -1 | cut -d= -f2)
+  # shellcheck disable=SC2086
+  "$STORE_TOOL" "shots/$shot-full.png" "$STORE_OUT/$name.png" $frame \
+    --size 1280x800 --theme "$theme" --title "$title" --subtitle "$subtitle" || fail "App Store 截图 $name：合成失败"
+}
+
+appstore_shots() {
+  STORE_PREFS="$CONTAINER/Library/Preferences/$DOMAIN"
+  STORE_TOOL="$WORK/app-store-screenshot"
+  swiftc -O scripts/app-store-screenshot.swift -o "$STORE_TOOL"
+  # 先合成到临时目录：有一张失败时 shots/app-store 里什么都没有，上架时就不会只换掉一部分截图。
+  STORE_OUT="$WORK/app-store"
+  rm -rf shots/app-store "$STORE_OUT"
+  mkdir -p "$STORE_OUT"
+  # CI 的屏幕只有 768 点高：Dock 改成自动隐藏，让出底下那一条，持仓那张才放得下。
+  defaults write com.apple.dock autohide -bool true
+  killall Dock 2>/dev/null || true
+  sleep 3
+
+  # 1. 第一次启动（没有保存过的自选）：英文的默认自选，菜单栏上是 S&P 500；八只里除了欧元美元都有迷你分时。
+  store_reset
+  store_scene 1-menu-bar 1 "Stocks in your menu bar" \
+    "Click to open, click again to hide. Your watchlist is always one click away." \
+    'status_title="S&P 500 [0-9]' 'items=8 quotes=8 ' 'sparklines>=7' "$STORE_LIST_FITS" --
+
+  # 2. 深色外观，四只美股，展开苹果看日 K：蜡烛图、均线、成交量。
+  store_reset
+  write_watchlist '[{"symbol":"us.INX","name":"S&P 500","alias":"S&P 500","pinned":true},
+    {"symbol":"usAAPL","name":"Apple"},{"symbol":"usMSFT","name":"Microsoft"},{"symbol":"usNVDA","name":"NVIDIA"}]' "$STORE_PREFS"
+  defaults write "$STORE_PREFS" appearance -string dark
+  store_scene 2-charts 2 "Charts in a click" \
+    "Intraday, 5-day, daily, weekly and monthly charts with volume and moving averages." \
+    'items=4 quotes=4 ' 'chart=day ' 'expanded=usAAPL' 'kline=([2-9][0-9]|[1-9][0-9]{2}) ' 'ma20=[1-9]' 'sparklines>=4' \
+    "$STORE_LIST_FITS" -- --expand usAAPL --chart day
+
+  # 3. 持仓：菜单栏上 S&P 500 后面是今日盈亏；列表上方选了“持仓”，三只编的美股持仓，成本是现价的八成多（涨得不多），
+  #    展开苹果看持仓盈亏。屏幕放不下第四只：展开的一行加三行正好不用滚动。
+  curl -s --max-time 10 "https://qt.gtimg.cn/q=usAAPL,usMSFT,usNVDA" | iconv -f gbk -t utf-8 2>/dev/null | tr ';' '\n' \
+    > "$WORK/store-quotes.txt" || true
+  local aapl msft nvda
+  aapl=$(store_cost usAAPL 0.86 285)
+  msft=$(store_cost usMSFT 0.89 440)
+  nvda=$(store_cost usNVDA 0.82 150)
+  echo "编的持仓成本：AAPL $aapl，MSFT $msft，NVDA $nvda"
+  store_reset
+  write_watchlist '[{"symbol":"us.INX","name":"S&P 500","alias":"S&P 500","pinned":true},
+    {"symbol":"usAAPL","name":"Apple","holding":{"shares":120,"cost":'"$aapl"'}},
+    {"symbol":"usMSFT","name":"Microsoft","holding":{"shares":45,"cost":'"$msft"'}},
+    {"symbol":"usNVDA","name":"NVIDIA","holding":{"shares":200,"cost":'"$nvda"'}}]' "$STORE_PREFS"
+  defaults write "$STORE_PREFS" ticker.dayProfit -bool true
+  defaults write "$STORE_PREFS" list.filter -string holdings
+  store_scene 3-holdings 3 "Track your holdings" \
+    "Today's and total P&L for every position, with totals per currency." \
+    'items=4 quotes=4 holdings=3 summary=us ' 'filter=holdings visible=3 ' 'expanded=usAAPL' 'status_title="S&P 500 .* Today ' \
+    'sparklines>=3' "$STORE_LIST_FITS" -- --expand usAAPL
+
+  # 4. 环球市场：美股、日经、恒生、上证、富时、DAX、黄金、欧元美元（环球股指和外汇没有迷你分时）。
+  store_reset
+  write_watchlist '[{"symbol":"us.INX","name":"S&P 500","alias":"S&P 500","pinned":true},
+    {"symbol":"znb_NKY","name":"Nikkei 225"},{"symbol":"hkHSI","name":"Hang Seng"},{"symbol":"sh000001","name":"SSE Composite"},
+    {"symbol":"znb_UKX","name":"FTSE 100"},{"symbol":"znb_DAX","name":"DAX"},
+    {"symbol":"hf_XAU","name":"Spot Gold"},{"symbol":"whEURUSD","name":"EUR/USD"}]' "$STORE_PREFS"
+  store_scene 4-global 4 "Markets around the world" \
+    "US, Hong Kong and China stocks, global indices, futures and FX." \
+    'status_title="S&P 500 [0-9]' 'items=8 quotes=8 ' 'sparklines>=4' "$STORE_LIST_FITS" --
+
+  # 5. 盈亏日历按年看：编的美元盈亏记录，大多数交易日都有，有赚有亏。上半年用去年一整年的（按年看的是有记录的最后一年），
+  #    下半年用今年 1 月到今天的。种子固定，同一天生成的都一样。
+  store_reset
+  defaults write "$STORE_PREFS" calendar.byYear -bool true
+  defaults write "$STORE_PREFS" holdings.history.v1 -data "$(python3 - "$(TZ=America/New_York date +%Y-%m-%d)" <<'PY' | xxd -p | tr -d '\n'
+import datetime, json, random, sys
+
+today = datetime.date.fromisoformat(sys.argv[1])
+year = today.year if today.month > 6 else today.year - 1
+end = min(today, datetime.date(year, 12, 31))
+
+def nth_weekday(month, weekday, n):
+    day = datetime.date(year, month, 1)
+    return day + datetime.timedelta(days=(weekday - day.weekday()) % 7 + 7 * (n - 1))
+
+def last_monday_of_may():
+    day = datetime.date(year, 5, 31)
+    return day - datetime.timedelta(days=day.weekday())
+
+def observed(day):
+    return day + datetime.timedelta(days={5: -1, 6: 1}.get(day.weekday(), 0))
+
+# 美股休市的日子（耶稣受难日不算，差一天看不出来）。
+holidays = {observed(datetime.date(year, 1, 1)), nth_weekday(1, 0, 3), nth_weekday(2, 0, 3), last_monday_of_may(),
+            observed(datetime.date(year, 6, 19)), observed(datetime.date(year, 7, 4)), nth_weekday(9, 0, 1),
+            nth_weekday(11, 3, 4), observed(datetime.date(year, 12, 25))}
+bias = [55, 30, -40, 70, 35, -25, 65, 20, -15, 45, 40, 50]
+rng = random.Random(11)
+records, total, value = [], 3800.0, 64000.0
+day = datetime.date(year, 1, 1)
+while day <= end:
+    if day.weekday() < 5 and day not in holidays:
+        profit = round(rng.gauss(bias[day.month - 1], 380), 2)
+        # 偶尔有一天没开 Mac，没有记录。
+        if rng.random() > 0.05:
+            total += profit
+            value += profit
+            records.append({"day": day.isoformat(), "region": "us", "dayProfit": profit,
+                            "totalProfit": round(total, 2), "marketValue": round(value, 2)})
+    day += datetime.timedelta(days=1)
+print(json.dumps({"records": records}, separators=(",", ":")))
+PY
+)"
+  store_scene 5-calendar 5 "Your P&L, day by day" \
+    "A profit calendar by month or by year." \
+    'route=calendar ' 'calendar_by_year=true' 'history=[1-9][0-9]{2} ' 'status_title="S&P 500 [0-9]' -- --calendar
+
+  defaults delete "$STORE_PREFS" 2>/dev/null || true
+  mv "$STORE_OUT" shots/app-store
+  ls -la shots/app-store
+}
+
 case "${1:-}" in
   smoke) smoke ;;
   sync) sync_test ;;
   update) update_test ;;
   appstore) appstore_test ;;
+  appstore-shots) appstore_shots ;;
   *)
-    echo "用法: $0 smoke|sync|update|appstore" >&2
+    echo "用法: $0 smoke|sync|update|appstore|appstore-shots" >&2
     exit 2
     ;;
 esac

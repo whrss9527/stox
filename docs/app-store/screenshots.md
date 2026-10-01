@@ -14,44 +14,46 @@ PNG or JPEG, no transparency. The first three show up on the product page, so pu
 The `app-store` workflow uploads the English screenshots (other languages fall back to them) and skips the upload when App Store Connect already has the same files (compared by MD5):
 
 1. If `docs/app-store/listing/screenshots/en-US/` has PNG or JPEG files, it uses those, in file name order (`1-panel.png`, `2-detail.png`, …).
-2. Otherwise it uses the two 1440 × 900 images from the latest successful `build` run on main (below): the panel first, then the expanded detail.
-3. If neither is there, it leaves the screenshots on App Store Connect as they are.
+2. Otherwise it uses the numbered images (`1-menu-bar.png` … `5-calendar.png`, in file name order) from the latest successful `build` run on main (below).
+3. If neither is there, it leaves the screenshots on App Store Connect as they are. This is also what happens when the screenshot step of that `build` run failed: it only publishes the images when all five came out, so a half-finished set is never uploaded.
 
 `python3 scripts/app-store-connect.py check --screenshots <folder>` checks the format, sizes and count.
 
-## From CI (1440 × 900)
+## From CI (1280 × 800)
 
-The `App Store edition (sandbox)` job in the `build` workflow launches the sandboxed build, opens the panel, and turns the capture into 1440 × 900 images with `scripts/app-store-screenshot.swift`: a menu bar across the top whose right end is the real one (Stox's ticker and the clock), and the real panel below it, clipped to its rounded corners, on a gradient desktop. Download the `app-store-screenshots` artifact from the run; the images are in `shots/app-store/`.
+The `App Store edition (sandbox)` job in the `build` workflow runs `scripts/ci-e2e.sh appstore-shots` after the sandbox checks. It launches the sandboxed build in English five times, each with its own made-up data, and turns every capture into a 1280 × 800 image with `scripts/app-store-screenshot.swift`:
 
-The CI runner's screen is 1× and its system language is English, so the screenshots show the English UI. To add a caption on the left:
+| File | Headline | Scene |
+|---|---|---|
+| `1-menu-bar.png` | Stocks in your menu bar | the English starter watchlist with sparklines, S&P 500 in the menu bar |
+| `2-charts.png` | Charts in a click | dark appearance, Apple expanded on the daily candlestick chart |
+| `3-holdings.png` | Track your holdings | three made-up US positions (costs a little below the current price), Today's P&L in the menu bar |
+| `4-global.png` | Markets around the world | S&P 500, Nikkei 225, Hang Seng, SSE Composite, FTSE 100, DAX, gold, EUR/USD |
+| `5-calendar.png` | Your P&L, day by day | the profit calendar by year, from made-up daily records |
+
+Each image has the headline and a subtitle on the left and, on the right, the real menu bar end (Stox's ticker and the clock) with the real panel hanging under it at its native size, on a dark gradient. Before each capture the desktop picture is set to the same gradient, so the panel's glass shows the same colour. A scene is retaken (up to three times) until its quotes, sparklines and charts are in. The CI screen is only 768 points tall, so the Dock is set to hide.
+
+Download the `app-store-screenshots` artifact from the run; the images are in `shots/app-store/`. When the commit message contains `[screenshots`, 560-pixel previews of all five are also published as annotations of the job (see `scripts/ci-annotate-image.sh`), for environments that can only reach the GitHub API.
+
+To compose one by hand:
 
 ```bash
-swift scripts/app-store-screenshot.swift shots/appstore-panel-full.png out.png $frame 1440 900 "Your watchlist,\none click away"
+swift scripts/app-store-screenshot.swift full.png out.png x y w h --size 1280x800 --theme 1 \
+  --title "Stocks in your menu bar" --subtitle "Click to open, click again to hide."
 ```
 
-(`$frame` is the last `panel_frame=` value in `shots/appstore-panel.log`: the panel's x, y, width and height in points.)
+`x y w h` is the last `panel_frame=` value the app prints with `--show-panel` (the panel's position and size in points). `--theme 1…5` picks the background hue. `swift scripts/app-store-screenshot.swift --wallpaper --theme 1 wallpaper.png` sets the desktop picture to that background.
 
-## Sharper, on your own Mac (2880 × 1800)
+## Sharper, on your own Mac (2560 × 1600 or 2880 × 1800)
 
-For Retina-quality images, take them on a Retina Mac with the English UI:
+CI captures at 1×. For Retina-quality images, take them on a Retina Mac with the English UI:
 
-1. Set a clean desktop picture; a fresh macOS user account keeps other menu bar items out of the shot.
+1. A fresh macOS user account keeps other menu bar items out of the shot.
 2. Build and run the App Store edition: `ADHOC=1 UNIVERSAL=0 scripts/build-app-store.sh && open dist/appstore/Stox.app` (or install the TestFlight build).
-3. Open the panel, then capture it with the diagnostics so the frame is known:
-   `dist/appstore/Stox.app/Contents/MacOS/Stox --show-panel --expand usAAPL` prints `STOX_DIAG panel_frame=x y w h …`.
-4. `screencapture -x full.png`, then
-   `swift scripts/app-store-screenshot.swift full.png shot1.png x y w h 2880 1800 "Stocks in your menu bar"`.
+3. Set up the scene the way `appstore_shots` in `scripts/ci-e2e.sh` does. For the sandboxed build, settings live in its container: `defaults write ~/Library/Containers/io.github.whrss9527.stox/Data/Library/Preferences/io.github.whrss9527.stox …`.
+4. Launch it with the diagnostics so the frame is known: `dist/appstore/Stox.app/Contents/MacOS/Stox --show-panel --expand usAAPL` prints `STOX_DIAG panel_frame=x y w h …`.
+5. `screencapture -x full.png`, then compose with `--size 2560x1600`: 2560 and 2880 wide canvases are drawn at 2×.
 
-The script scales by the canvas size (2880 is 2× of 1440), so a Retina capture stays sharp.
-
-## Suggested set
-
-1. Panel with the default watchlist and sparklines — "Your watchlist, one click away"
-2. Expanded Apple or Moutai with the intraday chart — "Intraday, K-line and order book"
-3. Holdings with totals and the profit calendar — "Track holdings and profit"
-4. Menu bar with stacked tickers — "Quotes right in the menu bar"
-5. Settings → iCloud Sync — "Syncs across your Macs with iCloud"
-
-Scenes 2–4 can be set up with the same launch arguments the CI uses (see `scripts/ci-e2e.sh smoke`: `--expand`, `--chart day`, `--calendar`, and `defaults write … ticker.layout -string stacked`). For the sandboxed build, write settings into its container: `defaults write ~/Library/Containers/io.github.whrss9527.stox/Data/Library/Preferences/io.github.whrss9527.stox …`.
+Put the results in `docs/app-store/listing/screenshots/en-US/` (they take precedence over the CI ones).
 
 Use made-up holdings in screenshots, not real ones.
