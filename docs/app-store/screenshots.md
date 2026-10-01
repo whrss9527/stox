@@ -29,7 +29,7 @@ The `App Store edition (sandbox)` job in the `build` workflow runs `scripts/ci-e
 | `2-charts.png` | Charts in a click | dark appearance, Apple expanded on the daily candlestick chart |
 | `3-holdings.png` | Track your holdings | three made-up US positions (costs a little below the current price), Today's P&L in the menu bar |
 | `4-global.png` | Markets around the world | S&P 500, Nikkei 225, Hang Seng, SSE Composite, FTSE 100, DAX, gold, EUR/USD |
-| `5-calendar.png` | Your P&L, day by day | the profit calendar by year, from made-up daily records |
+| `5-calendar.png` | Your P&L, day by day | the profit calendar for last month, from made-up daily records |
 
 Each image has the headline and a subtitle on the left and, on the right, the real menu bar end (Stox's ticker and the clock) with the real panel hanging under it at its native size, on a dark gradient. Before each capture the desktop picture is set to the same gradient, so the panel's glass shows the same colour. A scene is retaken (up to three times) until its quotes, sparklines and charts are in. The CI screen is only 768 points tall, so the Dock is set to hide.
 

@@ -879,16 +879,15 @@ appstore_shots() {
     "US, Hong Kong and China stocks, global indices, futures and FX." \
     'status_title="S&P 500 [0-9]' 'items=8 quotes=8 ' 'sparklines>=4' "$STORE_LIST_FITS" --
 
-  # 5. 盈亏日历按年看：编的美元盈亏记录，大多数交易日都有，有赚有亏。上半年用去年一整年的（按年看的是有记录的最后一年），
-  #    下半年用今年 1 月到今天的。种子固定，同一天生成的都一样。
+  # 5. 盈亏日历按月看：编的美元盈亏记录，从那年 1 月记到上个月最后一天，大多数交易日都有，有赚有亏。
+  #    日历打开时看的是有记录的最后一个月，所以是满满一个月。种子固定，同一个月生成的都一样。
   store_reset
-  defaults write "$STORE_PREFS" calendar.byYear -bool true
   defaults write "$STORE_PREFS" holdings.history.v1 -data "$(python3 - "$(TZ=America/New_York date +%Y-%m-%d)" <<'PY' | xxd -p | tr -d '\n'
 import datetime, json, random, sys
 
 today = datetime.date.fromisoformat(sys.argv[1])
-year = today.year if today.month > 6 else today.year - 1
-end = min(today, datetime.date(year, 12, 31))
+end = today.replace(day=1) - datetime.timedelta(days=1)
+year = end.year
 
 def nth_weekday(month, weekday, n):
     day = datetime.date(year, month, 1)
@@ -923,8 +922,8 @@ print(json.dumps({"records": records}, separators=(",", ":")))
 PY
 )"
   store_scene 5-calendar 5 "Your P&L, day by day" \
-    "A profit calendar by month or by year." \
-    'route=calendar ' 'calendar_by_year=true' 'history=[1-9][0-9]{2} ' 'status_title="S&P 500 [0-9]' -- --calendar
+    "Each trading day's profit or loss, recorded at the close. See it by month or by year." \
+    'route=calendar ' 'calendar_by_year=false' 'history=[1-9][0-9]+ ' 'status_title="S&P 500 [0-9]' -- --calendar
 
   defaults delete "$STORE_PREFS" 2>/dev/null || true
   mv "$STORE_OUT" shots/app-store
