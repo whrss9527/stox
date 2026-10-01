@@ -183,7 +183,7 @@ extension Portfolio {
             .map { entry, value in
                 AllocationEntry(
                     symbol: entry.item.symbol,
-                    name: entry.quote.name.isEmpty ? entry.item.displayName : entry.quote.name,
+                    name: entry.item.displayName(with: entry.quote),
                     marketValue: entry.position.marketValue,
                     value: value,
                     share: value / total * 100,
@@ -222,7 +222,7 @@ extension Portfolio {
             guard let holding = item.holding, let quote = quotes[item.symbol],
                   let position = position(holding, quote: quote, trades: item.trades)
             else { continue }
-            let name = quote.name.isEmpty ? item.displayName : quote.name
+            let name = item.displayName(with: quote)
             lines.append([
                 name,
                 item.symbol.displayCode,
@@ -279,7 +279,7 @@ public enum CloseSummary {
         items.compactMap { item in
             guard item.holding != nil, item.symbol.market.region == region, let quote = quotes[item.symbol], quote.hasTraded
             else { return nil }
-            return Mover(name: quote.name.isEmpty ? item.displayName : quote.name, changePercent: quote.changePercent)
+            return Mover(name: item.displayName(with: quote), changePercent: quote.changePercent)
         }
     }
 

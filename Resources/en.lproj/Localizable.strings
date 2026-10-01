@@ -96,7 +96,7 @@
 "A股%@" = "CN %@";
 "港股%@" = "HK %@";
 "美股%@" = "US %@";
-"期货外汇%@" = "Futures & FX %@";
+"环球%@" = "Global %@";
 "港股行情延时约 15 分钟" = "Hong Kong quotes are delayed by about 15 minutes";
 "刷新失败：%@" = "Refresh failed: %@";
 "取消钉住：点别处时自动关闭" = "Unpin: close when clicking elsewhere";
@@ -347,7 +347,7 @@
 "A股" = "A-shares";
 "港股" = "Hong Kong";
 "美股" = "US";
-"期货外汇" = "Futures & FX";
+"环球" = "Global";
 "持仓" = "Holdings";
 "涨跌幅" = "% Change";
 "涨跌额" = "Change";
@@ -640,6 +640,7 @@
 "基" = "FD";
 "期" = "FU";
 "汇" = "FX";
+"指" = "IX";
 
 /* StoxCore/MarketClock.swift */
 "交易中" = "Open";

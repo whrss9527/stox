@@ -1,33 +1,12 @@
-# App Review notes (draft, English)
+# App Review notes
 
-Paste into App Store Connect → the version page → App Review Information → Notes. Sign-in required: **No**.
+The notes are in [listing/review_notes.txt](listing/review_notes.txt) (English, up to 4000 characters). The `app-store` workflow puts them into App Store Connect → the version page → App Review Information → Notes, sets "Sign-in required" to No, and fills in the contact from the `APPSTORE_REVIEW_CONTACT` secret when it is set.
 
----
+What the notes cover, and why:
 
-Stox is a menu bar app for stock quotes. It has no Dock icon and no main window; everything happens from the menu bar icon.
+- **How to try it.** Stox has no Dock icon and no main window, so the notes start with where the menu bar icon is and walk through the panel, the expanded chart, search, the context menu, the global hotkey and Settings. The default watchlist already has symbols, so there is something to see without setting anything up.
+- **Data sources.** Guideline 5.2.2 asks apps that use third-party services for permission. The notes name every quote endpoint, say that these are the public endpoints the finance websites themselves use (no account or API key), that Hong Kong quotes are delayed and data is for reference only, and that the app offers no trading. They also explain why prices don't move outside market hours, so a reviewer on a weekend isn't confused.
+- **Privacy and permissions.** One line per entitlement and per system permission (notifications, launch at login, the hotkey without Accessibility), matching the "Data Not Collected" privacy answer.
+- **Updates.** The App Store build has no self-updater; the notes say so because the GitHub build does have one and the source is public.
 
-HOW TO TRY IT
-1. After launch, look for the Stox icon (a rising line chart) in the menu bar, near the clock. By default it also shows the Shanghai Composite index next to the icon.
-2. Left-click the icon to open the quote panel. The default watchlist has 8 symbols (Shanghai, Shenzhen, Hong Kong and US indices plus a few stocks), so there is something to see right away.
-3. Click any row to expand it: price details and an intraday chart. Use the buttons above the chart to switch to 5-day, daily, weekly and monthly charts.
-4. Type in the search field at the top (for example "AAPL" or "Tencent" / "腾讯") and press Return to add a symbol.
-5. Right-click a row to pin it to the menu bar, put it in a group, or enter holdings and price alerts. With holdings entered, the panel shows profit per position and totals.
-6. Right-click the menu bar icon to hide the quotes and keep only the icon; right-click again to show them.
-7. Press Control-Option-S in any app to open or close the panel (global hotkey; it can be changed or turned off in Settings → General).
-8. Open Settings with the gear button at the bottom of the panel: refresh interval, alerts, launch at login, menu bar display, iCloud sync and backup to a file.
-
-DATA SOURCES
-Quotes come from the free public web quote services of Tencent Finance (qt.gtimg.cn, smartbox.gtimg.cn, web.ifzq.gtimg.cn, proxy.finance.qq.com) and Sina Finance (hq.sinajs.cn as a fallback for quotes, stock2.finance.sina.com.cn for futures charts). These are the same endpoints their public finance websites use; they require no account or API key. Links in the context menu open Xueqiu and East Money web pages in the browser. Hong Kong quotes are delayed by about 15 minutes and other quotes may also be delayed. The app says so in its description and in Settings, and states that data is for reference only and is not investment advice. The app does not offer trading, brokerage or any financial transaction.
-
-Outside market hours the prices do not change; this is expected. On weekends the charts show the last trading day.
-
-PRIVACY AND PERMISSIONS
-- No account, analytics, ads or third-party SDKs. The only network traffic is HTTPS requests for quotes, which contain the stock codes on the watchlist and nothing that identifies the user.
-- Watchlist, holdings and settings are stored locally. If the user turns on iCloud sync, they are stored in the app's own iCloud container in the user's iCloud account.
-- Entitlements: App Sandbox, outgoing network connections (quotes), user-selected files (export/import a backup from Settings → iCloud Sync), and iCloud Documents (sync).
-- Notifications are requested only when the user turns on price alerts or the close summary.
-- Launch at login uses SMAppService and is off until the user turns it on.
-- The global hotkey uses RegisterEventHotKey and does not need Accessibility access.
-
-UPDATES
-This App Store build contains no self-update mechanism; updates come only through the App Store. (A separate open-source build distributed on GitHub has its own updater; that code is compiled out of this build.)
+Keep the notes in line with the description and the App Privacy answers when features change.

@@ -188,7 +188,7 @@ public struct AlertEngine: Codable, Sendable, Equatable {
                 let key = Self.key(item.symbol, condition)
                 guard firedDays[key] != day else { continue }
                 firedDays[key] = day
-                let name = quote.name.isEmpty ? item.displayName : quote.name
+                let name = item.displayName(with: quote)
                 triggers.append(AlertTrigger(
                     symbol: item.symbol, name: name, condition: condition, threshold: threshold, quote: quote, holding: item.holding
                 ))

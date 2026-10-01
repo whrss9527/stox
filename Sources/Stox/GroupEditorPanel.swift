@@ -111,7 +111,7 @@ struct GroupEditorPanel: View {
             }
         )) {
             HStack(spacing: 6) {
-                Text(store.quotes[item.symbol]?.name ?? item.displayName)
+                Text(item.displayName(with: store.quotes[item.symbol]))
                     .font(.system(size: 12))
                     .lineLimit(1)
                 Text(item.symbol.displayCode)

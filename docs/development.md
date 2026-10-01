@@ -15,6 +15,7 @@ Tests/StoxCoreTests/   Unit tests, using real API responses as samples
 scripts/
   build-app.sh           Build, assemble and sign Stox.app (the App Store edition with STOX_FLAVOR=appstore)
   build-app-store.sh     App Store edition: sign with the sandbox and provisioning profile, package Stox-AppStore.pkg for upload
+  app-store-connect.py   Fill in the App Store listing from docs/app-store/listing, pick the build, submit for review (App Store Connect API)
   make-icon.swift        Generate the app icon
   check-datasources.sh   Print raw quote API responses to spot format changes
   check-localization.py  Check that the English and Simplified Chinese strings are complete and consistent
@@ -73,6 +74,6 @@ When the repository secrets hold a Developer ID certificate and notarization cre
 
 You can also run the release workflow by hand on the Actions page: leave the tag empty to release the version at the top of `CHANGELOG.md`, or check overwrite to rebuild from the existing tag and replace the assets.
 
-The App Store edition is not released automatically. After a GitHub release, run the app-store workflow by hand on the Actions page to build, sign and upload it to App Store Connect, then submit it for review there; see [docs/app-store.md](app-store.md) (in Chinese).
+The App Store edition is not released automatically. After a GitHub release, add the English What's New (`docs/app-store/listing/en-US/whats_new/<version>.txt`) and run the app-store workflow by hand on the Actions page: it builds, signs and uploads the app, fills in the listing on App Store Connect from `docs/app-store/listing/`, picks the build and, when asked, submits it for review; see [docs/app-store.md](app-store.md) (in Chinese).
 
 See [docs/DESIGN.md](DESIGN.md) (in Chinese) for the design decisions.

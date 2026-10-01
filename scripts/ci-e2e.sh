@@ -464,12 +464,18 @@ smoke() {
 # 英文界面：系统语言是英文时，面板、详情、编辑页、设置窗口都是英文，截图放在 shots/en-*.png。
 english() {
   local en=(-AppleLanguages '(en)')
+  # 第一次启动（没有保存过的自选）：默认自选是美股指数这些，菜单栏上是标普 500，名称是英文。
+  defaults delete "$DOMAIN" watchlist.v1 2>/dev/null || true
   run_case en-panel --show-panel "${en[@]}"
   check_fits en-panel
   grep -q 'english=true sample="Settings…"' shots/en-panel.log || fail "英文系统下界面应该是英文"
-  run_case en-detail --show-panel --expand sh600519 "${en[@]}"
+  grep -q 'items=8 ' shots/en-panel.log || fail "英文界面的默认自选应该有 8 只"
+  grep -q 'status_title="S&P 500 ' shots/en-panel.log || fail "英文界面第一次启动时菜单栏上应该是 S&P 500"
+  run_case en-detail --show-panel --expand usAAPL "${en[@]}"
   check_fits en-detail
   run_case en-search --show-panel --search 腾讯 "${en[@]}"
+  # 环球股指：搜 nikkei 在最前面，行情来自新浪。
+  run_case en-search-global --show-panel --search nikkei "${en[@]}"
   # 设置里选了 English：只在 Stox 自己的偏好设置里写 AppleLanguages（不带启动参数），界面就是英文。
   defaults write "$DOMAIN" AppleLanguages -array en
   run_case en-settings-general --show-settings general
@@ -713,8 +719,8 @@ appstore_test() {
   # 设置写在容器里（沙盒里读不到 ~/Library/Preferences 里 GitHub 版的设置）。
   local prefs="$CONTAINER/Library/Preferences/$DOMAIN"
   defaults write "$prefs" tips.dismissed -bool true
-  run_case appstore-detail --show-panel --expand sh600519
-  grep -q "expanded=sh600519" shots/appstore-detail.log || fail "App Store 版展开详情失败"
+  run_case appstore-detail --show-panel --expand usAAPL
+  grep -q "expanded=usAAPL" shots/appstore-detail.log || fail "App Store 版展开详情失败"
   run_case appstore-settings --show-settings about
   grep -q "settings_page=about" shots/appstore-settings.log || fail "App Store 版的设置窗口没有打开"
   # 界面语言：沙盒里的设置在容器里，设置页从那里读出选的语言，启动时也按它显示。
@@ -733,7 +739,7 @@ appstore_test() {
   STOX_SYNC_DIR="$cloud" "$APP/Contents/MacOS/Stox" --show-panel > shots/appstore-sync.log 2>&1 &
   local pid=$!
   wait_for 30 log_has "已写入本机的自选和设置（8 只）" || fail "App Store 版在沙盒里没有写出同步文件"
-  grep -q '"sh600519"' "$cloud/sync.json" || fail "同步文件里没有默认自选"
+  grep -q '"usAAPL"' "$cloud/sync.json" || fail "同步文件里没有默认自选"
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
   grep -q "sync_container=false" shots/appstore-sync.log || fail "ad-hoc 构建不应该有 iCloud 容器的 entitlement"

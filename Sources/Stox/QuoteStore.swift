@@ -672,7 +672,7 @@ final class QuoteStore: ObservableObject {
                   let move = rapidMoves.record(quote, at: now, threshold: threshold)
             else { continue }
             firedAlertCount += 1
-            let name = quote.name.isEmpty ? item.displayName : quote.name
+            let name = item.displayName(with: quote)
             let trigger = AlertTrigger(
                 symbol: item.symbol, name: name, condition: move.direction == .up ? .rapidRise : .rapidFall,
                 threshold: move.percent, quote: quote

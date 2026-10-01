@@ -64,7 +64,7 @@ The three at the top show the expanded detail (intraday chart and average price 
 
 - **Quotes at a glance**: click the menu bar icon and the glass panel appears; click again, click elsewhere or press Esc and it's gone.
 - **Gone in a click**: right-click and only the icon is left in the menu bar, so nobody looking over your shoulder sees your stocks.
-- **Three markets**: China A-shares, Hong Kong and US stocks, plus indices, ETFs, mutual funds, international futures and FX; intraday and candlestick charts, order book and fund flow.
+- **Three markets**: China A-shares, Hong Kong and US stocks, plus indices, ETFs, mutual funds, global indices such as the Nikkei 225, FTSE 100 and DAX, international futures and FX; intraday and candlestick charts, order book and fund flow.
 - **Holdings and P&L**: enter your holdings and today's and total P&L are worked out for you, with a P&L calendar.
 - **Alerts when they matter**: price targets, % change, take profit and stop loss, limit up and down, new highs and lows, all as notifications.
 - **Light**: about 3.6 MB zipped and about 30 MB of memory; no sign-up and no API key.

@@ -9,6 +9,16 @@ The Mac App Store accepts 1 to 10 screenshots per language, all with a 16:10 asp
 
 PNG or JPEG, no transparency. The first three show up on the product page, so put the strongest first.
 
+## How they get uploaded
+
+The `app-store` workflow uploads the English screenshots (other languages fall back to them) and skips the upload when App Store Connect already has the same files (compared by MD5):
+
+1. If `docs/app-store/listing/screenshots/en-US/` has PNG or JPEG files, it uses those, in file name order (`1-panel.png`, `2-detail.png`, …).
+2. Otherwise it uses the two 1440 × 900 images from the latest successful `build` run on main (below): the panel first, then the expanded detail.
+3. If neither is there, it leaves the screenshots on App Store Connect as they are.
+
+`python3 scripts/app-store-connect.py check --screenshots <folder>` checks the format, sizes and count.
+
 ## From CI (1440 × 900)
 
 The `App Store edition (sandbox)` job in the `build` workflow launches the sandboxed build, opens the panel, and turns the capture into 1440 × 900 images with `scripts/app-store-screenshot.swift`: a menu bar across the top whose right end is the real one (Stox's ticker and the clock), and the real panel below it, clipped to its rounded corners, on a gradient desktop. Download the `app-store-screenshots` artifact from the run; the images are in `shots/app-store/`.

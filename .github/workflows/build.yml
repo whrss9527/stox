@@ -27,6 +27,13 @@ jobs:
         run: |
           command -v python3 > /dev/null || (apt-get update -qq && apt-get install -y -qq python3 > /dev/null)
           python3 scripts/check-localization.py
+      - name: App Store listing
+        # docs/app-store/listing 里的 App Store 资料：文件齐全、没超字数、网址是 https、截图尺寸对；
+        # 以及把资料填进 App Store Connect 的脚本的单元测试（JWT 签名的测试要用 openssl 命令）。
+        run: |
+          command -v openssl > /dev/null || (apt-get update -qq && apt-get install -y -qq openssl > /dev/null)
+          python3 scripts/app-store-connect.py check
+          python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Unit tests
         run: swift test
       - name: Live data smoke test
@@ -34,8 +41,11 @@ jobs:
         continue-on-error: true
         run: |
           swift run stox-cli quote sh000001 sh600519 sz000001 sz399006 sh510300 bj920819 hk00700 hkHSI usAAPL usBRK.B us.IXIC hf_XAU whUSDCNY
+          swift run stox-cli quote us.INX us.DJI usMSFT usNVDA hk00005 hkHSCEI whEURUSD
+          swift run stox-cli quote znb_NKY znb_UKX znb_DAX znb_CAC znb_SX5E znb_KOSPI znb_SENSEX znb_TWJQ znb_STI znb_IBOV
           swift run stox-cli search gzmt
           swift run stox-cli search 黄金
+          swift run stox-cli search nikkei
           swift run stox-cli search 腾讯
           swift run stox-cli kline sh600519 day
           swift run stox-cli kline hk00700 week
@@ -44,7 +54,7 @@ jobs:
           swift run stox-cli rank gainers 5
           swift run stox-cli rank industries 5
           swift run stox-cli flow sh600519
-          swift run stox-cli sina sh000001 sh600519 sh510300 hk00700 hkHSI usAAPL usBRK.B us.IXIC
+          swift run stox-cli sina sh000001 sh600519 sh510300 hk00700 hkHSI usAAPL usBRK.B us.IXIC znb_NKY
           swift run stox-cli latest-release 0.0.1
 
   app:

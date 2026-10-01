@@ -128,7 +128,7 @@ public enum TencentFundFlow {
     public static func supports(_ symbol: Symbol) -> Bool {
         switch symbol.market {
         case .sh, .sz, .bj: return !symbol.isIndex
-        case .hk, .us, .jj, .hf, .wh: return false
+        case .hk, .us, .jj, .hf, .wh, .zn: return false
         }
     }
 

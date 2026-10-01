@@ -1,0 +1,12 @@
+{
+  "primaryLocale": "en-US",
+  "primaryCategory": "FINANCE",
+  "secondaryCategory": "PRODUCTIVITY",
+  "contentRightsDeclaration": "USES_THIRD_PARTY_CONTENT",
+  "copyright": "{year} whrss9527",
+  "releaseType": "AFTER_APPROVAL",
+  "excludedTerritories": ["CHN"],
+  "availableInNewTerritories": true,
+  "price": "free",
+  "ageRating": "none"
+}
