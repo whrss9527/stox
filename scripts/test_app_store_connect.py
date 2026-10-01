@@ -193,6 +193,9 @@ class SyncTestCase(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.tmp)
         self.root = self.tmp / "listing"
         shutil.copytree(asc.LISTING, self.root)
+        # 仓库里各个版本的“此版本的新增内容”不算进来：测试自己决定有没有。
+        for whats_new in self.root.glob("*/whats_new"):
+            shutil.rmtree(whats_new)
         self.changelog = self.tmp / "CHANGELOG.md"
         self.changelog.write_text("# 更新日志\n\n## 0.49.0\n\n- 新功能 `stox-cli`，见 [说明](https://example.com)。\n\n## 0.48.0\n\n- 旧的\n",
                                   encoding="utf-8")
