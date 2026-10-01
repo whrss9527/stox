@@ -580,7 +580,7 @@ class ApiError(Exception):
 
     def report(self, kind="error"):
         for line in self.lines():
-            annotate(kind, line, title=f"App Store Connect（{self.method} {self.path}）")
+            annotate(kind, f"{self.method} {self.path}：{line}", title="App Store Connect")
 
 
 def urllib_send(method, url, headers, body):
@@ -853,8 +853,10 @@ class Sync:
         self.step("价格：免费")
         schedule = (self.api.get(f"/v1/apps/{self.app_id}/appPriceSchedule", allow_404=True) or {}).get("data")
         if schedule:
+            # 还没定过价的新 App 也会返回一个价格表（ID 和 App 一样），读它的价格却是 404：当作还没有价格。
             prices, included = self.api.get_all(
-                f"/v1/appPriceSchedules/{schedule['id']}/manualPrices", {"include": "appPricePoint,territory", "limit": 200}
+                f"/v1/appPriceSchedules/{schedule['id']}/manualPrices", {"include": "appPricePoint,territory", "limit": 200},
+                allow_404=True,
             )
             points = {item["id"]: item for item in included if item.get("type") == "appPricePoints"}
             customer = [((points.get(rel_id(p, "appPricePoint")) or {}).get("attributes") or {}).get("customerPrice") for p in prices]
@@ -892,7 +894,14 @@ class Sync:
         wanted_new = self.config["availableInNewTerritories"]
         self.step(f"销售范围：除了 {'、'.join(sorted(excluded)) or '（没有）'} 以外的所有国家和地区")
         current = (self.api.get(f"/v1/apps/{self.app_id}/appAvailabilityV2", allow_404=True) or {}).get("data")
-        if not current:
+        items = []
+        if current:
+            # 和价格一样，没设过销售范围的新 App 可能返回一个空壳，读它的地区是 404 或者空的：当作还没设过。
+            items, _ = self.api.get_all(
+                f"/v2/appAvailabilities/{current['id']}/territoryAvailabilities", {"include": "territory", "limit": 200},
+                allow_404=True,
+            )
+        if not items:
             territories, _ = self.api.get_all("/v1/territories", {"limit": 200})
             ids = sorted(t["id"] for t in territories)
             unknown = excluded - set(ids)
@@ -921,9 +930,6 @@ class Sync:
             return
         if (current.get("attributes") or {}).get("availableInNewTerritories") != wanted_new:
             annotate("warning", "“以后新增的国家和地区自动上架”和 config.json 里的不一样；API 改不了这一项，到网页上的“价格与销售范围”里改")
-        items, _ = self.api.get_all(
-            f"/v2/appAvailabilities/{current['id']}/territoryAvailabilities", {"include": "territory", "limit": 200}
-        )
         fixed = []
         for item in items:
             territory = rel_id(item, "territory")
@@ -1174,11 +1180,17 @@ class Sync:
             update = differences(current.get("attributes"), wanted)
             if update:
                 payload = self._update_payload("appStoreReviewDetails", current["id"], update)
-                self.api.write("PATCH", f"/v1/appStoreReviewDetails/{current['id']}", payload, describe(update))
-                self.changed(f"审核信息：{'、'.join(update)}")
+                try:
+                    self.api.write("PATCH", f"/v1/appStoreReviewDetails/{current['id']}", payload, describe(update))
+                    self.changed(f"审核信息：{'、'.join(update)}")
+                except ApiError as err:
+                    # 和价格、销售范围一样，没填过的可能只是个空壳，改不了就新建。
+                    if err.status != 404:
+                        raise
+                    current = None
             else:
                 print("    不用改")
-        else:
+        if not current:
             payload = {
                 "data": {
                     "type": "appStoreReviewDetails",

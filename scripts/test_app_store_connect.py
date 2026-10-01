@@ -232,6 +232,34 @@ class SyncTests(SyncTestCase):
         for call in self.fake.calls:
             self.assertEqual(call["headers"]["Authorization"], "Bearer test-token")
 
+    def test_placeholders_of_a_new_app(self):
+        # 真的 App Store Connect 上，没定过价、没设过销售范围的新 App 也会返回一个和 App 同 ID 的空壳，
+        # 再往下读它的价格、地区是 404（“There is no resource of type 'null' with id …”）。
+        listing = self.listing("0.48.0")
+        fake = self.fake
+        synced(fake, listing)
+        fake.get("/v1/apps/app1/appPriceSchedule", single(res("appPriceSchedules", "app1")))
+        fake.get("/v1/appPriceSchedules/app1/manualPrices", NOT_FOUND)
+        fake.get("/v1/apps/app1/appPricePoints", page(res("appPricePoints", "pp-0", customerPrice="0.0")))
+        fake.get("/v1/apps/app1/appAvailabilityV2", single(res("appAvailabilities", "app1", availableInNewTerritories=None)))
+        fake.get("/v2/appAvailabilities/app1/territoryAvailabilities", NOT_FOUND)
+        fake.get("/v1/territories", page(*[res("territories", t, currency="X") for t in TERRITORIES]))
+        fake.get("/v1/appStoreVersions/v1/appStoreReviewDetail", single(res("appStoreReviewDetails", "v1", notes=None)))
+        fake.on("PATCH", "/v1/appStoreReviewDetails/v1", lambda q, p: NOT_FOUND)
+
+        self.sync(listing, "0.48.0", attach_latest=True, contact=CONTACT)
+
+        price = fake.payload("POST", "/v1/appPriceSchedules")
+        self.assertEqual(price["included"][0]["relationships"]["appPricePoint"]["data"]["id"], "pp-0")
+        availability = fake.payload("POST", "/v2/appAvailabilities")
+        territories = {item["relationships"]["territory"]["data"]["id"]: item["attributes"]["available"]
+                       for item in availability["included"]}
+        self.assertEqual(territories, {t: t != "CHN" for t in TERRITORIES})
+        self.assertNotIn("PATCH", [m for m, path in fake.writes() if "territoryAvailabilities" in path])
+        review = fake.payload("POST", "/v1/appStoreReviewDetails")["data"]
+        self.assertEqual(review["attributes"]["contactEmail"], CONTACT["contactEmail"])
+        self.assertEqual(review["relationships"]["appStoreVersion"]["data"]["id"], "v1")
+
     def test_first_version_of_a_new_app(self):
         listing = self.listing("0.48.0")
         fake = self.fake
@@ -470,7 +498,7 @@ class SyncTests(SyncTestCase):
             api = asc.Api(lambda: "t", send=self.fake.send, sleep=self.sleeps.append)
             asc.Sync(api, listing, "0.48.0", attach_latest=True, submit=True, contact=CONTACT, sleep=self.sleeps.append).run()
         self.assertIn("App 隐私", str(caught.exception))
-        self.assertIn("::error title=App Store Connect（PATCH /v1/reviewSubmissions/sub1）::409 STATE_ERROR.ENTITY_STATE_INVALID", output.getvalue())
+        self.assertIn("::error title=App Store Connect::PATCH /v1/reviewSubmissions/sub1：409 STATE_ERROR.ENTITY_STATE_INVALID", output.getvalue())
         self.assertIn("You must provide privacy details.", output.getvalue())
         # 版本已经在这个审核提交里了，不再加一次。
         self.assertNotIn(("POST", "/v1/reviewSubmissionItems"), self.fake.writes())
