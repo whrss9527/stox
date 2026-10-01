@@ -88,9 +88,9 @@ use_chinese() {
 check_fits() {
   local name="$1" frame_h fitting available
   read -r frame_h fitting available < <(sed -nE 's/.*panel_frame=[0-9-]+ [0-9-]+ [0-9]+ ([0-9]+) content=[0-9]+x[0-9]+ fitting=([0-9]+) list_max=[0-9]+ available=([0-9]+).*/\1 \2 \3/p' "shots/$name.log" | tail -1) || true
-  [[ -n "${available:-}" ]] || fail "$name：没有面板尺寸的诊断信息"
+  [[ -n "${available:-}" ]] || fail "${name}：没有面板尺寸的诊断信息"
   if (( frame_h > available + 1 || fitting > available + 1 )); then
-    fail "$name：面板比屏幕能放的高（窗口 $frame_h，内容 $fitting，屏幕 $available），底下的按钮会看不到"
+    fail "${name}：面板比屏幕能放的高（窗口 ${frame_h}，内容 ${fitting}，屏幕 ${available}），底下的按钮会看不到"
   fi
 }
 
@@ -158,7 +158,7 @@ smoke() {
   defaults delete "$DOMAIN" watchlist.v1
   grep -q "alert_lines=6 " shots/alert-lines.log || fail "分时图上应该有六条提醒线：价格高于、低于，涨跌幅，止盈，止损"
   grep -q "alert_lines=4 " shots/alert-lines-kline.log || fail "日 K 上应该有四条提醒线，涨跌幅提醒只画在分时图上"
-  grep -Eq "alert_lines_in_view=[1-9]" shots/alert-lines-kline.log || echo "::warning::日 K 上的提醒线都不在图的范围里（现价 $price）"
+  grep -Eq "alert_lines_in_view=[1-9]" shots/alert-lines-kline.log || echo "::warning::日 K 上的提醒线都不在图的范围里（现价 ${price}）"
 
   # 五档：A 股个股有买卖五档，开盘前、停牌、涨跌停时不满，只提示。港股没有五档，选着五档时看分时，也不列五档。
   run_case orderbook --show-panel --expand sh600519 --chart orderBook
@@ -309,7 +309,7 @@ smoke() {
   local fitting available
   read -r fitting available < <(sed -nE 's/.*fitting=([0-9]+) list_max=[0-9]+ available=([0-9]+).*/\1 \2/p' shots/editor.log | head -1) || true
   if [[ -n "${fitting:-}" && -n "${available:-}" && "$fitting" -gt "$available" ]]; then
-    fail "编辑页比屏幕能放的还高（$fitting > $available），保存按钮会看不到"
+    fail "编辑页比屏幕能放的还高（$fitting > ${available}），保存按钮会看不到"
   fi
   grep -Eq "items=5 quotes=[0-9]+ holdings=4 summary=cn,hk,us " shots/holdings.log || fail "持仓没有读出来"
   # 列表上方只看港股时，持仓合计也只算港股。
@@ -809,14 +809,14 @@ store_scene() {
   for attempt in 1 2 3; do
     run_case "$shot" --show-panel "$@" -AppleLanguages '(en)'
     store_ready "shots/$shot.log" "${needs[@]}" && break
-    (( attempt < 3 )) || fail "App Store 截图 $name：试了三次还是不行，缺$(cat "$WORK/store-missing.txt")"
-    echo "App Store 截图 $name：第 $attempt 次缺$(cat "$WORK/store-missing.txt")，重新启动再截"
+    (( attempt < 3 )) || fail "App Store 截图 ${name}：试了三次还是不行，缺$(cat "$WORK/store-missing.txt")"
+    echo "App Store 截图 ${name}：第 $attempt 次缺$(cat "$WORK/store-missing.txt")，重新启动再截"
   done
   check_fits "$shot"
   frame=$(grep -o 'panel_frame=[0-9 -]*' "shots/$shot.log" | tail -1 | cut -d= -f2)
   # shellcheck disable=SC2086
   "$STORE_TOOL" "shots/$shot-full.png" "$STORE_OUT/$name.png" $frame \
-    --size 1280x800 --theme "$theme" --title "$title" --subtitle "$subtitle" || fail "App Store 截图 $name：合成失败"
+    --size 1280x800 --theme "$theme" --title "$title" --subtitle "$subtitle" || fail "App Store 截图 ${name}：合成失败"
 }
 
 appstore_shots() {
@@ -856,7 +856,7 @@ appstore_shots() {
   aapl=$(store_cost usAAPL 0.86 285)
   msft=$(store_cost usMSFT 0.89 440)
   nvda=$(store_cost usNVDA 0.82 150)
-  echo "编的持仓成本：AAPL $aapl，MSFT $msft，NVDA $nvda"
+  echo "编的持仓成本：AAPL ${aapl}，MSFT ${msft}，NVDA $nvda"
   store_reset
   write_watchlist '[{"symbol":"us.INX","name":"S&P 500","alias":"S&P 500","pinned":true},
     {"symbol":"usAAPL","name":"Apple","holding":{"shares":120,"cost":'"$aapl"'}},

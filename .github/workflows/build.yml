@@ -230,7 +230,7 @@ jobs:
               size=$(stat -f %z "$dir/$name-preview.jpg")
               chunks=$(( chunks + ((size + 2) / 3 * 4 + 3999) / 4000 ))
             done
-            echo "质量 $quality：$chunks 段"
+            echo "质量 ${quality}：${chunks} 段"
             [ "$chunks" -le 40 ] && break
           done
           ls -la "$dir"
