@@ -68,6 +68,9 @@ do {
             }
             let time = q.timestamp.map { QuoteFormatter.time($0, timeZone: symbol.market.region.timeZone) } ?? "--"
             let phase = MarketClock.effectivePhase(for: symbol.market.region, at: Date(), latestQuoteTime: q.timestamp)
+            // 英文界面里的名称和菜单栏上的简称。
+            let item = WatchItem(symbol: symbol, name: q.name)
+            let english = EnglishName.name(symbol, quote: q).map { "  英文 \($0) [\(item.automaticTickerName(with: q, english: true))]" } ?? ""
             print([
                 pad(symbol.rawValue, 10),
                 pad(q.name, 18),
@@ -78,7 +81,7 @@ do {
                 pad("额 " + (q.amount > 0 ? QuoteFormatter.largeNumber(q.amount) : "--"), 13),
                 pad(q.marketCap.map { "市值 " + QuoteFormatter.largeNumber($0) } ?? "", 14),
                 "\(time) \(symbol.market.region.displayName)\(phase.displayName)",
-            ].joined(separator: " "))
+            ].joined(separator: " ") + english)
         }
         exit(missing == 0 ? 0 : 1)
 
@@ -89,7 +92,8 @@ do {
         let query = arguments.dropFirst().joined(separator: " ")
         let results = try await provider.search(query)
         for r in results {
-            print("\(pad(r.symbol.rawValue, 12)) \(pad(r.name, 24)) \(r.typeLabel)")
+            let english = r.displayName(quote: nil, english: true)
+            print("\(pad(r.symbol.rawValue, 12)) \(pad(r.name, 24)) \(r.typeLabel)" + (english == r.name ? "" : "  英文 \(english)"))
         }
         exit(results.isEmpty ? 1 : 0)
 

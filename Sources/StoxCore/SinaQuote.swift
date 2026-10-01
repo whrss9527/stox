@@ -5,6 +5,7 @@ import FoundationNetworking
 
 /// 新浪财经行情，腾讯的行情接口不可用时的备用数据源。只提供实时行情；搜索、分时、K 线仍然用腾讯。
 /// 国际期货（`hf_XAU`）的写法和字段都和腾讯一样；外汇新浪是另一套代码，不请求。
+/// 腾讯没有的环球股指（`znb_NKY`）总是从这里取，腾讯的数据源也是来这里要（见 TencentProvider）。
 ///
 /// `https://hq.sinajs.cn/list=sh600519,hk00700,gb_aapl`，必须带 `Referer: https://finance.sina.com.cn/`（否则 403），
 /// 返回 GB18030 编码的 `var hq_str_sh600519="贵州茅台,1236.000,…";`。
@@ -61,11 +62,11 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
 ///
 /// - 沪深北：0 名称、1 今开、2 昨收、3 现价、4 最高、5 最低、8 成交量（股；上证的指数是手）、9 成交额（元）、
 ///   10–19 / 20–29 买一到买五 / 卖一到卖五（每档“量（股）、价”）、30 日期、31 时间
-/// - 港股：1 名称、2 今开、3 昨收、4 最高、5 最低、6 现价、11 成交额、12 成交量、13 市盈率、15 / 16 52 周最高 / 最低、
-///   17 日期（`2026/09/28`）、18 时间（`16:08`）。指数的 11 是千港元，没有成交量
+/// - 港股：0 英文名（`TENCENT`）、1 名称、2 今开、3 昨收、4 最高、5 最低、6 现价、11 成交额、12 成交量、13 市盈率、
+///   15 / 16 52 周最高 / 最低、17 日期（`2026/09/28`）、18 时间（`16:08`）。指数的 11 是千港元，没有成交量
 /// - 美股：0 名称、1 现价、3 北京时间、5 今开、6 最高、7 最低、8 / 9 52 周最高 / 最低、10 成交量、12 总市值、14 市盈率、
 ///   26 昨收、30 成交额
-/// - 国际期货：和腾讯的 `hf_` 行情一样，见 GlobalQuoteParser
+/// - 国际期货：和腾讯的 `hf_` 行情一样；环球股指：见 GlobalQuoteParser
 ///
 /// 查不到的代码返回空字符串 `var hq_str_sh999999="";`。
 public enum SinaQuoteParser {
@@ -150,7 +151,8 @@ public enum SinaQuoteParser {
                 high52Week: positive(15),
                 low52Week: positive(16),
                 timestamp: timestamp("\(fields[17]) \(fields[18])", region: region),
-                priceDecimals: isIndex ? 2 : 3
+                priceDecimals: isIndex ? 2 : 3,
+                englishName: EnglishName.cleaned(fields[0])
             )
         case .us:
             guard fields.count > 26, !fields[0].isEmpty, let price = positive(1), let previousClose = positive(26) else {
@@ -176,8 +178,12 @@ public enum SinaQuoteParser {
                 priceDecimals: price < 1 ? 4 : 2
             )
         case .global:
-            // 国际期货的字段和腾讯一样；外汇不从新浪取。
-            return symbol.market == .hf ? GlobalQuoteParser.futures(symbol: symbol, fields: fields) : nil
+            // 国际期货的字段和腾讯一样；环球股指只有新浪有；外汇不从新浪取。
+            switch symbol.market {
+            case .hf: return GlobalQuoteParser.futures(symbol: symbol, fields: fields)
+            case .zn: return GlobalQuoteParser.index(symbol: symbol, fields: fields)
+            default: return nil
+            }
         }
     }
 

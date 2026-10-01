@@ -49,6 +49,7 @@ public enum ProviderError: Error, LocalizedError, Equatable {
 }
 
 /// 腾讯财经行情源：免费、无需密钥，覆盖沪深北 A 股、港股（延时约 15 分钟）、美股，以及国际期货、贵金属和外汇。
+/// 腾讯没有的环球股指向新浪要。
 public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     public static let quoteEndpoint = "https://qt.gtimg.cn/utf8/q="
     public static let searchEndpoint = "https://smartbox.gtimg.cn/s3/?v=2&t=all&c=1&q="
@@ -62,12 +63,15 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     private let session: URLSession
     private let timeout: TimeInterval
     private let endpoint: String
+    /// 环球股指的行情。
+    private let sina: QuoteProvider
 
-    public init(session: URLSession = .shared, timeout: TimeInterval = 8, quoteEndpoint: String? = nil) {
+    public init(session: URLSession = .shared, timeout: TimeInterval = 8, quoteEndpoint: String? = nil, sina: QuoteProvider? = nil) {
         self.session = session
         self.timeout = timeout
         let override = ProcessInfo.processInfo.environment[Self.endpointOverrideVariable].flatMap { $0.isEmpty ? nil : $0 }
         endpoint = quoteEndpoint ?? override ?? Self.quoteEndpoint
+        self.sina = sina ?? SinaProvider(session: session, timeout: timeout)
     }
 
     public static func quoteURL(for symbols: [Symbol], endpoint: String = quoteEndpoint) -> URL? {
@@ -136,12 +140,27 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
         for symbol in symbols where seen.insert(symbol).inserted { unique.append(symbol) }
         guard !unique.isEmpty else { return [:] }
 
-        let batches = stride(from: 0, to: unique.count, by: Self.batchSize).map {
-            Array(unique[$0..<min($0 + Self.batchSize, unique.count)])
+        let indices = unique.filter { $0.market == .zn }
+        let own = unique.filter { $0.market != .zn }
+        let batches = stride(from: 0, to: own.count, by: Self.batchSize).map {
+            Array(own[$0..<min($0 + Self.batchSize, own.count)])
         }
         return try await withThrowingTaskGroup(of: [Symbol: Quote].self) { group in
             for batch in batches {
                 group.addTask { try await self.fetchBatch(batch) }
+            }
+            if !indices.isEmpty {
+                // 环球股指向新浪要，和腾讯的请求同时发出。新浪取不到时不耽误别的行情；只有环球股指时照常报错，
+                // 交给备用数据源再试。
+                let alone = own.isEmpty
+                group.addTask {
+                    do {
+                        return try await self.sina.fetchQuotes(for: indices)
+                    } catch {
+                        if alone { throw error }
+                        return [:]
+                    }
+                }
             }
             var merged: [Symbol: Quote] = [:]
             for try await quotes in group {
@@ -156,11 +175,12 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
         return Self.decodeText(try await get(url))
     }
 
-    /// 搜索接口搜不到期货外汇，先在内置的品种表里找，排在前面；搜索接口出错时只要品种表里有就先给这些。
+    /// 搜索接口搜不到期货外汇和环球股指，先在内置的品种表里找，排在前面；英文界面里还按英文名找常见的指数
+    /// （S&P 500、Hang Seng）。搜索接口出错时只要这里找到了就先给这些。
     public func search(_ query: String) async throws -> [SearchResult] {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
-        let local = GlobalCatalog.search(trimmed)
+        let local = (AppLanguage.isEnglish ? EnglishName.searchIndices(trimmed) : []) + GlobalCatalog.search(trimmed)
         guard let url = Self.searchURL(for: trimmed) else { throw URLError(.badURL) }
         do {
             let remote = TencentSearchParser.parse(Self.decodeText(try await get(url)))

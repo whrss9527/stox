@@ -20,9 +20,10 @@ import Foundation
 /// | 37 | 成交额（A 股单位为万元，港美股为元） |
 /// | 38 / 39 | 换手率%（港股在第 59 位） / 市盈率 |
 /// | 45 | 总市值（亿；指数为成分股总市值，不展示） |
-/// | 46 | A 股：市净率（ETF 是 0） |
+/// | 46 | A 股：市净率（ETF 是 0）；港美股：英文名（`TENCENT`、`Apple Inc.`、`Nasdaq Composite`） |
 /// | 47 / 48 | A 股：涨停价 / 跌停价；港美股：52 周最高 / 最低 |
 /// | 49 | A 股：量比 |
+/// | 56 | 美股的类别：`GP`、`GP-ETF`、`ZS`（指数） |
 /// | 61 | A 股的类别：`GP-A`、`GP-A-CYB`（创业板）、`GP-A-KCB`（科创板）、`ETF`、`ZS`（指数） |
 /// | 67 / 68 | A 股：52 周最高 / 最低（美股的 67 是当天的成交均价，即成交额除以成交量，没有用） |
 ///
@@ -131,8 +132,16 @@ public enum TencentQuoteParser {
             timestamp: parseTimestamp(fields[30], timeZone: region.timeZone),
             priceDecimals: isIndex ? 2 : decimalPlaces(of: fields[3], fallback: fields[4]),
             exchangeCode: fields[2].isEmpty ? nil : fields[2],
-            orderBook: isCN && !isIndex ? orderBook(number, lot: lot) : nil
+            orderBook: isCN && !isIndex ? orderBook(number, lot: lot) : nil,
+            englishName: isCN ? nil : englishName(fields, region: region)
         )
+    }
+
+    /// 港美股的英文名（第 46 位）。美股 ETF 的是基金的全称（`State Street Spdr S&P 500 Etf`），又长又不好认，不要。
+    static func englishName(_ fields: [String], region: MarketRegion) -> String? {
+        guard fields.count > 46 else { return nil }
+        if region == .us, fields.count > 56, fields[56].uppercased().contains("ETF") { return nil }
+        return EnglishName.cleaned(fields[46])
     }
 
     /// 场外基金：`v_jj161725="161725~招商中证白酒指数A~0.0000~0.0000~~0.5166~2.2327~-0.8065~2026-09-28~";`，

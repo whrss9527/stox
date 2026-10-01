@@ -17,7 +17,11 @@ public enum PriceDirection: Sendable, Equatable {
 /// 一条实时行情快照。金额统一换算成本币“元”，成交量统一换算成“股”。
 public struct Quote: Sendable, Equatable {
     public var symbol: Symbol
+    /// 数据源给的名称，是中文（美股、港股也是：AAPL 是“苹果”）。
     public var name: String
+    /// 数据源给的英文名：美股是公司名（`Apple Inc.`），港股是英文简称（`TENCENT`），港美股指数也有
+    /// （`Nasdaq Composite`）；别的是 nil。英文界面用它，见 EnglishName。
+    public var englishName: String?
     public var price: Double
     public var previousClose: Double
     public var open: Double
@@ -84,7 +88,8 @@ public struct Quote: Sendable, Equatable {
         orderBook: OrderBook? = nil,
         cumulativeNAV: Double? = nil,
         bid: Double? = nil,
-        ask: Double? = nil
+        ask: Double? = nil,
+        englishName: String? = nil
     ) {
         self.symbol = symbol
         self.name = name
@@ -114,6 +119,7 @@ public struct Quote: Sendable, Equatable {
         self.cumulativeNAV = cumulativeNAV
         self.bid = bid
         self.ask = ask
+        self.englishName = englishName
     }
 
     public var direction: PriceDirection { PriceDirection(change) }

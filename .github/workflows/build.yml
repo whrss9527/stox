@@ -22,11 +22,6 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
-      - name: Probe (temporary)
-        continue-on-error: true
-        run: |
-          command -v python3 > /dev/null || (apt-get update -qq && apt-get install -y -qq python3 ca-certificates > /dev/null)
-          python3 scripts/probe-tmp.py
       - name: Localization
         # 英文和简体中文的翻译表键一致，代码里用到的键都有翻译，没有漏掉 L() 的中文。
         run: |
@@ -46,8 +41,11 @@ jobs:
         continue-on-error: true
         run: |
           swift run stox-cli quote sh000001 sh600519 sz000001 sz399006 sh510300 bj920819 hk00700 hkHSI usAAPL usBRK.B us.IXIC hf_XAU whUSDCNY
+          swift run stox-cli quote us.INX us.DJI usMSFT usNVDA hk00005 hkHSCEI whEURUSD
+          swift run stox-cli quote znb_NKY znb_UKX znb_DAX znb_CAC znb_SX5E znb_KOSPI znb_AS51 znb_SENSEX znb_TWJQ znb_STI znb_IBOV
           swift run stox-cli search gzmt
           swift run stox-cli search 黄金
+          swift run stox-cli search nikkei
           swift run stox-cli search 腾讯
           swift run stox-cli kline sh600519 day
           swift run stox-cli kline hk00700 week
@@ -56,7 +54,7 @@ jobs:
           swift run stox-cli rank gainers 5
           swift run stox-cli rank industries 5
           swift run stox-cli flow sh600519
-          swift run stox-cli sina sh000001 sh600519 sh510300 hk00700 hkHSI usAAPL usBRK.B us.IXIC
+          swift run stox-cli sina sh000001 sh600519 sh510300 hk00700 hkHSI usAAPL usBRK.B us.IXIC znb_NKY
           swift run stox-cli latest-release 0.0.1
 
   app:

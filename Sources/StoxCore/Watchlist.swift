@@ -51,10 +51,27 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
     public var displayName: String { name.isEmpty ? symbol.displayCode : name }
 
     /// 菜单栏上显示的名字：优先用户设置的简称，否则截断全称。
-    public var tickerName: String {
+    public var tickerName: String { tickerName(with: nil, english: false) }
+
+    /// 列表、提醒里显示的名称：有行情时用行情里的名称，否则用记下的名称或代码。
+    /// 英文界面里能换成英文的换成英文（见 EnglishName），A 股、场外基金照旧是中文。
+    public func displayName(with quote: Quote?, english: Bool = AppLanguage.isEnglish) -> String {
+        if english, let name = EnglishName.name(symbol, quote: quote) { return name }
+        if let name = quote?.name, !name.isEmpty { return name }
+        return displayName
+    }
+
+    /// 菜单栏上显示的名字：优先用户设置的简称，否则见 automaticTickerName(with:english:)。
+    public func tickerName(with quote: Quote?, english: Bool = AppLanguage.isEnglish) -> String {
         if let alias, !alias.trimmingCharacters(in: .whitespaces).isEmpty {
             return alias.trimmingCharacters(in: .whitespaces)
         }
+        return automaticTickerName(with: quote, english: english)
+    }
+
+    /// 没有设简称时菜单栏上的名字：截断全称；英文界面里是英文简称（S&P 500、AAPL、Gold）。
+    public func automaticTickerName(with quote: Quote?, english: Bool = AppLanguage.isEnglish) -> String {
+        if english, let name = EnglishName.shortName(symbol, quote: quote) { return name }
         return NameAbbreviator.abbreviate(displayName)
     }
 }
@@ -97,8 +114,15 @@ extension WatchItem: Codable {
 }
 
 public enum Watchlist {
-    /// 首次启动时的默认自选：三大市场的主要指数加几只常见股票。
-    public static let defaults: [WatchItem] = [
+    /// 首次启动时的默认自选（没有保存过的自选时），按界面语言选。已经有自选的不动。
+    public static var defaults: [WatchItem] { defaults(english: AppLanguage.isEnglish) }
+
+    public static func defaults(english: Bool) -> [WatchItem] {
+        english ? englishDefaults : chineseDefaults
+    }
+
+    /// 中文界面：三大市场的主要指数加几只常见股票，菜单栏上是上证。
+    static let chineseDefaults: [WatchItem] = [
         item("sh000001", "上证指数", alias: "上证", pinned: true),  // l10n-ignore
         item("sz399001", "深证成指"),  // l10n-ignore
         item("sz399006", "创业板指"),  // l10n-ignore
@@ -109,9 +133,24 @@ public enum Watchlist {
         item("usAAPL", "苹果"),  // l10n-ignore
     ]
 
+    /// 英文界面：美股三大指数、三只大公司、黄金和欧元美元，菜单栏上是标普 500。名称在第一次取到行情后
+    /// 换成数据源的中文名，显示的是英文名（见 EnglishName）。
+    static let englishDefaults: [WatchItem] = [
+        item("us.INX", "S&P 500", alias: "S&P 500", pinned: true),
+        item("us.IXIC", "Nasdaq Composite"),
+        item("us.DJI", "Dow Jones"),
+        item("usAAPL", "Apple"),
+        item("usMSFT", "Microsoft"),
+        item("usNVDA", "NVIDIA"),
+        item("hf_XAU", "Spot Gold"),
+        item("whEURUSD", "EUR/USD"),
+    ]
+
     /// 常用指数：默认自选里的几个指数，自选删空以后一键加回来。
-    public static var commonIndices: [WatchItem] {
-        defaults.filter { $0.symbol.isIndex }
+    public static var commonIndices: [WatchItem] { commonIndices(english: AppLanguage.isEnglish) }
+
+    public static func commonIndices(english: Bool) -> [WatchItem] {
+        defaults(english: english).filter { $0.symbol.isIndex }
     }
 
     private static func item(_ raw: String, _ name: String, alias: String? = nil, pinned: Bool = false) -> WatchItem {
@@ -350,14 +389,16 @@ public enum MenuBarTicker {
     }
 
     /// 每只“显示在菜单栏”的证券对应一组文字片段；没有固定项或全部选项关闭时返回空数组。
-    public static func entries(items: [WatchItem], quotes: [Symbol: Quote], options: TickerOptions) -> [[TickerPart]] {
+    public static func entries(
+        items: [WatchItem], quotes: [Symbol: Quote], options: TickerOptions, english: Bool = AppLanguage.isEnglish
+    ) -> [[TickerPart]] {
         guard !options.isEmpty else { return [] }
         return items.filter(\.pinned).map { item in
             let quote = quotes[item.symbol]
             let direction = quote?.direction ?? .flat
             var parts: [TickerPart] = []
             if options.showName {
-                parts.append(TickerPart(role: .name, text: item.tickerName, direction: direction))
+                parts.append(TickerPart(role: .name, text: item.tickerName(with: quote, english: english), direction: direction))
             }
             if options.showPrice {
                 let text = quote.map { QuoteFormatter.price($0.price, decimals: $0.priceDecimals) } ?? "--"
@@ -373,14 +414,14 @@ public enum MenuBarTicker {
 }
 
 public enum QuoteLinks {
-    /// 雪球个股页：SH600519、00700、HKHSI、AAPL、.IXIC。场外基金、期货外汇没有，返回 nil。
+    /// 雪球个股页：SH600519、00700、HKHSI、AAPL、.IXIC。场外基金、环球的品种没有，返回 nil。
     public static func xueqiu(_ symbol: Symbol) -> URL? {
         let path: String
         switch symbol.market {
         case .sh, .sz, .bj: path = symbol.market.rawValue.uppercased() + symbol.code
         case .hk: path = symbol.isIndex ? "HK" + symbol.code : symbol.code
         case .us: path = symbol.code
-        case .jj, .hf, .wh: return nil
+        case .jj, .hf, .wh, .zn: return nil
         }
         return URL(string: "https://xueqiu.com/S/" + path)
     }

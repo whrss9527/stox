@@ -117,7 +117,7 @@ struct QuoteRow: View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 4) {
-                    Text(quote?.name ?? item.displayName)
+                    Text(item.displayName(with: quote))
                         .font(.system(size: 13, weight: .medium))
                         .lineLimit(1)
                     if item.pinned {
@@ -195,7 +195,7 @@ struct QuoteRow: View {
     private var compactSummary: some View {
         HStack(spacing: 6) {
             MarketBadge(market: item.symbol.market)
-            Text(quote?.name ?? item.displayName)
+            Text(item.displayName(with: quote))
                 .font(.system(size: 12.5, weight: .medium))
                 .lineLimit(1)
             Text(item.symbol.displayCode)
@@ -258,7 +258,7 @@ struct QuoteRow: View {
 
     /// 读屏软件念的内容：名称、代码、现价、涨跌，有持仓时加上持仓盈亏。
     private var accessibilityText: String {
-        var text = L("%@，%@", quote?.name ?? item.displayName, item.symbol.displayCode)
+        var text = L("%@，%@", item.displayName(with: quote), item.symbol.displayCode)
         guard let quote else { return text + L("，暂无行情") }
         text += L("，现价 %@", QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))
         switch quote.direction {
@@ -386,7 +386,8 @@ struct QuoteDetailView: View {
                     cell(L("日涨幅"), QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
                 }
             } else if item.symbol.isGlobal {
-                // 期货外汇没有成交量：开高低收、买价卖价；外汇有 52 周最高最低，期货写振幅。国际期货有分时图（来自新浪）。
+                // 环球的品种没有成交量：开高低收、买价卖价；外汇有 52 周最高最低，期货写振幅，环球股指写涨跌幅和振幅。
+                // 国际期货有分时图（来自新浪）。
                 if item.symbol.hasIntraday {
                     QuoteChartSection(item: item, quote: quote)
                 }
@@ -398,12 +399,19 @@ struct QuoteDetailView: View {
                 }
                 HStack(spacing: 0) {
                     cell(L("涨跌"), QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
-                    cell(L("买价"), quote.bid.map(price) ?? "--")
-                    cell(L("卖价"), quote.ask.map(price) ?? "--")
-                    if let high = quote.high52Week, let low = quote.low52Week {
-                        cell(L("52周高低"), price(high) + "/" + price(low))
-                    } else {
+                    if item.symbol.market == .zn {
+                        // 环球股指没有买价卖价。
+                        cell(L("涨跌幅"), QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
                         cell(L("振幅"), quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                        Color.clear.frame(maxWidth: .infinity, maxHeight: 1)
+                    } else {
+                        cell(L("买价"), quote.bid.map(price) ?? "--")
+                        cell(L("卖价"), quote.ask.map(price) ?? "--")
+                        if let high = quote.high52Week, let low = quote.low52Week {
+                            cell(L("52周高低"), price(high) + "/" + price(low))
+                        } else {
+                            cell(L("振幅"), quote.amplitude.map { QuoteFormatter.fixed($0, decimals: 2) + "%" } ?? "--")
+                        }
                     }
                 }
             } else {

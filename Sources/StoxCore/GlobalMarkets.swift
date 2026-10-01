@@ -9,11 +9,16 @@ import Foundation
 /// 外汇：`v_whUSDCNY="310~美元人民币~USDCNY~6.7062~0~20260929140022~6.7100~6.7050~6.7086~6.7050~6.7062~6.7064~-0.0038~-0.06~…~7.1430~6.6950~2026-09-29";`，
 /// 字段以 `~` 分隔：1 名称、3 现价、5 时间（北京时间）、6 昨收、7 今开、8 最高、9 最低、10 买价、11 卖价、
 /// 12 涨跌、13 涨跌幅%、19 / 20 52 周最高 / 最低。只有腾讯有，新浪的外汇是另一套代码和字段，不用。
+///
+/// 环球股指只有新浪有：`var hq_str_znb_NKY="日经225,68956.5000,2202.78,3.30,2:12 AM,1759126320,2026-10-01,14:30:01,67106.5200,66753.7200,68995.3000,67081.6600,0";`，
+/// 字段以逗号分隔：0 名称、1 现价、2 涨跌、3 涨跌幅%、6 日期、7 时间（北京时间）、8 今开、9 昨收、10 最高、11 最低；
+/// 4、5 是没用的旧时间。有的代码只有前 6 个字段（多伦多、瑞士这些，数据停在一年前），不认。
 public enum GlobalQuoteParser {
     public static func parse(symbol: Symbol, payload: String) -> Quote? {
         switch symbol.market {
         case .hf: return futures(symbol: symbol, fields: fields(payload, separator: ","))
         case .wh: return forex(symbol: symbol, fields: fields(payload, separator: "~"))
+        case .zn: return index(symbol: symbol, fields: fields(payload, separator: ","))
         default: return nil
         }
     }
@@ -68,6 +73,26 @@ public enum GlobalQuoteParser {
         )
     }
 
+    /// 环球股指：名称用品种表里的（新浪的叫法有的过时了，比如“德国DAX30”），表里没有的用新浪的。
+    static func index(symbol: Symbol, fields: [String]) -> Quote? {
+        func positive(_ index: Int) -> Double? {
+            guard index < fields.count, let value = Double(fields[index]), value.isFinite, value > 0 else { return nil }
+            return value
+        }
+        guard fields.count > 11, let price = positive(1), let previousClose = positive(9) else { return nil }
+        return Quote(
+            symbol: symbol,
+            name: GlobalCatalog.entry(for: symbol)?.name ?? shortName(fields[0], fallback: symbol.code),
+            price: price,
+            previousClose: previousClose,
+            open: positive(8) ?? 0,
+            high: positive(10) ?? 0,
+            low: positive(11) ?? 0,
+            timestamp: TencentQuoteParser.parseTimestamp(fields[6] + fields[7], timeZone: MarketRegion.global.timeZone),
+            priceDecimals: 2
+        )
+    }
+
     /// 名称去掉括号里的说明：`伦敦金（现货黄金）` → `伦敦金`。
     static func shortName(_ name: String, fallback: String) -> String {
         let short = name.prefix(while: { $0 != "（" && $0 != "(" }).trimmingCharacters(in: .whitespaces)
@@ -88,41 +113,54 @@ public enum GlobalQuoteParser {
     }
 }
 
-/// 期货外汇的品种表。腾讯的搜索接口搜不到期货外汇，搜索时先在这里找：中文名、英文、代码、拼音首字母都行。
+/// 环球的品种表：期货外汇和环球股指。腾讯的搜索接口搜不到这些，搜索时先在这里找：中文名、英文、代码、拼音首字母都行。
+/// 英文界面里的名称也在这里（见 EnglishName）。
 public enum GlobalCatalog {
     public struct Entry: Sendable {
         public let symbol: Symbol
         public let name: String
-        /// 搜索结果里显示的类型：贵金属、能源、期货、外汇。
+        /// 搜索结果里显示的类型：贵金属、能源、期货、外汇；环球股指是指数，用腾讯的类型代码 ZS。
         public let kind: String
+        /// 英文界面里的名称，和菜单栏上的英文简称。
+        public let english: String
+        public let short: String
         /// 除了名称和代码，还能用这些词搜到（小写）。两个字母的拼音首字母容易和股票撞上（by 是白银也是比亚迪的开头），不放。
         let keywords: [String]
     }
 
-    private static func hf(_ code: String, _ name: String, _ kind: String, _ keywords: [String]) -> Entry {
-        Entry(symbol: Symbol(market: .hf, code: code)!, name: name, kind: kind, keywords: keywords)
+    private static func hf(_ code: String, _ name: String, _ kind: String, _ english: String, _ short: String, _ keywords: [String]) -> Entry {
+        Entry(symbol: Symbol(market: .hf, code: code)!, name: name, kind: kind, english: english, short: short, keywords: keywords)
     }
 
+    /// 外汇的英文名就是两种货币的代码：EUR/USD；美元指数是 US Dollar Index，简称 DXY。
     private static func wh(_ code: String, _ name: String, _ keywords: [String]) -> Entry {
-        Entry(symbol: Symbol(market: .wh, code: code)!, name: name, kind: "外汇", keywords: keywords)
+        let pair = code == "USDX" ? "DXY" : "\(code.prefix(3))/\(code.dropFirst(3))"
+        return Entry(
+            symbol: Symbol(market: .wh, code: code)!, name: name, kind: "外汇",
+            english: code == "USDX" ? "US Dollar Index" : pair, short: pair, keywords: keywords
+        )
     }
 
-    /// 腾讯行情接口取得到的品种（2026 年 9 月实测）。常用的排在前面，同样匹配时先列出来。
+    private static func zn(_ code: String, _ name: String, _ english: String, _ short: String, _ keywords: [String]) -> Entry {
+        Entry(symbol: Symbol(market: .zn, code: code)!, name: name, kind: "ZS", english: english, short: short, keywords: keywords)
+    }
+
+    /// 腾讯行情接口取得到的期货外汇，和新浪取得到的环球股指（2026 年 9、10 月实测）。常用的排在前面，同样匹配时先列出来。
     public static let entries: [Entry] = [
-        hf("XAU", "伦敦金", "贵金属", ["现货黄金", "黄金", "金价", "gold", "xauusd", "ljj", "xhhj"]),
-        hf("GC", "纽约黄金", "贵金属", ["美黄金", "comex黄金", "黄金期货", "黄金", "gold", "nyhj", "mhj"]),
-        hf("XAG", "伦敦银", "贵金属", ["现货白银", "白银", "silver", "xagusd", "ldy", "xhby"]),
-        hf("SI", "纽约白银", "贵金属", ["美白银", "白银期货", "白银", "silver", "nyby", "mby"]),
-        hf("XPT", "纽约铂金", "贵金属", ["铂金", "白金", "platinum", "nybj"]),
-        hf("CL", "纽约原油", "能源", ["美原油", "wti原油", "原油", "wti", "crude", "oil", "nyyy", "myy"]),
-        hf("OIL", "布伦特原油", "能源", ["布油", "原油", "brent", "crude", "bltyy"]),
-        hf("NG", "美国天然气", "能源", ["天然气", "natural gas", "gas", "mgtrq", "trq"]),
-        hf("HG", "美铜", "期货", ["纽约铜", "铜", "copper"]),
-        hf("ES", "标普500指数期货", "期货", ["标普期货", "美股期货", "标普500", "s&p", "sp500", "bpqh"]),
-        hf("HSI", "恒生指数期货", "期货", ["恒指期货", "hszsqh", "hzqh"]),
-        hf("S", "美国大豆", "期货", ["美豆", "大豆", "soybean", "mgdd"]),
-        hf("C", "美国玉米", "期货", ["美玉米", "玉米", "corn", "mgym"]),
-        hf("W", "美国小麦", "期货", ["美麦", "小麦", "wheat", "mgxm"]),
+        hf("XAU", "伦敦金", "贵金属", "Spot Gold", "Gold", ["现货黄金", "黄金", "金价", "gold", "xauusd", "ljj", "xhhj"]),
+        hf("GC", "纽约黄金", "贵金属", "Gold Futures", "Gold Fut", ["美黄金", "comex黄金", "黄金期货", "黄金", "gold", "nyhj", "mhj"]),
+        hf("XAG", "伦敦银", "贵金属", "Spot Silver", "Silver", ["现货白银", "白银", "silver", "xagusd", "ldy", "xhby"]),
+        hf("SI", "纽约白银", "贵金属", "Silver Futures", "Silv Fut", ["美白银", "白银期货", "白银", "silver", "nyby", "mby"]),
+        hf("XPT", "纽约铂金", "贵金属", "Platinum", "Platinum", ["铂金", "白金", "platinum", "nybj"]),
+        hf("CL", "纽约原油", "能源", "WTI Crude", "WTI", ["美原油", "wti原油", "原油", "wti", "crude", "oil", "nyyy", "myy"]),
+        hf("OIL", "布伦特原油", "能源", "Brent Crude", "Brent", ["布油", "原油", "brent", "crude", "bltyy"]),
+        hf("NG", "美国天然气", "能源", "Natural Gas", "Nat Gas", ["天然气", "natural gas", "gas", "mgtrq", "trq"]),
+        hf("HG", "美铜", "期货", "Copper", "Copper", ["纽约铜", "铜", "copper"]),
+        hf("ES", "标普500指数期货", "期货", "S&P 500 Futures", "S&P Fut", ["标普期货", "美股期货", "标普500", "s&p", "sp500", "bpqh"]),
+        hf("HSI", "恒生指数期货", "期货", "Hang Seng Futures", "HSI Fut", ["恒指期货", "hszsqh", "hzqh"]),
+        hf("S", "美国大豆", "期货", "Soybeans", "Soybeans", ["美豆", "大豆", "soybean", "mgdd"]),
+        hf("C", "美国玉米", "期货", "Corn", "Corn", ["美玉米", "玉米", "corn", "mgym"]),
+        hf("W", "美国小麦", "期货", "Wheat", "Wheat", ["美麦", "小麦", "wheat", "mgxm"]),
         wh("USDCNY", "美元人民币", ["美元", "人民币", "汇率", "usd", "cny", "myrmb"]),
         wh("USDX", "美元指数", ["美元", "dxy", "dollar index", "myzs"]),
         wh("HKDCNY", "港元人民币", ["港元", "港币", "人民币", "hkd", "gyrmb", "gbrmb"]),
@@ -143,9 +181,25 @@ public enum GlobalCatalog {
         wh("USDHKD", "美元港元", ["美元", "港元", "港币", "usd", "hkd", "mygy"]),
         wh("USDSGD", "美元新加坡元", ["美元", "新加坡元", "usd", "sgd", "myxjpy"]),
         wh("EURGBP", "欧元英镑", ["欧元", "英镑", "eur", "gbp", "oyyb"]),
+        zn("NKY", "日经225", "Nikkei 225", "Nikkei", ["日经", "日经指数", "日本", "nikkei", "n225", "japan", "rj225"]),
+        zn("UKX", "富时100", "FTSE 100", "FTSE 100", ["英国富时100", "富时", "英国", "ftse", "ftse100", "fs100"]),
+        zn("DAX", "德国DAX", "DAX", "DAX", ["德国", "dax40", "germany", "dgdax"]),
+        zn("CAC", "法国CAC40", "CAC 40", "CAC 40", ["法国", "cac40", "france", "fgcac40"]),
+        zn("SX5E", "欧洲斯托克50", "Euro Stoxx 50", "STOXX 50", ["斯托克50", "欧洲", "stoxx", "stoxx50", "eurostoxx", "europe", "ozstk50"]),
+        zn("KOSPI", "韩国综合指数", "KOSPI", "KOSPI", ["韩国", "首尔", "korea", "hgzhzs"]),
+        zn("AS51", "澳洲标普200", "S&P/ASX 200", "ASX 200", ["澳洲", "澳大利亚", "asx", "asx200", "australia", "azbp200"]),
+        zn("SENSEX", "印度SENSEX", "BSE Sensex", "Sensex", ["印度", "孟买", "india", "bse", "ydsensex"]),
+        zn("TWJQ", "台湾加权指数", "TAIEX", "TAIEX", ["台湾", "台股", "加权指数", "taiex", "taiwan", "twse", "twjqzs"]),
+        zn("STI", "海峡时报指数", "Straits Times", "STI", ["新加坡", "海峡时报", "singapore", "hxsbzs"]),
+        zn("IBOV", "巴西IBOVESPA", "Ibovespa", "Ibovespa", ["巴西", "bovespa", "brazil", "bxibovespa"]),
     ]
 
-    /// 按关键词找品种：代码、名称完全相同的排最前，其次是别名完全相同的，再次是开头相同的，最后是包含的
+    private static let bySymbol = Dictionary(entries.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
+
+    /// 品种表里的这一只；不在表里的（比如直接输入的代码）是 nil。
+    public static func entry(for symbol: Symbol) -> Entry? { bySymbol[symbol] }
+
+    /// 按关键词找品种：代码、名称（中文或英文）完全相同的排最前，其次是别名完全相同的，再次是开头相同的，最后是包含的
     /// （只有中文、至少两个字时才算包含）。搜索结果排在股票前面，回车添加的是第一条，所以字母要多打几个才算：
     /// 至少两个字母才算完全相同（cl 是纽约原油），至少三个才看开头（打 a 不会冒出澳元）。
     /// 同一档里按品种表的顺序，最多 limit 个。
@@ -157,7 +211,7 @@ public enum GlobalCatalog {
         let prefix = text.count >= (isChinese ? 1 : 3)
         var ranked: [(rank: Int, index: Int, entry: Entry)] = []
         for (index, entry) in entries.enumerated() {
-            let names = [entry.symbol.code.lowercased(), entry.symbol.rawValue.lowercased(), entry.name.lowercased()]
+            let names = [entry.symbol.code, entry.symbol.rawValue, entry.name, entry.english].map { $0.lowercased() }
             let words = names + entry.keywords
             let rank: Int
             if exact, names.contains(text) {

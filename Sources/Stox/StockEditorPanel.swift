@@ -50,7 +50,7 @@ struct StockEditorPanel: View {
                             HStack {
                                 Text(L("菜单栏简称"))
                                 Spacer()
-                                TextField("", text: $alias, prompt: Text(NameAbbreviator.abbreviate(item.displayName)))
+                                TextField("", text: $alias, prompt: Text(item.automaticTickerName(with: store.quotes[symbol])))
                                     .textFieldStyle(.roundedBorder)
                                     .frame(width: 150)
                             }
@@ -183,7 +183,7 @@ struct StockEditorPanel: View {
             .buttonStyle(IconButtonStyle())
             .help(L("返回（Esc）"))
             VStack(alignment: .leading, spacing: 2) {
-                Text(item?.displayName ?? symbol.displayCode)
+                Text(item?.displayName(with: store.quotes[symbol]) ?? symbol.displayCode)
                     .font(.system(size: 14, weight: .semibold))
                     .lineLimit(1)
                 Text("\(symbol.market.region.displayName) \(symbol.displayCode)")

@@ -204,7 +204,7 @@ final class GlobalMarketsTests: XCTestCase {
         XCTAssertEqual(WatchlistFilter.global.apply(items).map(\.symbol.rawValue), ["hf_XAU", "whUSDCNY"])
         XCTAssertEqual(WatchlistFilter(id: "global"), .global)
         XCTAssertEqual(WatchlistFilter.global.id, "global")
-        XCTAssertEqual(MarketRegion.global.displayName, "期货外汇")
+        XCTAssertEqual(MarketRegion.global.displayName, "环球")
 
         XCTAssertNil(QuoteLinks.xueqiu(Symbol("hf_XAU")!))
         XCTAssertEqual(QuoteLinks.web(Symbol("hf_XAU")!)?.title, "新浪财经")

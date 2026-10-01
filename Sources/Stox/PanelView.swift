@@ -137,7 +137,7 @@ struct PanelHeader: View {
         case .cn: return L("A股%@", phase.displayName)
         case .hk: return L("港股%@", phase.displayName)
         case .us: return L("美股%@", phase.displayName)
-        case .global: return L("期货外汇%@", phase.displayName)
+        case .global: return L("环球%@", phase.displayName)
         }
     }
 
@@ -150,7 +150,7 @@ struct PanelHeader: View {
                 Text("Stox")
                     .font(.system(size: 14, weight: .semibold))
                 HStack(spacing: 8) {
-                    // 期货外汇工作日全天都在交易，不占这里的地方。
+                    // 环球的品种工作日全天都在交易，不占这里的地方。
                     ForEach(store.activeRegions.filter { $0 != .global }, id: \.self) { region in
                         let phase = store.phase(for: region)
                         HStack(spacing: 3) {
@@ -272,7 +272,7 @@ struct WatchlistView: View {
                         store.add(Watchlist.commonIndices)
                     }
                     .controlSize(.small)
-                    .help(Watchlist.commonIndices.map(\.name).joined(separator: L("、")))
+                    .help(Watchlist.commonIndices.map { $0.displayName(with: nil) }.joined(separator: L("、")))
                 }
                 .frame(maxWidth: .infinity)
                 .frame(height: 160)
@@ -521,7 +521,7 @@ struct BatchAddView: View {
         HStack(spacing: 8) {
             MarketBadge(market: symbol.market)
             if let item = store.item(for: symbol), !item.name.isEmpty {
-                Text(item.name)
+                Text(item.displayName(with: store.quotes[symbol]))
                     .font(.system(size: 12.5))
                     .lineLimit(1)
                 Text(symbol.displayCode)
@@ -992,7 +992,7 @@ struct SearchResultRow: View {
             HStack(spacing: 8) {
                 MarketBadge(market: result.symbol.market)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(result.name)
+                    Text(result.displayName(quote: quote))
                         .font(.system(size: 12.5, weight: .medium))
                         .lineLimit(1)
                     Text(subtitle)

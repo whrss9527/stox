@@ -1,7 +1,8 @@
 import Foundation
 
 /// 一只证券（股票、指数、基金），或者一个期货外汇品种。统一用腾讯接口的代码格式表示，例如
-/// `sh600519`、`sz399001`、`bj920819`、`hk00700`、`hkHSI`、`usAAPL`、`us.IXIC`、`hf_XAU`、`whUSDCNY`。
+/// `sh600519`、`sz399001`、`bj920819`、`hk00700`、`hkHSI`、`usAAPL`、`us.IXIC`、`hf_XAU`、`whUSDCNY`；
+/// 腾讯没有的环球股指用新浪的代码，比如 `znb_NKY`。
 public struct Symbol: Hashable, Sendable {
     public let market: Market
     public let code: String
@@ -12,7 +13,7 @@ public struct Symbol: Hashable, Sendable {
         self.code = normalized
     }
 
-    /// 从 `sh600519`、`hf_XAU` 这样的完整代码构造。
+    /// 从 `sh600519`、`hf_XAU`、`znb_NKY` 这样的完整代码构造。
     public init?(_ rawValue: String) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 2, let market = Market(rawValue: trimmed.prefix(2).lowercased()) else {
@@ -21,8 +22,14 @@ public struct Symbol: Hashable, Sendable {
         self.init(market: market, code: String(trimmed.dropFirst(2)))
     }
 
-    /// 腾讯接口里的代码。国际期货在市场前缀后面多一个下划线（`hf_XAU`）。
-    public var rawValue: String { market == .hf ? "hf_" + code : market.rawValue + code }
+    /// 腾讯接口里的代码。国际期货在市场前缀后面多一个下划线（`hf_XAU`）；环球股指是新浪的代码（`znb_NKY`）。
+    public var rawValue: String {
+        switch market {
+        case .hf: return "hf_" + code
+        case .zn: return "znb_" + code
+        default: return market.rawValue + code
+        }
+    }
 
     /// 指数没有成交量单位、价格固定两位小数，界面上也会单独标注。
     public var isIndex: Bool {
@@ -32,6 +39,7 @@ public struct Symbol: Hashable, Sendable {
         case .bj: return code.hasPrefix("899")
         case .hk: return !code.allSatisfy(\.isASCIIDigit)
         case .us: return code.hasPrefix(".")
+        case .zn: return true
         case .jj, .hf, .wh: return false
         }
     }
@@ -39,16 +47,16 @@ public struct Symbol: Hashable, Sendable {
     /// 场外基金：只有每天的净值，没有盘中行情、分时和 K 线。
     public var isFund: Bool { market == .jj }
 
-    /// 期货外汇：国际期货、贵金属现货和外汇。
+    /// 环球：国际期货、贵金属现货、外汇和环球股指。
     public var isGlobal: Bool { market.region == .global }
 
-    /// 能不能填持仓、记买卖：指数和期货外汇不能。
+    /// 能不能填持仓、记买卖：指数和环球的品种不能。
     public var canHold: Bool { !isIndex && !isGlobal }
 
-    /// 有没有分时（和列表里的迷你分时）：场外基金、外汇没有；国际期货的分时来自新浪。
-    public var hasIntraday: Bool { !isFund && market != .wh }
+    /// 有没有分时（和列表里的迷你分时）：场外基金、外汇、环球股指没有；国际期货的分时来自新浪。
+    public var hasIntraday: Bool { !isFund && market != .wh && market != .zn }
 
-    /// 有没有五日和 K 线：场外基金和期货外汇没有（数据源不提供）。
+    /// 有没有五日和 K 线：场外基金和环球的品种没有（数据源不提供）。
     public var hasKline: Bool { !isFund && !isGlobal }
 
     /// 科创板（上交所 688、689 开头）：腾讯接口里它的成交量、K 线的量是股，别的 A 股是手。
@@ -95,6 +103,14 @@ public struct Symbol: Hashable, Sendable {
             let upper = code.uppercased()
             guard upper.count == 6 || upper == "USDX", upper.allSatisfy(\.isASCIILetter) else { return nil }
             return upper
+        case .zn:
+            // znb_NKY：市场前缀后面的“b_”可有可无。
+            var upper = code.uppercased()
+            if upper.hasPrefix("B_") { upper.removeFirst(2) }
+            guard (1...10).contains(upper.count), upper.allSatisfy({ $0.isASCIILetter || $0.isASCIIDigit }),
+                  upper.contains(where: \.isASCIILetter)
+            else { return nil }
+            return upper
         }
     }
 }
@@ -126,15 +142,16 @@ extension Symbol: Codable {
 /// 把用户随手输入的代码解析成 Symbol。
 ///
 /// 支持：`sh600519`、`600519.SH`、`600519`（按号段推断沪深北）、`700`/`00700`（港股）、
-/// `AAPL`/`brk.b`（美股）、`us.IXIC`、`hkHSI`，场外基金 `jj161725`、`161725.OF`，期货外汇 `hf_XAU`、`whUSDCNY`。
+/// `AAPL`/`brk.b`（美股）、`us.IXIC`、`hkHSI`，场外基金 `jj161725`、`161725.OF`，期货外汇 `hf_XAU`、`whUSDCNY`，
+/// 环球股指 `znb_NKY`。
 public enum SymbolInput {
     public static func parse(_ input: String) -> Symbol? {
         let text = input.filter { !$0.isWhitespace }
         guard !text.isEmpty else { return nil }
 
-        // 1. 前缀格式：sh600519 / hk00700 / usAAPL / us.IXIC / hf_XAU / whUSDCNY。
+        // 1. 前缀格式：sh600519 / hk00700 / usAAPL / us.IXIC / hf_XAU / whUSDCNY / znb_NKY。
         //    美股、港股字母代码和外汇要求小写前缀，避免把 USO、HKD、WHR 之类的美股代码误判；
-        //    国际期货要带下划线（hf_C 是玉米，hfc 还是美股）。
+        //    国际期货要带下划线（hf_C 是玉米，hfc 还是美股），环球股指要写全 znb_。
         if text.count > 2 {
             let prefix = String(text.prefix(2))
             let rest = String(text.dropFirst(2))
@@ -147,6 +164,7 @@ public enum SymbolInput {
                 case .us: accept = prefix == "us" || rest.hasPrefix(".")
                 case .hf: accept = rest.hasPrefix("_")
                 case .wh: accept = prefix == "wh"
+                case .zn: accept = prefix == "zn" && rest.hasPrefix("b_")
                 }
                 if accept, let symbol = Symbol(market: market, code: rest) { return symbol }
             }
