@@ -514,6 +514,57 @@ class SyncTests(SyncTestCase):
         self.assertIn("UNRESOLVED_ISSUES", str(caught.exception))
         self.assertFalse([w for w in self.fake.writes() if "reviewSubmission" in w[1]])
 
+    def in_review(self, listing):
+        """0.48.0 已经提交、在等审核；撤回以后苹果把它变成 DEVELOPER_REJECTED。"""
+        synced(self.fake, listing, version="0.48.0")
+        waiting = res("appStoreVersions", "v1", platform="MAC_OS", versionString="0.48.0",
+                      appVersionState="WAITING_FOR_REVIEW", copyright=listing.copyright, releaseType="AFTER_APPROVAL")
+        withdrawn = json.loads(json.dumps(waiting))
+        withdrawn["attributes"]["appVersionState"] = "DEVELOPER_REJECTED"
+        self.fake.get("/v1/apps/app1/appStoreVersions", page(waiting), page(waiting), page(withdrawn))
+        self.fake.get("/v1/apps/app1/reviewSubmissions", page(res("reviewSubmissions", "sub0", platform="MAC_OS", state="WAITING_FOR_REVIEW")))
+        self.fake.get("/v1/reviewSubmissions/sub0/items", page(res(
+            "reviewSubmissionItems", "item0", rels={"appStoreVersion": {"type": "appStoreVersions", "id": "v1"}}, state="READY_FOR_REVIEW")))
+
+    def test_version_in_review_stops_without_withdraw(self):
+        listing = self.listing("0.49.0")
+        self.in_review(listing)
+        with self.assertRaises(asc.Failure) as caught:
+            self.sync(listing, "0.49.0", attach_latest=True)
+        self.assertIn("WAITING_FOR_REVIEW", str(caught.exception))
+        self.assertIn("withdraw", str(caught.exception))
+        self.assertEqual(self.fake.writes(), [])
+
+    def test_withdraw_replaces_the_version_in_review(self):
+        listing = self.listing("0.49.0")
+        self.in_review(listing)
+        output = self.sync(listing, "0.49.0", attach_latest=True, withdraw=True)
+        writes = self.fake.writes()
+        # 先撤回（在写别的之前），等它变回可以改，再把同一个版本改成 0.49.0。
+        self.assertEqual(writes[0], ("PATCH", "/v1/reviewSubmissions/sub0"))
+        self.assertEqual(self.fake.payload("PATCH", "/v1/reviewSubmissions/sub0")["data"]["attributes"], {"canceled": True})
+        self.assertEqual(self.fake.payload("PATCH", "/v1/appStoreVersions/v1")["data"]["attributes"], {"versionString": "0.49.0"})
+        self.assertNotIn(("POST", "/v1/appStoreVersions"), writes)
+        self.assertIn("已撤回：DEVELOPER_REJECTED", output)
+        self.assertEqual(self.sleeps, [10])
+        # 撤回后它还是 App Store 上唯一的版本，算第一个版本：不发 whatsNew。
+        for call in self.fake.calls:
+            if call["method"] == "PATCH" and call["path"].startswith("/v1/appStoreVersionLocalizations/"):
+                self.assertNotIn("whatsNew", call["payload"]["data"]["attributes"])
+
+    def test_withdraw_does_nothing_when_checks_fail(self):
+        # 不是第一个版本又没写英文的“此版本的新增内容”：检查在撤回之前，什么都不撤。
+        listing = self.listing("0.49.0")
+        self.in_review(listing)
+        live = res("appStoreVersions", "v0", platform="MAC_OS", versionString="0.47.0", appVersionState="READY_FOR_DISTRIBUTION")
+        waiting = self.fake.gets["/v1/apps/app1/appStoreVersions"][0][1]["data"][0]
+        self.fake.get("/v1/apps/app1/appStoreVersions", page(waiting, live))
+        listing.whats_new.pop("en-US", None)
+        with self.assertRaises(asc.Failure) as caught:
+            self.sync(listing, "0.49.0", attach_latest=True, withdraw=True)
+        self.assertIn("whats_new", str(caught.exception))
+        self.assertEqual(self.fake.writes(), [])
+
     def test_dry_run_writes_nothing(self):
         listing = self.listing("0.48.0")
         synced(self.fake, listing)

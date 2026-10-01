@@ -106,6 +106,8 @@ BUSY_STATES = {
     "WAITING_FOR_REVIEW", "IN_REVIEW", "WAITING_FOR_EXPORT_COMPLIANCE", "PENDING_APPLE_RELEASE",
     "PENDING_DEVELOPER_RELEASE", "PROCESSING_FOR_DISTRIBUTION", "PROCESSING_FOR_APP_STORE", "ACCEPTED", "PENDING_CONTRACT",
 }
+# 其中还没审完、可以撤回的（--withdraw-review）：撤回后版本变回 DEVELOPER_REJECTED，可以改、可以换构建再提交。
+WITHDRAWABLE_STATES = {"WAITING_FOR_REVIEW", "IN_REVIEW"}
 
 SUBMIT_HINT = (
     "提交审核没成功，苹果的原因见上面。常见的是只能在网页上做的事还没做：App 隐私（App Privacy）问卷、"
@@ -752,10 +754,10 @@ def age_rating_answers(current):
 
 class Sync:
     def __init__(self, api, listing, version, build=None, wait_minutes=0, attach_latest=False, submit=False,
-                 contact=None, sleep=time.sleep, clock=time.time):
+                 contact=None, withdraw=False, sleep=time.sleep, clock=time.time):
         self.api, self.listing, self.version = api, listing, version
         self.build_number, self.wait_minutes, self.attach_latest = build, wait_minutes, attach_latest
-        self.submit, self.contact, self.sleep, self.clock = submit, contact, sleep, clock
+        self.submit, self.contact, self.withdraw, self.sleep, self.clock = submit, contact, withdraw, sleep, clock
         self.config = listing.config
         self.changes = []
         self.app, self.app_id = None, None
@@ -805,18 +807,27 @@ class Sync:
             annotate("warning", f"App 的主要语言是 {primary}，资料里写的是 {self.listing.primary_locale}；主要语言要在网页上的 App 信息里改")
 
     def inspect_versions(self):
-        """先只读：有版本在审核时停下；不是第一个版本却没写“此版本的新增内容”时停下。都在写入任何东西之前。"""
+        """先只读：有版本在审核时停下（--withdraw-review 时记下来，检查都过了再撤回）；
+        不是第一个版本却没写“此版本的新增内容”时停下。都在写入任何东西之前。"""
         self.versions, _ = self.api.get_all(
             f"/v1/apps/{self.app_id}/appStoreVersions", {"filter[platform]": PLATFORM, "limit": 200}
         )
+        to_withdraw = []
         for version in self.versions:
             state = resource_state(version)
-            if state in BUSY_STATES:
-                raise Failure(
-                    f"版本 {(version.get('attributes') or {}).get('versionString')} 正在审核或等待发布（{state}），现在不能改。"
-                    "等它有了结果（或者在 App Store Connect 里把它从审核中撤回）后再运行。"
-                )
-        editable = [v for v in self.versions if resource_state(v) in EDITABLE_STATES]
+            if state not in BUSY_STATES:
+                continue
+            if self.withdraw and state in WITHDRAWABLE_STATES:
+                to_withdraw.append(version)
+                continue
+            hint = "等它有了结果后再运行。"
+            if state in WITHDRAWABLE_STATES:
+                hint = "等它有了结果后再运行；想用新版本替换它，运行时勾上 withdraw（先撤回审核）。"
+            raise Failure(
+                f"版本 {(version.get('attributes') or {}).get('versionString')} 正在审核或等待发布（{state}），现在不能改。" + hint
+            )
+        # 要撤回的版本撤回后可以改，当作可以改的来算（下面检查用的是撤回以后的样子）。
+        editable = [v for v in self.versions if resource_state(v) in EDITABLE_STATES or v in to_withdraw]
         self.editable_version = editable[0] if editable else None
         reused = self.editable_version["id"] if self.editable_version else None
         self.first_version = not [v for v in self.versions if v["id"] != reused]
@@ -838,6 +849,43 @@ class Sync:
                 raise Failure(
                     f"{self.version} 不是 App Store 上的第一个版本，要写“此版本的新增内容”，还缺：{'、'.join(hints)}。加上以后再运行。"
                 )
+        if to_withdraw:
+            self.withdraw_review(to_withdraw)
+
+    def withdraw_review(self, versions):
+        """把还没审完的版本从审核里撤回（取消它所在的审核提交），等苹果把它变回可以改的状态。"""
+        ids = {v["id"] for v in versions}
+        names = "、".join(str((v.get("attributes") or {}).get("versionString")) for v in versions)
+        self.step(f"撤回审核：版本 {names}")
+        submissions, _ = self.api.get_all(f"/v1/apps/{self.app_id}/reviewSubmissions", {
+            "filter[platform]": PLATFORM,
+            "filter[state]": "WAITING_FOR_REVIEW,IN_REVIEW",
+            "limit": 50,
+        })
+        targets = [s for s in submissions if self.submission_versions(s["id"]) & ids]
+        if not targets:
+            raise Failure(f"找不到版本 {names} 所在的审核提交，到 App Store Connect 网页上的“App 审核”里撤回以后再运行。")
+        for submission in targets:
+            payload = {"data": {"type": "reviewSubmissions", "id": submission["id"], "attributes": {"canceled": True}}}
+            self.api.write("PATCH", f"/v1/reviewSubmissions/{submission['id']}", payload, "撤回")
+        self.changed(f"撤回审核：版本 {names}")
+        if self.api.dry_run:
+            return
+        deadline = self.clock() + 600
+        while True:
+            self.versions, _ = self.api.get_all(
+                f"/v1/apps/{self.app_id}/appStoreVersions", {"filter[platform]": PLATFORM, "limit": 200}
+            )
+            states = {v["id"]: resource_state(v) for v in self.versions}
+            if not any(states.get(i) in BUSY_STATES for i in ids):
+                break
+            if self.clock() > deadline:
+                raise Failure(f"撤回了 10 分钟，版本 {names} 还在审核状态（{'、'.join(sorted(set(states[i] for i in ids if i in states)))}），过一会儿再运行。")
+            print(f"    等苹果撤回：{'、'.join(states.get(i) or '?' for i in ids)}", flush=True)
+            self.sleep(10)
+        print(f"    已撤回：{'、'.join(states.get(i) or '?' for i in ids)}")
+        if self.editable_version:
+            self.editable_version = next((v for v in self.versions if v["id"] == self.editable_version["id"]), self.editable_version)
 
     def app_attributes(self):
         wanted = self.config["contentRightsDeclaration"]
@@ -1353,6 +1401,8 @@ def main(argv=None):
     which.add_argument("--attach-latest-build", action="store_true", help="选这个版本最新的可用构建，没有就不选")
     sync.add_argument("--wait-build-minutes", type=int, default=0, help="--build 时最多等几分钟（默认不等）")
     sync.add_argument("--submit", action="store_true", help="最后提交审核")
+    sync.add_argument("--withdraw-review", action="store_true",
+                      help="有版本还在等审核或审核中时，先把它撤回（用这个版本替换它），而不是停下")
     sync.add_argument("--screenshots", help="截图文件夹（默认 docs/app-store/listing/screenshots/<主要语言>）")
     sync.add_argument("--dry-run", action="store_true", help="只读不写，打印要写的内容")
     args = parser.parse_args(argv)
@@ -1370,6 +1420,7 @@ def main(argv=None):
             Sync(
                 api, listing, args.version, build=args.build, wait_minutes=args.wait_build_minutes,
                 attach_latest=args.attach_latest_build, submit=args.submit, contact=contact,
+                withdraw=args.withdraw_review,
             ).run()
         return 0
     except ApiError as err:

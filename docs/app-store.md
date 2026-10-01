@@ -152,6 +152,7 @@ App Store 版的 Info.plist 里有 `ITSAppUsesNonExemptEncryption = NO`（`scrip
 - `build`：`upload`（默认）构建、校验并上传；`validate` 只构建和校验，不上传（第一次可以先选它、不勾 listing，看看签名和校验有没有问题）；`none` 不构建，只做下面的 listing。
 - `listing`（默认勾上）：把 [app-store/listing/](app-store/listing/) 里的资料填进 App Store Connect，并选上构建。
 - `submit`（默认不勾）：最后提交审核，要和 listing 一起勾。
+- `withdraw`（默认不勾）：有版本还在等审核或审核中（还没审完）时，先把它从审核里撤回，再用这次的版本号、资料和构建替换它，要和 listing 一起勾。用在旧版本还没过审、又想直接换成新版本的时候。不勾时遇到这种情况会停下来。各项检查都在撤回之前做，检查没过不会撤回。
 - `version`：留空时用最近的标签（比如 `v0.46.0` → `0.46.0`）。App Store 的每个新版本号都要比上一个上架的大。
 
 build 这一步（macOS）：检查 Secrets → 跑单元测试 → 把证书导入临时钥匙串 → `scripts/build-app-store.sh`（检查描述文件的 App ID 和 iCloud 容器、编译通用版、放进描述文件、带沙盒签名、`productbuild` 打成 `dist/Stox-AppStore.pkg` 并签名）→ `xcrun altool --validate-app` → `xcrun altool --upload-app`。构建号是“提交数.运行次数”（比如 `612.3`），每次上传都会变大。`.pkg` 也作为构建产物留在这次运行里；runner 上的 Xcode 哪天没有 altool 了，工作流会直接报错，这时下载 `.pkg` 用 [Transporter](https://apps.apple.com/app/transporter/id1450874784) 上传，再用 build 选 none 运行一次。

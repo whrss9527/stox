@@ -37,6 +37,10 @@ on:
         description: "最后提交审核（要和 listing 一起勾）"
         type: boolean
         default: false
+      withdraw:
+        description: "有版本还在等审核或审核中时，先把它撤回、用这个版本替换（要和 listing 一起勾）"
+        type: boolean
+        default: false
       version:
         description: "版本号（CFBundleShortVersionString），留空时取最近的标签，比如 0.46.0"
         required: false
@@ -60,8 +64,13 @@ jobs:
           BUILD: ${{ inputs.build }}
           LISTING: ${{ inputs.listing }}
           SUBMIT: ${{ inputs.submit }}
+          WITHDRAW: ${{ inputs.withdraw }}
           VERSION: ${{ inputs.version }}
         run: |
+          if [ "$WITHDRAW" = "true" ] && [ "$LISTING" != "true" ]; then
+            echo "::error title=输入不对::withdraw（撤回审核）要和 listing 一起勾上：撤回以后要把这个版本的资料和构建填上。"
+            exit 1
+          fi
           if [ "$SUBMIT" = "true" ] && [ "$LISTING" != "true" ]; then
             echo "::error title=输入不对::submit（提交审核）要和 listing 一起勾上：提交前要先把资料填好、选上构建。"
             exit 1
@@ -317,6 +326,7 @@ jobs:
           BUILD_NUMBER: ${{ needs.build.outputs.build-number }}
           INPUT_VERSION: ${{ inputs.version }}
           SUBMIT: ${{ inputs.submit }}
+          WITHDRAW: ${{ inputs.withdraw }}
           SCREENSHOTS: ${{ steps.screenshots.outputs.dir }}
         run: |
           # 版本号：这次构建的；没有构建时用输入的；都没有时用最近的标签（和 scripts/build-app.sh 一样）。
@@ -340,6 +350,9 @@ jobs:
           fi
           if [ "$SUBMIT" = "true" ]; then
             args+=(--submit)
+          fi
+          if [ "$WITHDRAW" = "true" ]; then
+            args+=(--withdraw-review)
           fi
           if [ -n "$SCREENSHOTS" ]; then
             args+=(--screenshots "$SCREENSHOTS")
