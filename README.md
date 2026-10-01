@@ -74,6 +74,14 @@ The three at the top show the expanded detail (intraday chart and average price 
 
 Stox needs macOS 13 Ventura or later, on Apple silicon or Intel.
 
+With [Homebrew](https://brew.sh):
+
+```sh
+brew install --cask whrss9527/tap/stox
+```
+
+Or by hand:
+
 1. Download the latest `Stox.zip` from [Releases](https://github.com/whrss9527/stox/releases), unzip it and drag `Stox.app` into Applications.
 2. Double-click to open it.
 3. When there's a new version, click Update at the bottom of the panel.
