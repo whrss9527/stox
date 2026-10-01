@@ -193,7 +193,7 @@ fetch "sina quote (fallback)" 'https://hq.sinajs.cn/list=sh600519,sz000001,sh000
 fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030"
 fetch "sina futures (fallback)" "https://hq.sinajs.cn/list=hf_XAU,hf_GC,hf_CL" "GB18030" "https://finance.sina.com.cn/"
 # 环球股指（自选里的“指”）：腾讯没有，用新浪的 znb_ 代码。字段 6、7 是北京时间的日期和时间，看是不是最近的；
-# 只有前 6 个字段的（多伦多、瑞士这些）数据停在一年前，不用。
+# 只有前 6 个字段的（多伦多、瑞士这些）数据停在一年前，澳洲标普200（AS51）停在前一天，都不用。
 fetch "sina global indices" "https://hq.sinajs.cn/list=znb_NKY,znb_UKX,znb_DAX,znb_CAC,znb_SX5E,znb_KOSPI,znb_AS51,znb_SENSEX,znb_TWJQ,znb_STI,znb_IBOV,znb_SPTSX,znb_SMI" "GB18030" "https://finance.sina.com.cn/"
 
 # K 线（面板里的日 K、周 K、月 K 用）：只打印每个序列的条数和首尾几条，并检查字段顺序。

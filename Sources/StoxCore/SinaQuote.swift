@@ -48,13 +48,17 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
 
     public func search(_ query: String) async throws -> [SearchResult] { [] }
 
-    /// 新浪返回 GB18030；解不了时按 UTF-8 尽量解。
+    /// 新浪返回 GB18030；解不了时按 UTF-8 尽量解。Linux 上（命令行工具）没有 GB18030，一个字节当一个字符解：
+    /// 中文名是乱码，但不会像按 UTF-8 解那样拼出组合字符（“台”的两个字节是 U+0328），和前面的引号连成一个字，
+    /// 让这一条和下一条行情搅在一起。
     static func decodeText(_ data: Data) -> String {
         #if canImport(Darwin)
         let gb18030 = CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(CFStringEncodings.GB_18030_2000.rawValue))
         if let text = String(data: data, encoding: String.Encoding(rawValue: gb18030)) { return text }
-        #endif
         return String(decoding: data, as: UTF8.self)
+        #else
+        return String(String.UnicodeScalarView(data.map { Unicode.Scalar($0) }))
+        #endif
     }
 }
 

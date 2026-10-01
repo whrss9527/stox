@@ -187,7 +187,6 @@ public enum GlobalCatalog {
         zn("CAC", "法国CAC40", "CAC 40", "CAC 40", ["法国", "cac40", "france", "fgcac40"]),
         zn("SX5E", "欧洲斯托克50", "Euro Stoxx 50", "STOXX 50", ["斯托克50", "欧洲", "stoxx", "stoxx50", "eurostoxx", "europe", "ozstk50"]),
         zn("KOSPI", "韩国综合指数", "KOSPI", "KOSPI", ["韩国", "首尔", "korea", "hgzhzs"]),
-        zn("AS51", "澳洲标普200", "S&P/ASX 200", "ASX 200", ["澳洲", "澳大利亚", "asx", "asx200", "australia", "azbp200"]),
         zn("SENSEX", "印度SENSEX", "BSE Sensex", "Sensex", ["印度", "孟买", "india", "bse", "ydsensex"]),
         zn("TWJQ", "台湾加权指数", "TAIEX", "TAIEX", ["台湾", "台股", "加权指数", "taiex", "taiwan", "twse", "twjqzs"]),
         zn("STI", "海峡时报指数", "Straits Times", "STI", ["新加坡", "海峡时报", "singapore", "hxsbzs"]),

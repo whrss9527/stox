@@ -19,11 +19,12 @@ final class EnglishNameTests: XCTestCase {
     v_sh000001="1~上证指数~000001~3842.19~3830.45~3839.25~414560247~0~0~0.00~0~0.00~0~0.00~0~0.00~0~0.00~0~0.00~0~0.00~0~0.00~0~0.00~0~0.00~0~~20260930161500~11.74~0.31~3851.22~3833.09~3842.19/414560247/679398992445~414560247~67939899~0.85~16.76~~3851.22~3833.09~0.47~602370.78~682245.82~0.00~-1~-1~0.92~0~3842.53~~~~~~67939899.2445~0.0000~0~ ~ZS~-3.19~-2.78~~~~4258.86~3741.11~-0.57~-3.46~-3.71~4858320758781~~-9.37~-4.50~4858320758781~~~-1.05~-0.02~~CNY~0~~0.00~0~";
     """#
 
-    // 同一时间新浪的环球股指（原样）。多伦多只有前 6 个字段，XIN9I 查不到。
+    // 同一时间新浪的环球股指（原样）。台湾加权的第 4、5 位是空的，多伦多只有前 6 个字段，XIN9I 查不到。
     static let sina = #"""
     var hq_str_znb_NKY="日经225,68956.5000,2202.78,3.30,2:12 AM,1759126320,2026-10-01,14:30:01,67106.5200,66753.7200,68995.3000,67081.6600,0";
     var hq_str_znb_UKX="英国富时100,10445.5900,-160.41,-1.51,9/26/2025,1758859200,2026-10-01,17:26:52,10606.3900,10606.0000,10606.3900,10390.7300,0";
     var hq_str_znb_DAX="德国DAX30,25028.9492,-170.24,-0.68,9/26/2025,1758859200,2026-10-01,17:40:55,25058.0801,25199.1895,25104.7793,24831.5996,0";
+    var hq_str_znb_TWJQ="台湾加权指数,48353.4900,413.36,0.86,,,2026-10-01,13:38:15,47961.9800,47940.1300,48353.4900,47893.4200,10211739648";
     var hq_str_znb_SPTSX="S&P/TSX综合指数,29761.28,29.30,0.10,9/26/2025,1758859200";
     var hq_str_znb_XIN9I="";
     """#
@@ -207,9 +208,9 @@ final class EnglishNameTests: XCTestCase {
     }
 
     func testParsesGlobalIndices() throws {
-        let symbols = ["znb_NKY", "znb_UKX", "znb_DAX", "znb_SPTSX", "znb_XIN9I"].map { Symbol($0)! }
+        let symbols = ["znb_NKY", "znb_UKX", "znb_DAX", "znb_TWJQ", "znb_SPTSX", "znb_XIN9I"].map { Symbol($0)! }
         let quotes = SinaQuoteParser.parse(Self.sina, symbols: symbols)
-        XCTAssertEqual(quotes.count, 3, "只有前 6 个字段的、空的不认")
+        XCTAssertEqual(quotes.count, 4, "只有前 6 个字段的、空的不认")
 
         let nikkei = try XCTUnwrap(quotes[symbols[0]])
         XCTAssertEqual(nikkei.name, "日经225")
@@ -231,8 +232,26 @@ final class EnglishNameTests: XCTestCase {
 
         XCTAssertEqual(quotes[symbols[2]]?.name, "德国DAX", "用品种表里的名称，不用新浪过时的“德国DAX30”")
         XCTAssertEqual(quotes[symbols[1]]?.direction, .down)
+        XCTAssertEqual(quotes[symbols[3]]?.previousClose, 47940.13, "第 4、5 位空着也认")
         XCTAssertEqual(SinaProvider.code(for: symbols[0]), "znb_NKY")
         XCTAssertEqual(SinaProvider.quoteURL(for: Array(symbols.prefix(2)))?.absoluteString, "https://hq.sinajs.cn/list=znb_NKY,znb_UKX")
+    }
+
+    /// 新浪返回的是 GB18030。“台”的两个字节按 UTF-8 解是组合字符 U+0328，会和前面的引号连成一个字；
+    /// Linux 上解不了 GB18030 时这一条和下一条也不能搅在一起。
+    func testDecodesSinaBytesWithoutMixingRecords() {
+        var data = Data(#"var hq_str_znb_TWJQ=""#.utf8)
+        data.append(contentsOf: [0xCC, 0xA8, 0xCD, 0xE5])  // 台湾
+        data.append(contentsOf: Data(#",48353.4900,413.36,0.86,,,2026-10-01,13:38:15,47961.9800,47940.1300,48353.4900,47893.4200,0";"#.utf8))
+        data.append(contentsOf: Data("\n".utf8))
+        data.append(contentsOf: Data(#"var hq_str_znb_STI=""#.utf8))
+        data.append(contentsOf: [0xD0, 0xC2, 0xBC, 0xD3])  // 新加
+        data.append(contentsOf: Data(#",5667.6800,-8.20,-0.14,,,2026-10-01,17:20:00,5654.8700,5675.8800,5700.5900,5652.8200,0";"#.utf8))
+        let symbols = [Symbol("znb_TWJQ")!, Symbol("znb_STI")!]
+        let quotes = SinaQuoteParser.parse(SinaProvider.decodeText(data), symbols: symbols)
+        XCTAssertEqual(quotes[symbols[0]]?.price, 48353.49)
+        XCTAssertEqual(quotes[symbols[1]]?.price, 5667.68)
+        XCTAssertEqual(quotes[symbols[1]]?.name, "海峡时报指数", "名称用品种表里的")
     }
 
     func testGlobalIndexSymbols() throws {

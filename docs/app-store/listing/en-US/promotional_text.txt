@@ -1,1 +1,1 @@
-Your watchlist lives in the menu bar: A shares, Hong Kong and US stocks, futures and FX. Click to open, click again to hide. No account, no API key.
+Your watchlist lives in the menu bar: A shares, Hong Kong and US stocks, global indices, futures and FX. Click to open, click again to hide. No account, no API key.

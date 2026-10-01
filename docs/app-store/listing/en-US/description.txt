@@ -12,7 +12,8 @@ QUOTES IN THE MENU BAR
 • Optionally show only the icon while the market is closed.
 
 MARKETS AND CHARTS
-• Shanghai, Shenzhen and Beijing A shares, Hong Kong and US stocks, major indices and ETFs, mutual funds (net asset value), international futures, precious metals and FX.
+• Shanghai, Shenzhen and Beijing A shares, Hong Kong and US stocks, major indices and ETFs, mutual funds (net asset value), global indices such as the Nikkei 225, FTSE 100 and DAX, international futures, precious metals and FX.
+• English names for indices, US and Hong Kong stocks, futures and FX.
 • Search by code, name or pinyin initials; paste several codes to add them all at once.
 • Intraday, five-day, daily, weekly and monthly charts with volume and moving averages; order book, fund flow and limit prices for A shares; pre-market and after-hours prices for US stocks.
 • A-share top gainers, losers and industry rankings.
