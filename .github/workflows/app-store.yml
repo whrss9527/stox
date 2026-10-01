@@ -286,7 +286,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # 仓库里放了截图就用仓库里的；没有就用 main 上最近一次成功的 build 做的 1440x900 截图（app-store-screenshots）。
+          # 仓库里放了截图就用仓库里的；没有就用 main 上最近一次成功的 build 做的商店截图（app-store-screenshots 里的
+          # app-store/1-menu-bar.png … 5-calendar.png，文件名决定顺序）。
           committed=docs/app-store/listing/screenshots/en-US
           if [ -n "$(find "$committed" -maxdepth 1 -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' \) 2>/dev/null)" ]; then
             echo "用仓库里的截图：$committed"
@@ -299,17 +300,12 @@ jobs:
           if [ -n "$run_id" ] && gh run download "$run_id" --repo "$GITHUB_REPOSITORY" --name app-store-screenshots --dir "$shots"; then
             dir="$RUNNER_TEMP/screenshots"
             mkdir -p "$dir"
-            # 文件名决定顺序：先放面板，再放展开的详情。
-            n=1
+            # 带序号的那几张（1-menu-bar.png …），按文件名排好；截图那一步失败时 app-store 目录不存在，这里就是空的。
             copied=""
-            for name in appstore-panel appstore-detail; do
-              file=$(find "$shots" -type f -name "$name-1440x900.png" | head -1)
-              if [ -n "$file" ]; then
-                cp "$file" "$dir/$n-$name.png"
-                copied="$copied $n-$name.png"
-                n=$((n + 1))
-              fi
-            done
+            while IFS= read -r file; do
+              cp "$file" "$dir/"
+              copied="$copied $(basename "$file")"
+            done < <(find "$shots" -type f -path '*/app-store/[0-9]*.png' | sort)
             if [ -n "$copied" ]; then
               echo "用 build 运行 $run_id 的截图：$copied"
               echo "dir=$dir" >> "$GITHUB_OUTPUT"
