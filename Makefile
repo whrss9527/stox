@@ -6,6 +6,8 @@ build:
 test:
 	swift test
 	python3 scripts/check-localization.py
+	python3 scripts/app-store-connect.py check
+	python3 -m unittest discover -s scripts -p 'test_*.py'
 
 # 生成 dist/Stox.app
 app:

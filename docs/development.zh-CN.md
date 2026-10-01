@@ -15,6 +15,7 @@ Tests/StoxCoreTests/   单元测试，使用真实接口返回作为样本
 scripts/
   build-app.sh         编译并组装、签名 Stox.app（STOX_FLAVOR=appstore 时是 App Store 版）
   build-app-store.sh   App Store 版：带沙盒和描述文件签名，打成上传用的 Stox-AppStore.pkg
+  app-store-connect.py 把 docs/app-store/listing 里的资料填进 App Store Connect、选构建、提交审核（App Store Connect API）
   make-icon.swift      生成 App 图标
   check-datasources.sh 打印行情接口的原始返回，排查格式变化
   check-localization.py  检查英文和简体中文的翻译是否齐全、一致
@@ -73,6 +74,6 @@ CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设
 
 也可以在 Actions 页面手动运行 release：不填标签就发 `CHANGELOG.md` 最上面的版本；勾选 overwrite 可以用原标签的代码重新打包、替换附件。
 
-App Store 版不自动发布：GitHub 版发布以后，在 Actions 页面手动运行 app-store，构建、签名并上传到 App Store Connect，再到 App Store Connect 里提交审核，见 [docs/app-store.md](app-store.md)。
+App Store 版不自动发布：GitHub 版发布以后，写好英文的“此版本的新增内容”（`docs/app-store/listing/en-US/whats_new/<版本号>.txt`），在 Actions 页面手动运行 app-store：构建、签名并上传，按 `docs/app-store/listing/` 填好 App Store Connect 上的资料、选上构建，勾了 submit 时提交审核，见 [docs/app-store.md](app-store.md)。
 
 设计取舍见 [docs/DESIGN.md](DESIGN.md)。
