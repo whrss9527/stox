@@ -1,27 +1,33 @@
-Stox is a menu bar app for stock quotes. It has no Dock icon and no main window; everything happens from the menu bar icon.
+Stox is a free, open-source menu bar app for stock, index, futures and currency quotes. It has no Dock icon and no main window. There is no account or login, no in-app purchase and no user-generated content.
 
-HOW TO TRY IT
-1. After launch, look for the Stox icon (a rising line chart) in the menu bar, near the clock. By default it also shows the S&P 500 index next to the icon (when the system language is English; with Chinese it is the Shanghai Composite).
-2. Left-click the icon to open the quote panel. The default watchlist has 8 symbols (the S&P 500, Nasdaq and Dow Jones indices, Apple, Microsoft, NVIDIA, spot gold and EUR/USD), so there is something to see right away.
-3. Click any row to expand it: price details and an intraday chart. Use the buttons above the chart to switch to 5-day, daily, weekly and monthly charts.
-4. Type in the search field at the top (for example "AAPL", "Nikkei" or "Tencent" / "腾讯") and press Return to add a symbol.
-5. Right-click a row to pin it to the menu bar, put it in a group, or enter holdings and price alerts. With holdings entered, the panel shows profit per position and totals.
-6. Right-click the menu bar icon to hide the quotes and keep only the icon; right-click again to show them.
-7. Press Control-Option-S in any app to open or close the panel (global hotkey; it can be changed or turned off in Settings → General).
-8. Open Settings with the gear button at the bottom of the panel: refresh interval, alerts, launch at login, menu bar display, iCloud sync and backup to a file.
+1. SCREEN RECORDING
+A recording made on a Mac running the latest macOS is attached to our reply in App Store Connect. It starts by launching the app and follows the steps in section 3.
 
-DATA SOURCES
-Quotes come from the free public web quote services of Tencent Finance (qt.gtimg.cn, smartbox.gtimg.cn, web.ifzq.gtimg.cn, proxy.finance.qq.com) and Sina Finance (hq.sinajs.cn for global indices such as the Nikkei 225 and as a fallback for quotes, stock2.finance.sina.com.cn for futures charts). These are the same endpoints their public finance websites use; they require no account or API key. Links in the context menu open Xueqiu and East Money web pages in the browser. Hong Kong quotes are delayed by about 15 minutes and other quotes may also be delayed. The app says so in its description and in Settings, and states that data is for reference only and is not investment advice. The app does not offer trading, brokerage or any financial transaction.
+2. PURPOSE AND AUDIENCE
+For individual investors who want to watch the markets while they work, without keeping a browser tab or a trading app open. Stox puts the prices of a personal watchlist (US, Hong Kong and China stocks, global indices, futures, FX) in the menu bar, one click away from charts, holdings P&L and price alerts. It only displays information: no trading, brokerage, payments or investment advice.
 
-Outside market hours the prices do not change; this is expected. On weekends the charts show the last trading day.
+3. HOW TO TRY IT (no login or sample files needed)
+1) After launch, find the Stox icon (a rising line chart) in the menu bar near the clock, followed by the S&P 500 (the Shanghai Composite when the system language is Chinese).
+2) Left-click it to open the panel. The default watchlist has 8 symbols, so there is something to see right away.
+3) Click a row to expand it: price details and an intraday chart. The buttons above the chart switch to 5-day, daily, weekly and monthly charts.
+4) Type "AAPL", "Nikkei" or "Tencent" in the search field and press Return to add a symbol.
+5) Right-click a row to pin it to the menu bar, put it in a group, or enter holdings and price alerts. With holdings, the panel shows P&L per position and in total, and a daily profit calendar.
+6) Control-Option-S opens or closes the panel from any app.
+7) The gear button opens Settings: refresh interval, alerts, launch at login, menu bar display, iCloud sync and backup to a file.
+Outside market hours prices do not change; on weekends the charts show the last trading day.
+
+4. EXTERNAL SERVICES
+- Tencent Finance public web quote endpoints (qt.gtimg.cn, smartbox.gtimg.cn, web.ifzq.gtimg.cn, proxy.finance.qq.com): quotes, symbol search and charts.
+- Sina Finance public web quote endpoints (hq.sinajs.cn, stock2.finance.sina.com.cn): global indices, fallback quotes and futures charts.
+- Apple iCloud (the app's own iCloud Documents container), only when the user turns on sync.
+- Links in the context menu open Xueqiu, East Money and Sina Finance pages in the browser.
+No authentication service, payment processor, analytics, ads, AI service or third-party SDK. Quote requests contain only stock codes.
+
+5. REGIONAL DIFFERENCES
+The app works the same in every region where it is offered (all except mainland China). The only differences follow the system language: an English or Simplified Chinese interface, and a starter watchlist of US and global markets (English) or China markets (Chinese). Users can change both.
+
+6. REGULATED INDUSTRY AND THIRD-PARTY MATERIAL
+Stox is not a financial service: it offers no trading, brokerage, payments, account linking or advice, so no financial license applies. Quotes come from the public endpoints listed above, which the providers' own finance websites use and which need no account or API key. Each user's Mac requests them directly; we run no server and do not store, sell or redistribute the data. The app names its sources, says that Hong Kong quotes are delayed by about 15 minutes and that other quotes may be delayed, and says that data is for reference only and is not investment advice.
 
 PRIVACY AND PERMISSIONS
-- No account, analytics, ads or third-party SDKs. The only network traffic is HTTPS requests for quotes, which contain the stock codes on the watchlist and nothing that identifies the user.
-- Watchlist, holdings and settings are stored locally. If the user turns on iCloud sync, they are stored in the app's own iCloud container in the user's iCloud account.
-- Entitlements: App Sandbox, outgoing network connections (quotes), user-selected files (export/import a backup from Settings → iCloud Sync), and iCloud Documents (sync).
-- Notifications are requested only when the user turns on price alerts or the close summary.
-- Launch at login uses SMAppService and is off until the user turns it on.
-- The global hotkey uses RegisterEventHotKey and does not need Accessibility access.
-
-UPDATES
-This App Store build contains no self-update mechanism; updates come only through the App Store. (A separate open-source build distributed on GitHub has its own updater; that code is compiled out of this build.)
+Data stays on the Mac, or in the user's own iCloud when sync is on. Entitlements: App Sandbox, outgoing connections, user-selected files (backup), iCloud Documents (sync). Notifications are requested only when alerts are turned on. Launch at login (SMAppService) is off by default. The hotkey needs no Accessibility access. No self-updater; updates come only through the App Store.
