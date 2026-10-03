@@ -6,8 +6,10 @@ import UserNotifications
 
 /// 价格提醒和新版本的系统通知。
 @MainActor
-final class Notifier: NSObject, UNUserNotificationCenterDelegate {
+final class Notifier: NSObject, ObservableObject, UNUserNotificationCenterDelegate {
     static let shared = Notifier()
+    /// CI 用：环境变量指定通知权限（比如 denied），不去读系统的，用来截“通知已关闭”的提示。
+    nonisolated static let testPermissionVariable = "STOX_TEST_NOTIFICATIONS"
     /// 通知回调在主线程以外被调用时也要读它，所以不隔离在主线程上。
     nonisolated static let routeKey = "route"
     static let aboutRoute = "about"
@@ -17,6 +19,13 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     /// 点击通知时调用：价格提醒打开面板并展开那一只，收盘小结打开面板，新版本通知打开“关于与更新”。
     var onOpen: ((String?) -> Void)?
 
+    /// 系统给的通知权限。启动时、打开面板时、App 回到前台时、请求授权以后和通知发不出去时都重新读一次，
+    /// 用户在系统设置里关掉通知再回来，设置、编辑页和面板上的提示跟着变。
+    @Published private(set) var permission: NotificationPermission = .unknown
+    private let testPermission = ProcessInfo.processInfo.environment[Notifier.testPermissionVariable]
+        .flatMap(NotificationPermission.init(rawValue:))
+    private var activeObserver: NSObjectProtocol?
+
     /// 通知中心要求进程是一个 .app 包；`swift run` 直接运行可执行文件时调用会崩溃，所以先判断。
     var isAvailable: Bool {
         Bundle.main.bundleIdentifier != nil && Bundle.main.bundleURL.pathExtension == "app"
@@ -25,11 +34,49 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     func setUp() {
         guard isAvailable else { return }
         UNUserNotificationCenter.current().delegate = self
+        refreshPermission()
+        activeObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in
+            Task { @MainActor in Notifier.shared.refreshPermission() }
+        }
     }
 
-    func requestAuthorization() {
+    /// 重新读一次通知权限。
+    func refreshPermission() {
+        if let testPermission {
+            permission = testPermission
+            return
+        }
         guard isAvailable else { return }
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        UNUserNotificationCenter.current().getNotificationSettings { @Sendable settings in
+            let permission = NotificationPermission(settings.authorizationStatus)
+            Task { @MainActor in
+                let notifier = Notifier.shared
+                if notifier.permission != permission {
+                    Log.info("通知权限：\(permission.rawValue)")
+                    notifier.permission = permission
+                }
+            }
+        }
+    }
+
+    /// 还没问过时弹出系统的询问；问过了系统不会再问，结果都会重新读进 permission。
+    func requestAuthorization() {
+        guard isAvailable, testPermission == nil else { return }
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { @Sendable granted, error in
+            if let error {
+                Log.error("请求通知权限失败：\(error.localizedDescription)")
+            } else if !granted {
+                Log.info("没有得到通知权限，提醒发不出来")
+            }
+            Task { @MainActor in Notifier.shared.refreshPermission() }
+        }
+    }
+
+    /// 打开系统设置的通知页，在那里找到 Stox 打开“允许通知”。
+    static func openSystemSettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!)
     }
 
     func post(_ trigger: AlertTrigger) {
@@ -44,7 +91,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.userInfo = [Self.routeKey: Self.symbolRoutePrefix + trigger.symbol.rawValue]
         let identifier = "\(trigger.symbol.rawValue).\(trigger.condition.rawValue).\(Int(Date().timeIntervalSince1970))"
         let request = UNNotificationRequest(identifier: identifier, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request) { _ in }
+        UNUserNotificationCenter.current().add(request) { @Sendable error in
+            // 通知被关掉时系统不弹也不告诉用户：记一笔，再读一次权限，面板上会提示。
+            guard let error else { return }
+            Log.error("提醒没有发出去：\(error.localizedDescription)")
+            Task { @MainActor in Notifier.shared.refreshPermission() }
+        }
     }
 
     /// 收盘小结，点击后打开面板。
@@ -88,6 +140,16 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
             Notifier.shared.onOpen?(route)
         }
         completionHandler()
+    }
+}
+
+extension NotificationPermission {
+    init(_ status: UNAuthorizationStatus) {
+        switch status {
+        case .notDetermined: self = .notDetermined
+        case .denied: self = .denied
+        default: self = .authorized  // authorized、provisional
+        }
     }
 }
 

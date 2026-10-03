@@ -10,6 +10,7 @@ struct StockEditorPanel: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
+    @ObservedObject private var notifier = Notifier.shared
     @State private var pinned = false
     @State private var alias = ""
     @State private var priceAbove = ""
@@ -124,6 +125,9 @@ struct StockEditorPanel: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Text(L("价格提醒"))
                                 .font(.system(size: 12.5, weight: .semibold))
+                            if notifier.permission == .denied {
+                                NotificationDeniedNote()
+                            }
                             numberField(L("价格高于"), text: $priceAbove, unit: currency)
                             numberField(L("价格低于"), text: $priceBelow, unit: currency)
                             numberField(L("涨幅达到"), text: $riseAbove, unit: "%")

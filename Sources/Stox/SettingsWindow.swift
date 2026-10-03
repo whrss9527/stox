@@ -207,6 +207,7 @@ struct FormNote: View {
 @MainActor
 struct GeneralPage: View {
     @ObservedObject var settings: SettingsStore
+    @ObservedObject private var notifier = Notifier.shared
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var loginItemError: String?
     @State private var language = LanguageSetting.current
@@ -267,6 +268,9 @@ struct GeneralPage: View {
                     FormNote(L("点方框后按下新的组合键，至少包含 ⌃、⌥、⇧、⌘ 中的一个，按 Esc 取消。在任何 App 里都能用，不需要辅助功能权限。"))
                 }
                 Section(L("价格提醒")) {
+                    if notifier.permission == .denied {
+                        NotificationDeniedNote()
+                    }
                     Toggle(L("到价时发送系统通知"), isOn: $settings.alertsEnabled)
                     FormNote(L("在行情面板里右键某只证券，选“价格提醒与简称…”设置目标价、涨跌幅，填了持仓的还能设止盈止损。每个条件每个交易日最多提醒一次。"))
                     Toggle(L("收盘后发一条今日盈亏小结"), isOn: $settings.closeSummary)
@@ -293,9 +297,7 @@ struct GeneralPage: View {
                         if value > 0 { Notifier.shared.requestAuthorization() }
                     }
                     FormNote(L("交易时段里，自选里的证券相对最近 5 分钟的最低点涨了、或者相对最高点跌了超过这个幅度时提醒，同一只同一个方向 15 分钟内只提醒一次。"))
-                    Button(L("打开系统的通知设置")) {
-                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.notifications")!)
-                    }
+                    Button(L("打开系统的通知设置")) { Notifier.openSystemSettings() }
                 }
                 Section(L("启动")) {
                     Toggle(L("登录时自动启动"), isOn: launchAtLoginBinding)

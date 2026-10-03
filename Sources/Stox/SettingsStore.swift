@@ -207,6 +207,13 @@ final class SettingsStore: ObservableObject {
         didSet { defaults.set(rapidMoveThreshold, forKey: Keys.rapidMoveThreshold) }
     }
     static let rapidMoveOptions: [Double] = [0, 1, 2, 3, 5]
+    /// 几个要发通知的开关合在一起，判断面板上要不要提示“通知已关闭”。
+    var notificationNeeds: NotificationNeeds {
+        NotificationNeeds(
+            alertsEnabled: alertsEnabled, limitAlerts: limitAlerts, yearAlerts: yearHighLowAlerts,
+            rapidMoves: rapidMoveThreshold > 0, closeSummary: closeSummary
+        )
+    }
     /// 菜单栏只显示图标（右键单击菜单栏图标切换）。
     @Published var hideTicker: Bool {
         didSet { defaults.set(hideTicker, forKey: Keys.hideTicker) }
