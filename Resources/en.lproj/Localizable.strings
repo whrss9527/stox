@@ -74,6 +74,12 @@
 "最小化" = "Minimize";
 "关闭窗口" = "Close Window";
 
+/* Stox/NotificationNotes.swift */
+"系统设置里关掉了 Stox 的通知，价格提醒、止盈止损和收盘小结都不会弹出来。" = "Notifications for Stox are turned off in System Settings, so price alerts, take-profit and stop-loss alerts and close summaries won’t appear.";
+"在“通知”里找到 Stox，打开“允许通知”" = "Find Stox under Notifications and turn on Allow Notifications";
+"通知已关闭，提醒发不出来" = "Notifications are off, alerts won’t show";
+"系统设置里关掉了 Stox 的通知，到价提醒、止盈止损都不会弹出来。点这里打开系统设置，在“通知”里找到 Stox，打开“允许通知”。" = "Notifications for Stox are turned off in System Settings, so price, take-profit and stop-loss alerts won’t appear. Click to open System Settings, find Stox under Notifications and turn on Allow Notifications.";
+
 /* Stox/OrderBookView.swift */
 "买一" = "Bid 1";
 "买二" = "Bid 2";

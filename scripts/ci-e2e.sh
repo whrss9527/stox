@@ -160,6 +160,16 @@ smoke() {
   grep -q "alert_lines=4 " shots/alert-lines-kline.log || fail "日 K 上应该有四条提醒线，涨跌幅提醒只画在分时图上"
   grep -Eq "alert_lines_in_view=[1-9]" shots/alert-lines-kline.log || echo "::warning::日 K 上的提醒线都不在图的范围里（现价 ${price}）"
 
+  # 通知被关掉：面板底部、编辑页和设置的“价格提醒”都提示提醒发不出来（看截图）。CI 里用环境变量假装系统拒绝了通知。
+  write_watchlist '[{"symbol":"sh600519","name":"贵州茅台","alert":{"priceAbove":3000}}]'
+  STOX_TEST_NOTIFICATIONS=denied run_case notifications-denied --show-panel
+  STOX_TEST_NOTIFICATIONS=denied run_case notifications-editor --show-panel --edit sh600519
+  STOX_TEST_NOTIFICATIONS=denied run_case notifications-settings --show-settings general
+  defaults delete "$DOMAIN" watchlist.v1
+  grep -q "notifications=denied notification_hint=true" shots/notifications-denied.log || fail "通知被关掉、又设了价格提醒时，面板上应该提示"
+  check_fits notifications-denied
+  grep -q "notification_hint=false" shots/panel.log || fail "没设提醒时，面板上不应该提示通知被关掉"
+
   # 五档：A 股个股有买卖五档，开盘前、停牌、涨跌停时不满，只提示。港股没有五档，选着五档时看分时，也不列五档。
   run_case orderbook --show-panel --expand sh600519 --chart orderBook
   run_case orderbook-hk --show-panel --expand hk00700 --chart orderBook
