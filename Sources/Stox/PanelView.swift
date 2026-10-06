@@ -81,7 +81,9 @@ struct PanelView: View {
 @MainActor
 struct WatchlistPanel: View {
     @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
+    @ObservedObject private var notifier = Notifier.shared
     let actions: PanelActions
 
     var body: some View {
@@ -111,6 +113,10 @@ struct WatchlistPanel: View {
             #if !APP_STORE
             UpdateBanner { actions.openSettings(.about) }
             #endif
+            // 有开着的提醒、但系统设置里关掉了通知时，底部一行小字提示；没开提醒的人不打扰。
+            if settings.notificationNeeds.shouldWarn(notifier.permission, items: store.items) {
+                NotificationDeniedHint()
+            }
             PanelFooter(actions: actions)
         }
         .task(id: router.searchText) {
