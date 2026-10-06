@@ -219,11 +219,17 @@ PY
 shape "tencent 5-day: sh600519" "https://web.ifzq.gtimg.cn/appstock/app/day/query?code=sh600519"
 shape "tencent 5-day: hk00700" "https://web.ifzq.gtimg.cn/appstock/app/day/query?code=hk00700"
 shape "tencent 5-day: usAAPL (dayus)" "https://web.ifzq.gtimg.cn/appstock/app/dayus/query?code=usAAPL.OQ"
-shape "tencent 5-day: usAAPL (UsDay)" "https://web.ifzq.gtimg.cn/appstock/app/UsDay/query?code=usAAPL"
+# 旧的候选 UsDay 路径已不存在，应用使用上面的 dayus/query。
+if [[ "${STOX_DATASOURCE_EXPERIMENTS:-0}" = 1 ]]; then
+  shape "tencent 5-day: usAAPL (UsDay)" "https://web.ifzq.gtimg.cn/appstock/app/UsDay/query?code=usAAPL"
+fi
 
 # 新浪行情（腾讯不可用时的备用）：A 股、ETF、北交所、指数、港股、美股个股和美股指数的写法。
 fetch "sina quote (fallback)" 'https://hq.sinajs.cn/list=sh600519,sz000001,sh000001,sz399006,sh510300,bj920819,hk00700,hkHSI,gb_aapl,gb_brk.b,gb_brk$b,gb_ixic,gb_$ixic,gb_dji,gb_$dji,gb_inx,gb_$inx,sh999999' "GB18030" "https://finance.sina.com.cn/"
-fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030"
+# 缺 Referer 的请求固定 403，不属于应用实际使用的接口。
+if [[ "${STOX_DATASOURCE_EXPERIMENTS:-0}" = 1 ]]; then
+  fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030"
+fi
 fetch "sina futures (fallback)" "https://hq.sinajs.cn/list=hf_XAU,hf_GC,hf_CL" "GB18030" "https://finance.sina.com.cn/"
 # 环球股指（自选里的“指”）：腾讯没有，用新浪的 znb_ 代码。字段 6、7 是北京时间的日期和时间，看是不是最近的；
 # 只有前 6 个字段的（多伦多、瑞士这些）数据停在一年前，澳洲标普200（AS51）停在前一天，都不用。

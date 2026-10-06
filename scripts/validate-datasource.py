@@ -5,6 +5,7 @@ import argparse
 import json
 import pathlib
 import re
+import sys
 
 
 def validate(title, text, json_response=False):
@@ -52,7 +53,11 @@ def main():
     parser.add_argument('encoding')
     parser.add_argument('--json', action='store_true')
     args = parser.parse_args()
-    validate(args.title, pathlib.Path(args.file).read_bytes().decode(args.encoding), args.json)
+    try:
+        validate(args.title, pathlib.Path(args.file).read_bytes().decode(args.encoding), args.json)
+    except (ValueError, UnicodeError) as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == '__main__':

@@ -36,7 +36,7 @@ class DatasourceTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 validator.validate('minute', body, True)
 
-    def run_probe(self, body, curl_status=0, only=r'^tencent quote: A shares'):
+    def run_probe(self, body, curl_status=0, only=r'^tencent quote: A shares', experiments=False):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             curl = root/'curl'
@@ -52,6 +52,7 @@ pathlib.Path(args[args.index('-o')+1]).write_text(os.environ['FAKE_CURL_BODY'])
             curl.chmod(0o755)
             report = root/'failures.md'
             env = dict(os.environ, PATH=f'{root}:'+os.environ['PATH'], ONLY=only,
+                       STOX_DATASOURCE_EXPERIMENTS='1' if experiments else '0',
                        FAKE_CURL_BODY=body, FAKE_CURL_STATUS=str(curl_status), STOX_DATASOURCE_REPORT=str(report))
             result = subprocess.run(['bash', str(ROOT/'scripts/check-datasources.sh')], env=env, capture_output=True, text=True)
             return result.returncode, report.read_text(), result.stdout+result.stderr
@@ -82,6 +83,16 @@ pathlib.Path(args[args.index('-o')+1]).write_text(os.environ['FAKE_CURL_BODY'])
         code, report, output = self.run_probe('<html>broken</html>', only='^tencent minute: sh600519$')
         self.assertNotEqual(code, 0, output)
         self.assertIn('broken', report)
+
+    def test_known_failed_diagnostics_require_explicit_opt_in(self):
+        for title in ['sina quote without referer', 'tencent 5-day: usAAPL (UsDay)']:
+            only = '^' + __import__('re').escape(title) + '$'
+            code, report, output = self.run_probe('', 22, only)
+            self.assertEqual(code, 0, output)
+            self.assertEqual(report, '')
+            code, report, output = self.run_probe('', 22, only, experiments=True)
+            self.assertNotEqual(code, 0, output)
+            self.assertIn(title, report)
 
     def test_valid_probe_succeeds_without_failure_report(self):
         code, report, output = self.run_probe(quotes())
