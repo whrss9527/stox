@@ -20,6 +20,8 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
     }
     /// 用“记一笔”记下的买卖，最早的在前，最多留 `Trade.limit` 笔。全部卖出、持仓清掉以后也还留着。
     public var trades: [Trade]
+    /// 未知类型的交易照原样保存，界面不展示，也不参与盈亏计算。
+    public var unknownTrades: [PreservedJSONItem] = []
 
     /// 分组名最多这么多个字。
     public static let groupNameLimit = 10
@@ -93,8 +95,9 @@ extension WatchItem: Codable {
         holding = (try? c.decodeIfPresent(Holding.self, forKey: .holding)).flatMap { $0.isValid ? $0 : nil }
         note = (try? c.decodeIfPresent(String.self, forKey: .note)).flatMap { $0.isEmpty ? nil : $0 }
         group = Self.normalizedGroup(try? c.decodeIfPresent(String.self, forKey: .group))
-        // 一笔一笔地读，读不懂的那笔（比如以后的版本加的新类型）跳过，别的照常。
-        trades = (try? c.decodeIfPresent([Lenient<Trade>].self, forKey: .trades))?.compactMap(\.value) ?? []
+        let savedTrades = try? c.decodeIfPresent(PreservingArray<Trade>.self, forKey: .trades)
+        trades = savedTrades?.values ?? []
+        unknownTrades = savedTrades?.unknown ?? []
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -107,8 +110,8 @@ extension WatchItem: Codable {
         try c.encodeIfPresent(holding, forKey: .holding)
         try c.encodeIfPresent(note, forKey: .note)
         try c.encodeIfPresent(group, forKey: .group)
-        if !trades.isEmpty {
-            try c.encode(trades, forKey: .trades)
+        if !trades.isEmpty || !unknownTrades.isEmpty {
+            try c.encode(PreservingArray(values: trades, unknown: unknownTrades), forKey: .trades)
         }
     }
 }

@@ -11,7 +11,7 @@ var products: [Product] = [
 var targets: [Target] = [
     .target(name: "StoxCore"),
     .executableTarget(name: "StoxCLI", dependencies: ["StoxCore"]),
-    .testTarget(name: "StoxCoreTests", dependencies: ["StoxCore"]),
+    .testTarget(name: "StoxCoreTests", dependencies: ["StoxCore"], resources: [.copy("Fixtures")]),
 ]
 
 #if os(macOS)

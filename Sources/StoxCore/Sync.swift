@@ -55,10 +55,12 @@ public struct SyncedSettings: Codable, Equatable, Sendable {
 /// 同步的内容：自选（连同价格提醒、菜单栏简称、是否显示在菜单栏）和设置。
 public struct SyncContent: Equatable, Sendable {
     public var watchlist: [WatchItem]
+    public var unknownWatchItems: [PreservedJSONItem]
     public var settings: SyncedSettings
 
-    public init(watchlist: [WatchItem], settings: SyncedSettings) {
+    public init(watchlist: [WatchItem], settings: SyncedSettings, unknownWatchItems: [PreservedJSONItem] = []) {
         self.watchlist = watchlist
+        self.unknownWatchItems = unknownWatchItems
         self.settings = settings
     }
 
@@ -79,7 +81,10 @@ public struct SyncContent: Equatable, Sendable {
     public func merging(cloud: SyncContent) -> SyncContent {
         var seen = Set(cloud.watchlist.map(\.symbol))
         let extra = watchlist.filter { seen.insert($0.symbol).inserted }
-        return SyncContent(watchlist: cloud.watchlist + extra, settings: settings.overlaid(with: cloud.settings))
+        var opaqueIDs = Set(cloud.unknownWatchItems.map(\.identity))
+        let extraOpaque = unknownWatchItems.filter { opaqueIDs.insert($0.identity).inserted }
+        return SyncContent(watchlist: cloud.watchlist + extra, settings: settings.overlaid(with: cloud.settings),
+                           unknownWatchItems: cloud.unknownWatchItems + extraOpaque)
     }
 }
 
@@ -90,14 +95,15 @@ extension SyncContent: Codable {
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let items = try container.decodeIfPresent([LossyWatchItem].self, forKey: .watchlist) ?? []
-        watchlist = Watchlist.deduplicated(items.compactMap(\.item))
+        let items = try container.decodeIfPresent(PreservingArray<WatchItem>.self, forKey: .watchlist)
+        watchlist = Watchlist.deduplicated(items?.values ?? [])
+        unknownWatchItems = items?.unknown ?? []
         settings = try container.decodeIfPresent(SyncedSettings.self, forKey: .settings) ?? SyncedSettings()
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(watchlist, forKey: .watchlist)
+        try container.encode(PreservingArray(values: watchlist, unknown: unknownWatchItems), forKey: .watchlist)
         try container.encode(settings, forKey: .settings)
     }
 }
@@ -240,6 +246,16 @@ public enum SyncMerge {
             guard seen.insert(item.symbol).inserted else { return nil }
             return merged[item.symbol]
         }
+        // 未知证券也按条目合并，保留原始 JSON、位置和明确的删除。
+        let oldOpaque = Dictionary(baseline.unknownWatchItems.map { ($0.identity, $0) }, uniquingKeysWith: { first, _ in first })
+        let opaqueLists = ordered.map { Dictionary($0.content.unknownWatchItems.map { ($0.identity, $0) }, uniquingKeysWith: { first, _ in first }) }
+        let opaqueIDs = Set(oldOpaque.keys).union(opaqueLists.flatMap { $0.keys })
+        result.content.unknownWatchItems = opaqueIDs.sorted().compactMap { id in
+            let old = oldOpaque[id]
+            let changed = opaqueLists.filter { $0[id] != old }
+            if let latest = changed.last { return latest[id] }
+            return old
+        }.sorted { $0.index == $1.index ? $0.identity < $1.identity : $0.index < $1.index }
         var settings = baseline.settings
         func field<Value: Equatable>(_ key: WritableKeyPath<SyncedSettings, Value?>) {
             let old = baseline.settings[keyPath: key]
