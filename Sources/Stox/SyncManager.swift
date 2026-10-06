@@ -77,8 +77,22 @@ final class SyncManager: ObservableObject {
     var fileURL: URL? { location?.fileURL }
     var available: Bool { location != nil }
 
+    /// 未知证券不进入行情列表，另存一份，关掉同步或重新启动也不会丢。
+    private var unknownWatchItems: [PreservedJSONItem] {
+        get {
+            defaults.data(forKey: "sync.unknownWatchItems").flatMap {
+                try? JSONDecoder().decode([PreservedJSONItem].self, from: $0)
+            } ?? []
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                defaults.set(data, forKey: "sync.unknownWatchItems")
+            }
+        }
+    }
+
     private var currentContent: SyncContent {
-        SyncContent(watchlist: store.items, settings: settings.syncedSettings)
+        SyncContent(watchlist: store.items, settings: settings.syncedSettings, unknownWatchItems: unknownWatchItems)
     }
 
     // MARK: - 备份到文件
@@ -91,6 +105,7 @@ final class SyncManager: ObservableObject {
     /// 导入备份：替换本机的自选和设置，或者只添加本机没有的证券。和在本机改动一样，开着同步时会同步上去。
     func importBackup(_ content: SyncContent, replace: Bool) {
         let result = replace ? content : currentContent.importing(content)
+        unknownWatchItems = result.unknownWatchItems
         store.replaceWatchlist(result.watchlist)
         settings.apply(result.settings)
         Log.info("导入备份：\(replace ? "替换" : "合并")，现在 \(store.items.count) 只")
@@ -347,6 +362,7 @@ final class SyncManager: ObservableObject {
     private func applyRemote(_ content: SyncContent) {
         isApplyingRemote = true
         defer { isApplyingRemote = false }
+        unknownWatchItems = content.unknownWatchItems
         store.replaceWatchlist(content.watchlist)
         settings.apply(content.settings)
     }

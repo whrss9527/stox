@@ -60,15 +60,6 @@ public struct Trade: Codable, Hashable, Sendable {
     }
 }
 
-/// 读数组时用：这一项读不懂就是 nil，不让整个数组读失败。
-struct Lenient<Value: Decodable>: Decodable {
-    let value: Value?
-
-    init(from decoder: Decoder) throws {
-        value = try? Value(from: decoder)
-    }
-}
-
 extension Array where Element == Trade {
     /// 新记的几笔接在后面，只留最近的 `Trade.limit` 笔。
     public func appending(_ trades: [Trade]) -> [Trade] {

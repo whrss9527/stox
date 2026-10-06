@@ -1,0 +1,67 @@
+{
+  "format": 1,
+  "updatedAt": "2026-10-06T10:00:00Z",
+  "device": "Future Mac",
+  "content": {
+    "watchlist": [
+      {
+        "symbol": "usAAPL",
+        "name": "Apple",
+        "trades": [
+          {
+            "side": "buy",
+            "shares": 2,
+            "price": 100,
+            "day": "2026-10-01"
+          },
+          {
+            "side": "future-split",
+            "ratio": {
+              "numerator": 3,
+              "denominator": 2
+            },
+            "day": "2026-10-02",
+            "metadata": [
+              true,
+              null,
+              "keep"
+            ]
+          },
+          {
+            "side": "sell",
+            "shares": 1,
+            "price": 150,
+            "day": "2026-10-03"
+          }
+        ]
+      },
+      {
+        "symbol": "future:bond",
+        "name": "Future Bond",
+        "faceValue": 18446744073709551615,
+        "options": {
+          "coupon": 1.25,
+          "flags": [
+            true,
+            false,
+            null
+          ]
+        }
+      },
+      {
+        "symbol": "usMSFT",
+        "name": "Microsoft"
+      },
+      {
+        "symbol": "future:option",
+        "contract": {
+          "strike": 100,
+          "expiry": "2030-01-01"
+        }
+      }
+    ],
+    "settings": {
+      "showName": true
+    }
+  }
+}
