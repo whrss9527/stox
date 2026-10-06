@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 0.50.3（2026-10-06）
+
+### 中文
+
+- 更新说明：英文界面按英文显示新版本改动，旧版本没有英文时仍显示中文；GitHub 发布页的安装说明也提供两种语言。
+
+### English
+
+- Release notes: new changes appear in English when using the English interface, with Chinese as the fallback for older versions. GitHub installation instructions are also bilingual.
+
 ## 0.50.2（2026-10-06）
 
 - 同步文件读到新版本的证券或交易类型时，原始内容会保留并按原位置写回，编辑已知证券、重新启动或合并同步都不会把它们静默丢掉。

@@ -107,6 +107,19 @@ final class UpdateTests: XCTestCase {
 }
 
 final class ReleaseNotesTests: XCTestCase {
+    func testBilingualNotesSelectTheInterfaceLanguage() {
+        let notes = "## 更新内容\n\n### 中文\n- 价格提醒：改进\n\n### English\n- Price alerts: improved\n\n## 安装\n下载\n## Installation\nDownload"
+        XCTAssertEqual(ReleaseNotesText.highlights(notes, isEnglish: false), "- 价格提醒：改进")
+        XCTAssertEqual(ReleaseNotesText.highlights(notes, isEnglish: true), "- Price alerts: improved")
+    }
+
+    func testEnglishFallsBackToChineseForOldOrEmptyTranslations() {
+        XCTAssertEqual(ReleaseNotesText.highlights("## 更新内容\n- 同步改进", isEnglish: true), "- 同步改进")
+        XCTAssertEqual(ReleaseNotesText.highlights("## 更新内容\n### 中文\n- 同步改进\n### English\n  ", isEnglish: true), "- 同步改进")
+        XCTAssertEqual(ReleaseNotesText.highlights("## Installation\nDownload", isEnglish: true), "")
+        XCTAssertEqual(ReleaseNotesText.highlights("## 更新内容\r\n### English\r\n- Fixed", isEnglish: false), "- Fixed")
+    }
+
     func testKeepsOnlyTheHighlights() {
         let notes = """
         ## 更新内容
