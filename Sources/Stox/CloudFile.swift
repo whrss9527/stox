@@ -88,30 +88,43 @@ enum CloudFile {
         }
     }
 
-    /// 两台 Mac 同时改过时 iCloud 会留下冲突版本：所有版本里改动时间最晚的胜出，写回去并清掉其他版本。
-    /// 返回胜出的内容；没有冲突返回 nil。
-    static func resolveConflicts(at url: URL) -> SyncDocument? {
+    /// 在同一个协调写操作里读、合并、写，避免拉取之后、写回之前到来的云端改动被覆盖。
+    static func merge(_ document: SyncDocument, base: SyncContent?, at url: URL) throws -> SyncDocument {
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        var coordinationError: NSError?
+        var result: Result<SyncDocument, Error> = .success(document)
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { writeURL in
+            result = Result {
+                var merged = document
+                if FileManager.default.fileExists(atPath: writeURL.path) {
+                    let remote = try SyncDocument.decode(Data(contentsOf: writeURL))
+                    merged = SyncMerge.threeWay(base: base, local: document, remote: remote)
+                }
+                try merged.encoded().write(to: writeURL, options: .atomic)
+                return merged
+            }
+        }
+        if let coordinationError { throw coordinationError }
+        return try result.get()
+    }
+
+    /// 冲突版本按上次同步的基线逐项合并，成功写回后才清理冲突；读不懂的版本保留并报错。
+    static func resolveConflicts(at url: URL, base: SyncContent?) throws -> SyncDocument? {
         let conflicts = NSFileVersion.unresolvedConflictVersionsOfItem(at: url) ?? []
         guard !conflicts.isEmpty else { return nil }
         var candidates: [SyncDocument] = []
-        if let current = try? read(at: url) {
-            candidates.append(current)
-        }
+        if let current = try read(at: url) { candidates.append(current) }
         for version in conflicts {
-            if let data = try? Data(contentsOf: version.url), let document = try? SyncDocument.decode(data) {
-                candidates.append(document)
-            }
+            candidates.append(try SyncDocument.decode(Data(contentsOf: version.url)))
         }
-        let winner = SyncDocument.newest(candidates)
+        guard let merged = SyncMerge.resolving(base: base, documents: candidates) else { return nil }
+        try write(merged, to: url)
         for version in conflicts {
             version.isResolved = true
+            try version.remove()
         }
-        try? NSFileVersion.removeOtherVersionsOfItem(at: url)
-        if let winner {
-            try? write(winner, to: url)
-        }
-        Log.info("iCloud 同步：解决了 \(conflicts.count) 个冲突版本，采用来自 \(winner?.device ?? "?") 的改动")
-        return winner
+        Log.info("iCloud 同步：合并了 \(conflicts.count) 个冲突版本")
+        return merged
     }
 
     /// 文件的修改时间和大小，用来判断有没有变化。
