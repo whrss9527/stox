@@ -63,6 +63,8 @@ To test sync and updates, environment variables replace the real iCloud Drive an
 
 CI launches the packaged app on macOS: it opens the panel, details, search and Settings window and takes screenshots (in Chinese, then a few in English); tests sync with a fake iCloud Drive folder; and really updates the app to 9.9.9 from a local fake release and confirms it relaunches.
 
+The scheduled datasource probe returns a failure for request errors or missing required quote fields and retains endpoint/response excerpts. On main, failures create or comment on the fixed-title bug issue without assigning it to an agent. Build smoke failures remain non-blocking but emit a warning. Diagnostic candidate symbols may legitimately return empty records.
+
 ### Releasing a new version
 
 Releases are driven by `CHANGELOG.md`, using the shared release workflow in [Frit](https://github.com/whrss9527/frit):

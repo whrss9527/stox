@@ -13,14 +13,51 @@ on:
   push:
     paths:
       - scripts/check-datasources.sh
+      - scripts/validate-datasource.py
       - .github/workflows/datasources.yml
+
+concurrency:
+  group: datasource-probe-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v5
-      - run: ./scripts/check-datasources.sh
+      - name: Probe sources
+        id: probe
+        run: ./scripts/check-datasources.sh
         env:
           ONLY: ${{ inputs.only }}
+          STOX_DATASOURCE_REPORT: ${{ runner.temp }}/datasource-failures.md
+      - name: Report failures
+        if: failure() && steps.probe.outcome == 'failure' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="行情数据源巡检失败"
+          body="$RUNNER_TEMP/datasource-issue.md"
+          printf '巡检运行：[查看日志](https://github.com/%s/actions/runs/%s)\n\n' "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" > "$body"
+          if [ -s "$RUNNER_TEMP/datasource-failures.md" ]; then
+            head -c 50000 "$RUNNER_TEMP/datasource-failures.md" >> "$body"
+          else
+            echo '巡检未生成详细报告，请检查运行日志。' >> "$body"
+          fi
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search '"行情数据源巡检失败" in:title' --json number,title --jq '.[] | select(.title == "行情数据源巡检失败") | .number' | head -1)
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label bug --body-file "$body"
+          fi
+      - name: Upload failure report
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: datasource-failures
+          path: ${{ runner.temp }}/datasource-failures.md
+          if-no-files-found: ignore
