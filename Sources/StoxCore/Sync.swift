@@ -203,3 +203,59 @@ public enum SyncRules {
         return remote != local && !remote.watchlist.isEmpty
     }
 }
+
+/// 按证券和设置字段合并相对于上次同步的改动；只有同一项同时改了才按写入时间取舍。
+public enum SyncMerge {
+    public static func threeWay(base: SyncContent?, local: SyncDocument, remote: SyncDocument) -> SyncDocument {
+        resolving(base: base, documents: [local, remote])!
+    }
+
+    /// 多个 iCloud 冲突版本使用同一基线，避免合并中间结果的时间覆盖较早版本的独立改动。
+    public static func resolving(base: SyncContent?, documents: [SyncDocument]) -> SyncDocument? {
+        let ordered = documents.sorted { lhs, rhs in
+            if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt < rhs.updatedAt }
+            if lhs.device != rhs.device { return lhs.device < rhs.device }
+            return ((try? lhs.encoded()) ?? Data()).lexicographicallyPrecedes((try? rhs.encoded()) ?? Data())
+        }
+        guard var result = ordered.last else { return nil }
+        let baseline = base ?? SyncContent(watchlist: [], settings: SyncedSettings())
+        let original = Dictionary(baseline.watchlist.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
+        let lists = ordered.map { Dictionary($0.content.watchlist.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first }) }
+        let symbols = Set(original.keys).union(lists.flatMap { $0.keys })
+        var merged: [Symbol: WatchItem] = [:]
+        for symbol in symbols {
+            let old = original[symbol]
+            let changed = lists.filter { $0[symbol] != old }
+            // nil 是删除，也是有效改动，不能 compactMap 后丢掉。
+            if let latest = changed.last {
+                merged[symbol] = latest[symbol]
+            } else {
+                merged[symbol] = old
+            }
+        }
+        let oldOrder = baseline.watchlist.map(\.symbol)
+        let preferred = ordered.last(where: { $0.content.watchlist.map(\.symbol) != oldOrder }) ?? result
+        var seen = Set<Symbol>()
+        result.content.watchlist = ([preferred] + ordered.reversed()).flatMap { $0.content.watchlist }.compactMap { item in
+            guard seen.insert(item.symbol).inserted else { return nil }
+            return merged[item.symbol]
+        }
+        var settings = baseline.settings
+        func field<Value: Equatable>(_ key: WritableKeyPath<SyncedSettings, Value?>) {
+            let old = baseline.settings[keyPath: key]
+            let changed = ordered.compactMap { $0.content.settings[keyPath: key] }.filter { $0 != old }
+            if let latest = changed.last { settings[keyPath: key] = latest }
+        }
+        field(\.refreshInterval)
+        field(\.slowWhenIdle)
+        field(\.colorScheme)
+        field(\.showName)
+        field(\.showPrice)
+        field(\.showPercent)
+        field(\.rotateTicker)
+        field(\.alertsEnabled)
+        field(\.tickerLayout)
+        result.content.settings = settings
+        return result
+    }
+}

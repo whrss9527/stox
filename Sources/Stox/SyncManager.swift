@@ -41,6 +41,15 @@ final class SyncManager: ObservableObject {
             }
         }
     }
+    private var localUpdatedAt: Date {
+        get { defaults.object(forKey: "sync.localUpdatedAt") as? Date ?? Date() }
+        set { defaults.set(newValue, forKey: "sync.localUpdatedAt") }
+    }
+
+    private var localDocument: SyncDocument {
+        SyncDocument(updatedAt: localUpdatedAt, device: CloudFile.deviceName, content: currentContent)
+    }
+
     private var lastStamp: String?
     private var lastPull = Date.distantPast
     private var watcher: DispatchSourceFileSystemObject?
@@ -166,9 +175,13 @@ final class SyncManager: ObservableObject {
             await finishEnable(push: false)
             status = .synced(remote.updatedAt, remote.device)
         case .useLocal:
+            lastSynced = remote.content
+            localUpdatedAt = Date()
             await finishEnable(push: true)
         case .merge:
             applyRemote(currentContent.merging(cloud: remote.content))
+            lastSynced = remote.content
+            localUpdatedAt = Date()
             Log.info("iCloud 同步：合并了本机和 iCloud 的自选")
             await finishEnable(push: true)
         }
@@ -204,10 +217,11 @@ final class SyncManager: ObservableObject {
     func flushBeforeQuit() {
         guard enabled, let url = fileURL, SyncRules.shouldPush(local: currentContent, lastSynced: lastSynced) else { return }
         pushTask?.cancel()
-        let document = SyncDocument(updatedAt: Date(), device: CloudFile.deviceName, content: currentContent)
+        let document = localDocument
         do {
-            try CloudFile.write(document, to: url)
-            lastSynced = document.content
+            let merged = try CloudFile.merge(document, base: lastSynced, at: url)
+            applyRemote(merged.content)
+            lastSynced = merged.content
             Log.info("iCloud 同步：退出前写入了本机的改动（\(document.content.watchlist.count) 只）")
         } catch {
             Log.error("iCloud 同步：退出前写入失败：\(error.localizedDescription)")
@@ -234,7 +248,9 @@ final class SyncManager: ObservableObject {
 
     /// 本机内容变了：稍等一下（连续改动合并成一次）再写到 iCloud。
     private func localChanged() {
-        guard enabled, !isApplyingRemote else { return }
+        guard !isApplyingRemote else { return }
+        localUpdatedAt = Date()
+        guard enabled else { return }
         pushTask?.cancel()
         pushTask = Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: 1_000_000_000)
@@ -252,15 +268,21 @@ final class SyncManager: ObservableObject {
             return
         }
         let content = currentContent
-        let document = SyncDocument(updatedAt: Date(), device: CloudFile.deviceName, content: content)
+        let document = localDocument
+        let base = lastSynced
         do {
-            try await Task.detached(priority: .utility) {
-                try CloudFile.write(document, to: url)
+            let written = try await Task.detached(priority: .utility) {
+                try CloudFile.merge(document, base: base, at: url)
             }.value
-            lastSynced = content
-            lastStamp = CloudFile.stamp(of: url)
-            status = .synced(document.updatedAt, document.device)
-            Log.info("iCloud 同步：已写入本机的自选和设置（\(content.watchlist.count) 只）")
+            // 写文件期间又编辑了：把这些新改动也保留，下一次推送再写回去。
+            let result = currentContent == content ? written.content
+                : SyncMerge.threeWay(base: content, local: localDocument, remote: written).content
+            if result != currentContent { applyRemote(result) }
+            lastSynced = written.content
+            lastStamp = nil
+            status = .synced(written.updatedAt, written.device)
+            Log.info("iCloud 同步：已写入本机的自选和设置（\(written.content.watchlist.count) 只）")
+            if currentContent != written.content { localChanged() }
         } catch {
             status = .error(L("写入 iCloud 失败：%@", error.localizedDescription))
             Log.error("iCloud 同步：写入失败：\(error.localizedDescription)")
@@ -271,8 +293,9 @@ final class SyncManager: ObservableObject {
 
     private func readCloud() async throws -> SyncDocument? {
         guard let url = fileURL else { throw SyncError.unavailable }
+        let base = lastSynced
         return try await Task.detached(priority: .utility) { () throws -> SyncDocument? in
-            if let winner = CloudFile.resolveConflicts(at: url) {
+            if let winner = try CloudFile.resolveConflicts(at: url, base: base) {
                 return winner
             }
             return try CloudFile.read(at: url)
@@ -296,16 +319,18 @@ final class SyncManager: ObservableObject {
     private func pull() async {
         guard enabled else { return }
         lastPull = Date()
+        let stampBeforeRead = fileURL.flatMap(CloudFile.stamp(of:))
         do {
             guard let remote = try await readCloud() else {
                 // 云端还没有文件（第一次，或者被删了）：把本机的放上去。
                 await push()
                 return
             }
-            lastStamp = fileURL.flatMap(CloudFile.stamp(of:))
+            lastStamp = stampBeforeRead
             if SyncRules.shouldApply(remote: remote.content, local: currentContent, lastSynced: lastSynced) {
-                applyRemote(remote.content)
-                Log.info("iCloud 同步：应用了来自 \(remote.device) 的改动（\(remote.content.watchlist.count) 只）")
+                let merged = lastSynced.map { SyncMerge.threeWay(base: $0, local: localDocument, remote: remote) } ?? remote
+                applyRemote(merged.content)
+                Log.info("iCloud 同步：应用了来自 \(remote.device) 的改动（\(merged.content.watchlist.count) 只）")
             }
             lastSynced = remote.content
             status = .synced(remote.updatedAt, remote.device)

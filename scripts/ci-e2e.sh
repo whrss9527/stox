@@ -602,6 +602,40 @@ JSON
   log_has "Stox 已退出" || fail "收到 kill 后没有正常退出"
   echo "===== stox.log ====="
   cat "$LOG"
+
+  # 两台 Mac 从同一基线分别改不同证券：本机改备注，云端改另一只的持仓，两项都应保留。
+  python3 - "$cloud/sync.json" "$WORK/local-watchlist.json" <<'PYMERGE'
+import json, sys
+from datetime import datetime, timezone
+path, local_path = sys.argv[1:]
+doc = json.load(open(path))
+local = json.loads(json.dumps(doc['content']['watchlist']))
+local[0]['note'] = 'Mac A note'
+json.dump(local, open(local_path, 'w'))
+doc['content']['watchlist'][1]['holding'] = {'shares': 100, 'cost': 200}
+doc['updatedAt'] = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+doc['device'] = 'Mac B'
+json.dump(doc, open(path, 'w'))
+PYMERGE
+  write_watchlist "$(cat "$WORK/local-watchlist.json")"
+  concurrent_sync_merged() {
+    python3 - "$cloud/sync.json" <<'PYCHECK'
+import json, sys
+try:
+    items = json.load(open(sys.argv[1]))['content']['watchlist']
+    assert any(i.get('note') == 'Mac A note' for i in items)
+    assert any(i.get('holding', {}).get('shares') == 100 and i.get('holding', {}).get('cost') == 200 for i in items)
+except (AssertionError, OSError, ValueError, KeyError):
+    sys.exit(1)
+PYCHECK
+  }
+  : > "$LOG"
+  STOX_SYNC_DIR="$cloud" "$APP/Contents/MacOS/Stox" > shots/sync-concurrent.log 2>&1 &
+  pid=$!
+  wait_for 25 concurrent_sync_merged || fail "两台 Mac 改不同证券时，备注或持仓丢失"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  echo "✅ 两台 Mac 的独立改动都保留"
   defaults delete "$DOMAIN" 2>/dev/null || true
 }
 
