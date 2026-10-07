@@ -62,7 +62,8 @@ final class QuoteStore: ObservableObject {
     /// 最近一次行情来自备用数据源。
     @Published private(set) var usingBackup = false
     /// 主数据源刚失败过：这个时间之前直接用备用的，免得每次刷新都先等主数据源超时。
-    private var primaryRetryAfter = Date.distantPast
+    private var failover = FailoverPolicy()
+    private let clock: QuoteStoreClock
     private let settings: SettingsStore
     private let defaults: UserDefaults
     private var alertEngine: AlertEngine
@@ -77,12 +78,14 @@ final class QuoteStore: ObservableObject {
         settings: SettingsStore,
         provider: QuoteProvider = TencentProvider(),
         backup: QuoteProvider? = SinaProvider(),
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        clock: QuoteStoreClock? = nil
     ) {
         self.settings = settings
         self.provider = provider
         self.backup = backup
         self.defaults = defaults
+        self.clock = clock ?? QuoteStoreClock()
 
         if let data = defaults.data(forKey: Keys.watchlist), let saved = Watchlist.decode(data) {
             items = saved
@@ -121,8 +124,8 @@ final class QuoteStore: ObservableObject {
                 guard let self else { return }
                 await self.refresh()
                 let delay = self.effectiveInterval
-                self.retryAt = self.lastError == nil ? nil : Date().addingTimeInterval(delay)
-                try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                self.retryAt = self.lastError == nil ? nil : self.clock.now().addingTimeInterval(delay)
+                try? await self.clock.sleep(delay)
             }
         }
     }
@@ -140,7 +143,7 @@ final class QuoteStore: ObservableObject {
 
     /// 网络从不可用变为可用时，马上重新尝试主源。
     func networkDidRecover() {
-        primaryRetryAfter = .distantPast
+        failover.reset()
         retryBackoff.reset()
         retryAt = nil
         restart()
@@ -152,7 +155,7 @@ final class QuoteStore: ObservableObject {
             restart()
             return
         }
-        if Date().timeIntervalSince(lastUpdated) > min(settings.refreshInterval, 3) {
+        if clock.now().timeIntervalSince(lastUpdated) > min(settings.refreshInterval, 3) {
             restart()
         }
     }
@@ -181,7 +184,7 @@ final class QuoteStore: ObservableObject {
             var merged = quotes.filter { symbols.contains($0.key) }
             merged.merge(result) { _, new in new }
             quotes = merged
-            lastUpdated = Date()
+            lastUpdated = clock.now()
             lastError = result.isEmpty ? L("没有取到行情数据") : nil
             // 名称只从主数据源记：两家的叫法有细微差别，来回改会让 iCloud 同步个不停。
             if source == .primary {
@@ -203,14 +206,14 @@ final class QuoteStore: ObservableObject {
     /// 持仓涉及两种以上货币时，每 10 分钟取一次汇率；取不到时一分钟后再试，这期间照旧按货币分开显示。
     private func refreshRatesIfNeeded() async {
         let currencies = Set(items.filter { $0.holding != nil }.map { $0.symbol.market.region })
-        guard currencies.count > 1, Date().timeIntervalSince(ratesFetched) > 600 else { return }
-        ratesFetched = Date()
+        guard currencies.count > 1, clock.now().timeIntervalSince(ratesFetched) > 600 else { return }
+        ratesFetched = clock.now()
         do {
             if let value = try await provider.fetchExchangeRates() {
                 rates = value
             }
         } catch {
-            ratesFetched = Date().addingTimeInterval(-540)
+            ratesFetched = clock.now().addingTimeInterval(-540)
         }
     }
 
@@ -221,7 +224,7 @@ final class QuoteStore: ObservableObject {
         while !Task.isCancelled {
             await refreshExtendedHoursIfNeeded()
             // 仍按行情轮询节奏检查时段变化，实际网络请求由下面的缓存间隔控制。
-            try? await Task.sleep(nanoseconds: UInt64(min(effectiveInterval, 60) * 1_000_000_000))
+            try? await clock.sleep(min(effectiveInterval, 60))
         }
     }
 
@@ -240,9 +243,9 @@ final class QuoteStore: ObservableObject {
         let wanted = Set(symbols)
         let interval: TimeInterval = usPhase.isLive ? max(settings.refreshInterval, 15, Double(symbols.count) * 2) : 1800
         guard !wanted.isSubset(of: extendedHoursFetched.symbols)
-            || Date().timeIntervalSince(extendedHoursFetched.date) >= interval
+            || clock.now().timeIntervalSince(extendedHoursFetched.date) >= interval
         else { return }
-        extendedHoursFetched = (Date(), wanted)
+        extendedHoursFetched = (clock.now(), wanted)
         let provider = self.provider
         let requests = symbols.map { ($0, quotes[$0]?.exchangeCode) }
         // 每只的结果：取到了（可能是没有盘前盘后成交）或者请求失败。
@@ -294,7 +297,7 @@ final class QuoteStore: ObservableObject {
                 // 分时只是锦上添花，失败时保留上一次的，下一轮再试。
             }
             let live = phase(for: symbol.market.region).isLive
-            try? await Task.sleep(nanoseconds: (live ? 60 : 600) * 1_000_000_000)
+            try? await clock.sleep(live ? 60 : 600)
         }
     }
 
@@ -315,7 +318,7 @@ final class QuoteStore: ObservableObject {
                 // 和分时一样，失败时保留上一次的，下一轮再试。
             }
             let live = phase(for: symbol.market.region).isLive
-            try? await Task.sleep(nanoseconds: (live ? 60 : 1800) * 1_000_000_000)
+            try? await clock.sleep(live ? 60 : 1800)
         }
     }
 
@@ -326,7 +329,7 @@ final class QuoteStore: ObservableObject {
             for symbol in symbols where symbol.hasIntraday {
                 guard !Task.isCancelled else { return }
                 let maxAge: TimeInterval = phase(for: symbol.market.region).isLive ? 110 : 600
-                if let fetched = sparklineFetched[symbol], Date().timeIntervalSince(fetched) < maxAge { continue }
+                if let fetched = sparklineFetched[symbol], clock.now().timeIntervalSince(fetched) < maxAge { continue }
                 do {
                     if let series = try await provider.fetchIntraday(for: symbol), !Task.isCancelled {
                         updateSparkline(symbol, from: series)
@@ -334,15 +337,15 @@ final class QuoteStore: ObservableObject {
                 } catch {
                     // 取不到就先不画，下一轮再试。
                 }
-                sparklineFetched[symbol] = Date()
-                try? await Task.sleep(nanoseconds: 150_000_000)
+                sparklineFetched[symbol] = clock.now()
+                try? await clock.sleep(0.15)
             }
-            try? await Task.sleep(nanoseconds: 15 * 1_000_000_000)
+            try? await clock.sleep(15)
         }
     }
 
     private func updateSparkline(_ symbol: Symbol, from series: IntradaySeries) {
-        sparklineFetched[symbol] = Date()
+        sparklineFetched[symbol] = clock.now()
         if let sparkline = Sparkline(series: series, region: symbol.market.region), sparklines[symbol] != sparkline {
             sparklines[symbol] = sparkline
         }
@@ -363,7 +366,7 @@ final class QuoteStore: ObservableObject {
                 fundFlowLoaded.insert(symbol)
             }
             let live = phase(for: symbol.market.region).isLive
-            try? await Task.sleep(nanoseconds: (live ? 60 : 600) * 1_000_000_000)
+            try? await clock.sleep(live ? 60 : 600)
         }
     }
 
@@ -373,12 +376,12 @@ final class QuoteStore: ObservableObject {
             if kind == .industries {
                 if let entries = try await provider.fetchIndustries(count: count) {
                     industries = entries
-                    rankUpdated[kind] = Date()
+                    rankUpdated[kind] = clock.now()
                     rankError = nil
                 }
             } else if let entries = try await provider.fetchRank(kind, count: count) {
                 rank[kind] = entries
-                rankUpdated[kind] = Date()
+                rankUpdated[kind] = clock.now()
                 rankError = nil
             }
         } catch {
@@ -399,7 +402,7 @@ final class QuoteStore: ObservableObject {
                 // 失败时保留上一次的，下一轮再试。
             }
             let live = phase(for: symbol.market.region).isLive
-            try? await Task.sleep(nanoseconds: (live ? 60 : 1800) * 1_000_000_000)
+            try? await clock.sleep(live ? 60 : 1800)
         }
     }
 
@@ -410,11 +413,11 @@ final class QuoteStore: ObservableObject {
         MarketRegion.allCases.filter { region in items.contains { $0.symbol.market.region == region } }
     }
 
-    func phase(for region: MarketRegion, at date: Date = Date()) -> MarketPhase {
+    func phase(for region: MarketRegion, at date: Date? = nil) -> MarketPhase {
         // 节假日靠盘中行情的时间认出来。只有场外基金时没有盘中行情，净值日期总是前一个交易日，
         // 拿它来认会把每个交易日都当成休市，所以这时只按时间表。
         let live = quotes.values.filter { $0.symbol.market.region == region && !$0.symbol.isFund }.compactMap(\.timestamp).max()
-        return MarketClock.effectivePhase(for: region, at: date, latestQuoteTime: live)
+        return MarketClock.effectivePhase(for: region, at: date ?? clock.now(), latestQuoteTime: live)
     }
 
     /// 这个市场所有行情里最新的时间，收盘小结、盈亏记录和记一笔的交易日用它。场外基金的时间是净值日期，
@@ -602,14 +605,10 @@ final class QuoteStore: ObservableObject {
 
     /// 取实时行情：先用腾讯，取不到时改用新浪。主数据源失败后两分钟内直接用备用的，之后再试主数据源。
     private func fetchQuotes(_ symbols: [Symbol]) async throws -> (quotes: [Symbol: Quote], source: QuoteSource) {
-        let skipPrimary = Date() < primaryRetryAfter
+        let skipPrimary = failover.skipsPrimary(at: clock.now())
         let result = try await QuoteFailover.fetchQuotes(symbols, primary: provider, backup: backup, skipPrimary: skipPrimary)
         let backupNow = result.source == .backup
-        if backupNow, !skipPrimary {
-            primaryRetryAfter = Date().addingTimeInterval(120)
-        } else if !backupNow {
-            primaryRetryAfter = .distantPast
-        }
+        failover.record(source: result.source, skippedPrimary: skipPrimary, at: clock.now())
         if backupNow != usingBackup {
             usingBackup = backupNow
             Log.info(backupNow ? "腾讯行情取不到，改用新浪行情" : "腾讯行情恢复了")
@@ -640,7 +639,7 @@ final class QuoteStore: ObservableObject {
         for summary in Portfolio.summaries(items: items, quotes: quotes) {
             let region = summary.region
             let latest = latestQuoteTime(for: region)
-            guard let day = CloseSummary.closedDay(region: region, phase: phase(for: region), latestQuoteTime: latest, now: Date())
+            guard let day = CloseSummary.closedDay(region: region, phase: phase(for: region), latestQuoteTime: latest, now: clock.now())
             else { continue }
             history.record(summary, day: day)
         }
@@ -653,7 +652,7 @@ final class QuoteStore: ObservableObject {
 
     /// 记进最近的提醒。
     private func log(_ trigger: AlertTrigger) {
-        alertLog.append(trigger, at: Date())
+        alertLog.append(trigger, at: clock.now())
         saveAlertLog()
     }
 
@@ -681,13 +680,13 @@ final class QuoteStore: ObservableObject {
             let key = Keys.closeSummaryPrefix + region.rawValue
             guard let note = CloseSummary.due(
                 region: region, phase: phase(for: region), summary: summary,
-                latestQuoteTime: latest, now: Date(), lastSentDay: defaults.string(forKey: key),
+                latestQuoteTime: latest, now: clock.now(), lastSentDay: defaults.string(forKey: key),
                 movers: CloseSummary.movers(items: items, quotes: quotes, region: region),
                 hidingAmounts: settings.hideAmounts
             ) else { continue }
             defaults.set(note.day, forKey: key)
             closeSummaryCount += 1
-            alertLog.append(note, at: Date())
+            alertLog.append(note, at: clock.now())
             saveAlertLog()
             onCloseSummary?(note)
         }
@@ -697,7 +696,7 @@ final class QuoteStore: ObservableObject {
     private func checkRapidMoves(_ fresh: [Symbol: Quote]) {
         let threshold = settings.rapidMoveThreshold
         guard settings.alertsEnabled, threshold > 0 else { return }
-        let now = Date()
+        let now = clock.now()
         for item in items {
             guard let quote = fresh[item.symbol], quote.hasTraded,
                   phase(for: item.symbol.market.region) == .trading,
@@ -717,7 +716,7 @@ final class QuoteStore: ObservableObject {
     private func evaluateAlerts() {
         guard settings.alertsEnabled else { return }
         let triggers = alertEngine.evaluate(
-            items: items, quotes: quotes, now: Date(), limitAlerts: settings.limitAlerts, yearAlerts: settings.yearHighLowAlerts
+            items: items, quotes: quotes, now: clock.now(), limitAlerts: settings.limitAlerts, yearAlerts: settings.yearHighLowAlerts
         )
         guard !triggers.isEmpty else { return }
         firedAlertCount += triggers.count

@@ -17,6 +17,7 @@ var targets: [Target] = [
 #if os(macOS)
 products.append(.executable(name: "Stox", targets: ["Stox"]))
 targets.append(.executableTarget(name: "Stox", dependencies: ["StoxCore"]))
+targets.append(.testTarget(name: "StoxTests", dependencies: ["Stox", "StoxCore"]))
 #endif
 
 let package = Package(
