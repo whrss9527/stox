@@ -205,6 +205,7 @@ smoke() {
   grep -q "source=backup" shots/failover.log || fail "腾讯行情不可用时没有改用新浪"
   grep -Eq "items=8 quotes=[1-9]" shots/failover.log || fail "改用新浪后没有行情"
   grep -q "items=8 quotes=8 " shots/failover.log || echo "::warning::新浪没有返回全部 8 只的行情"
+  scripts/check-quote-recovery.sh "$APP"
 
   # 休市时只显示图标：菜单栏上的市场（默认是上证）休市时只剩图标，交易中照常显示行情。CI 什么时候跑都能判断。
   defaults write "$DOMAIN" ticker.hideWhenClosed -bool true

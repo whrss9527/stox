@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 0.50.5（2026-10-07）
+
+### 中文
+
+- 行情主备数据源都连接失败时逐步放慢重试，面板显示倒计时；网络恢复后立即重新取行情。
+
+### English
+
+- When both quote sources fail, retries slow down and the panel shows a countdown. Quotes refresh immediately when the network returns.
+
 ## 0.50.4（2026-10-07）
 
 ### 中文

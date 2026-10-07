@@ -61,6 +61,8 @@ To test sync and updates, environment variables replace the real iCloud Drive an
 | `STOX_UPDATE_URL=http://127.0.0.1:8765/latest.json` | Read the "latest release" from here, in the format of GitHub's releases API |
 | `STOX_TEST_TRANSLOCATED=1` | Act as if running from a read-only temporary location, so updates install into Applications |
 
+`scripts/check-quote-recovery.sh` uses a local HTTP server to fail both quote sources and then restore the primary. It checks backoff, the panel retry state, and the normal cadence after recovery. Run it only in isolated CI: it launches the app and temporarily changes refresh settings.
+
 CI launches the packaged app on macOS: it opens the panel, details, search and Settings window and takes screenshots (in Chinese, then a few in English); tests sync with a fake iCloud Drive folder; and really updates the app to 9.9.9 from a local fake release and confirms it relaunches.
 
 The scheduled datasource probe returns a failure for request errors or missing required quote fields and retains endpoint/response excerpts. On main, failures create or comment on the fixed-title bug issue without assigning it to an agent. Build smoke failures remain non-blocking but emit a warning. Diagnostic candidate symbols may legitimately return empty records. Known-failed exploratory probes (the retired UsDay path and Sina without its required Referer) run only with `STOX_DATASOURCE_EXPERIMENTS=1`; production probes remain strict.

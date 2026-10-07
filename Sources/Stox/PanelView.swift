@@ -1070,7 +1070,9 @@ struct PanelFooter: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text(statusText)
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(statusText(at: context.date))
+            }
                 .font(.system(size: 10.5))
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
@@ -1177,11 +1179,14 @@ struct PanelFooter: View {
         }
     }
 
-    private var statusText: String {
+    private func statusText(at date: Date) -> String {
         if let copiedMessage {
             return copiedMessage
         }
         if store.items.isEmpty { return L("还没有自选") }
+        if let retryAt = store.retryAt, store.lastError != nil {
+            return L("连不上行情，%@ 秒后重试", max(1, Int(ceil(retryAt.timeIntervalSince(date)))))
+        }
         guard let updated = store.lastUpdated else { return L("正在获取行情…") }
         let cadence = store.effectiveInterval > settings.refreshInterval
             ? L("休市中每分钟刷新")

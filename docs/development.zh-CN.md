@@ -61,6 +61,8 @@ dist/Stox.app/Contents/MacOS/Stox --check-update --show-panel     # 先检查一
 | `STOX_UPDATE_URL=http://127.0.0.1:8765/latest.json` | 从这里读取“最新发布”，格式同 GitHub 的 releases 接口 |
 | `STOX_TEST_TRANSLOCATED=1` | 当作从只读的临时位置运行，更新会装进“应用程序” |
 
+`scripts/check-quote-recovery.sh` 用本地 HTTP 服务让主备行情都失败，再恢复主源，检查退避、面板重试状态和恢复后的正常间隔。仅在 CI 的隔离环境运行，会启动 App 并临时修改刷新设置。
+
 CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设置窗口并截图；用假的 iCloud 云盘文件夹测试同步；用本地的假发布把程序真正更新到 9.9.9 并确认重新启动。
 
 定时数据源巡检在请求失败或行情关键字段缺失时返回失败，并保留接口及返回片段。main 上失败会创建或追加固定标题的 bug issue，不自动打 agent 标签。构建里的真实接口冒烟仍不阻断构建，但会输出警告；诊断中的候选代码允许返回空条目。 已知固定失败的探索项（废弃 UsDay 路径、缺少必需 Referer 的新浪请求）仅在 `STOX_DATASOURCE_EXPERIMENTS=1` 时运行；正式接口仍严格检查。

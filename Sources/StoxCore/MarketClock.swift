@@ -118,9 +118,27 @@ public enum RefreshPolicy {
     /// 所有关注的市场都不在交易时，刷新间隔放宽到至少这么多秒。
     public static let idleInterval: TimeInterval = 60
 
+    /// 连续失败后翻倍，最多一分钟；成功时回到正常轮询间隔。
+    public static func failureInterval(base: TimeInterval, failures: Int) -> TimeInterval {
+        guard failures > 0 else { return max(base, 1) }
+        return min(60, max(base, 1) * pow(2, Double(min(failures, 6))))
+    }
+
     public static func interval(base: TimeInterval, phases: [MarketPhase], slowWhenIdle: Bool) -> TimeInterval {
         let base = max(base, 1)
         guard slowWhenIdle else { return base }
         return phases.contains(where: \.isLive) ? base : max(base, idleInterval)
+    }
+}
+
+/// 两个行情源都失败后的退避；成功或网络恢复后归零。
+public struct QuoteRetryBackoff: Equatable, Sendable {
+    public private(set) var failures = 0
+    public init() {}
+    public mutating func failed() { failures = min(failures + 1, 6) }
+    public mutating func reset() { failures = 0 }
+
+    public func interval(base: TimeInterval) -> TimeInterval {
+        RefreshPolicy.failureInterval(base: base, failures: failures)
     }
 }

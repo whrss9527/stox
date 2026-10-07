@@ -752,3 +752,5 @@
 "天天基金" = "Eastmoney Fund";
 "新浪财经" = "Sina Finance";
 "雪球" = "Xueqiu";
+
+"连不上行情，%@ 秒后重试" = "Cannot reach quotes; retrying in %@s";
