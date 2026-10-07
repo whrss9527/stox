@@ -315,9 +315,9 @@ public enum InstallLocation {
 public enum ReleaseNotesText {
     static let highlightsHeading = "## 更新内容"  // l10n-ignore
     /// 这些标题下面的内容不显示。
-    static let skippedHeadings = ["## 安装", "## What's Changed", "## New Contributors"]  // l10n-ignore
+    static let skippedHeadings = ["## 安装", "## Installation", "## What's Changed", "## New Contributors"]  // l10n-ignore
 
-    public static func highlights(_ notes: String) -> String {
+    public static func highlights(_ notes: String, isEnglish: Bool = AppLanguage.isEnglish) -> String {
         let lines = notes.replacingOccurrences(of: "\r\n", with: "\n").components(separatedBy: "\n")
         var kept: [String] = []
         var skipping = false
@@ -337,7 +337,23 @@ public enum ReleaseNotesText {
             if trimmed.hasPrefix("**Full Changelog**") { continue }
             if !skipping { kept.append(line) }
         }
-        return kept.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return localized(kept.joined(separator: "\n"), isEnglish: isEnglish)
+    }
+
+    /// 新版在同一节里用语言小标题分隔，旧版没有英文时仍显示中文。
+    private static func localized(_ notes: String, isEnglish: Bool) -> String {
+        let chineseHeading = "### 中文"  // l10n-ignore
+        var chinese: [String] = [], english: [String] = []
+        var inEnglish = false
+        for line in notes.components(separatedBy: "\n") {
+            let heading = line.trimmingCharacters(in: .whitespaces)
+            if heading == chineseHeading { inEnglish = false; continue }
+            if heading == "### English" { inEnglish = true; continue }
+            if inEnglish { english.append(line) } else { chinese.append(line) }
+        }
+        let zh = chinese.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        let en = english.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return isEnglish ? (en.isEmpty ? zh : en) : (zh.isEmpty ? en : zh)
     }
 
     /// 几个版本的更新内容合在一起（从新到旧）：每个版本一段，开头是加粗的版本号，下面是它的“更新内容”。

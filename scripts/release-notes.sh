@@ -6,9 +6,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 version="${1#v}"
-section=$(awk -v heading="## ${version}" '
-  $0 == heading { found = 1; next }
-  found && /^## / { exit }
+section=$(awk -v version="$version" '
+  /^## / {
+    if (found) exit
+    heading = $2
+    sub(/（.*$/, "", heading)
+    sub(/\(.*$/, "", heading)
+    if (heading == version) { found = 1; next }
+  }
   found { print }
 ' CHANGELOG.md | sed -e '/./,$!d')
 
