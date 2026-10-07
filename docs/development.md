@@ -29,6 +29,14 @@ scripts/
 
 The core's `FailoverPolicy` and `TickerVisibility` keep time and visibility decisions independent of AppKit. For resources outside the main app, set `AppLanguage.bundle` before starting work; tests restore it after checking their isolated translation bundle. Localization follows the selected bundle.
 
+### Quote invariant checks
+
+`swift run stox-cli check` checks the reviewed A-share, Hong Kong and US sample symbols against the field counts in `Sources/StoxCore/DatasourceSnapshots`, as well as price range, previous close, A-share turnover/volume, timestamp and 52-week high. Use `--source sina` for the backup source. `--save-raw response.bin` preserves original bytes even for HTTP errors; `--raw response.bin --at 2026-10-07T10:00:00Z` replays a response without networking. Exit status is 0 for success, 1 for response differences and 2 for invalid arguments. Symbols without a reviewed schema fail explicitly.
+
+StoxCore has no holiday calendar. The default timestamp window is ten calendar days for A shares, five for Hong Kong/US, and five minutes into the future. An unusually long exchange closure requires an explicit `--max-age-days` override (`STOX_QUOTE_MAX_AGE_DAYS` for the script). The invariant check reports these bounds; it does not claim to know the exact last holiday trading date. Review field meanings before changing snapshots.
+
+The Linux `datasources` workflow builds the CLI, runs replay tests and both live source checks, preserves raw responses, and appends invariant differences to the existing failure issue report. `ONLY` still selects source/market probes.
+
 ### Interface languages
 
 User-visible text is written in Chinese as `L("中文原文", arguments…)` (see `Sources/StoxCore/AppLanguage.swift`). The Chinese source is the key in `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings`, which `scripts/build-app.sh` copies into the app. Arguments use `%@` placeholders, and translations can reorder them with `%1$@`, `%2$@`. When you add or change text, update both tables and run `python3 scripts/check-localization.py` (`make test` runs it too); CI runs it on every push. To try the English interface without changing your system language:

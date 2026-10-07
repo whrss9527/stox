@@ -14,6 +14,10 @@ on:
     paths:
       - scripts/check-datasources.sh
       - scripts/validate-datasource.py
+      - scripts/check-quote-invariants.sh
+      - Sources/StoxCore/QuoteDataCheck.swift
+      - Sources/StoxCore/DatasourceSnapshots/**
+      - Sources/StoxCLI/**
       - .github/workflows/datasources.yml
 
 concurrency:
@@ -23,20 +27,37 @@ concurrency:
 jobs:
   probe:
     runs-on: ubuntu-latest
+    container: swift:6.0-noble
     timeout-minutes: 25
     permissions:
       contents: read
       issues: write
     steps:
       - uses: actions/checkout@v5
+      - name: Tools
+        run: apt-get update -qq && apt-get install -y -qq curl python3 gh
+      - name: Build CLI and check replay tests
+        id: build
+        run: |
+          swift build --product stox-cli
+          STOX_REQUIRE_CLI=1 python3 -m unittest discover -s scripts -p 'test_quote_data_cli.py'
       - name: Probe sources
         id: probe
         run: ./scripts/check-datasources.sh
         env:
           ONLY: ${{ inputs.only }}
           STOX_DATASOURCE_REPORT: ${{ runner.temp }}/datasource-failures.md
+          STOX_DATASOURCE_RAW_DIR: ${{ runner.temp }}/datasource-raw
+      - name: Quote invariants
+        id: check
+        if: always() && !cancelled() && steps.build.outcome == 'success'
+        run: scripts/check-quote-invariants.sh
+        env:
+          ONLY: ${{ inputs.only }}
+          STOX_DATASOURCE_REPORT: ${{ runner.temp }}/datasource-failures.md
+          STOX_DATASOURCE_RAW_DIR: ${{ runner.temp }}/datasource-raw
       - name: Report failures
-        if: failure() && steps.probe.outcome == 'failure' && github.ref == 'refs/heads/main'
+        if: failure() && (steps.probe.outcome == 'failure' || steps.check.outcome == 'failure' || steps.build.outcome == 'failure') && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -60,4 +81,11 @@ jobs:
         with:
           name: datasource-failures
           path: ${{ runner.temp }}/datasource-failures.md
+          if-no-files-found: ignore
+      - name: Upload raw responses
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: datasource-raw
+          path: ${{ runner.temp }}/datasource-raw
           if-no-files-found: ignore

@@ -3,6 +3,7 @@ import StoxCore
 
 // 命令行小工具：检查数据源、调试解析结果。
 //
+//   stox-cli check [--source tencent|sina]  断言行情字段与不变量
 //   stox-cli quote sh600519 700 AAPL us.IXIC   解析并打印行情
 //   stox-cli sina sh600519 700 AAPL            用备用的新浪行情
 //   stox-cli raw sh600519 hk00700              打印接口原始返回
@@ -18,6 +19,7 @@ import StoxCore
 func printUsage() {
     print("""
     用法:
+      stox-cli check [--source tencent|sina] [--raw 文件] [--save-raw 文件] [--at ISO时间] [--max-age-days 天数] [代码]...
       stox-cli quote <代码>...    例如 stox-cli quote sh600519 700 AAPL us.IXIC
       stox-cli sina <代码>...     用备用的新浪行情，格式同上
       stox-cli raw <代码>...      打印接口原始返回
@@ -55,6 +57,8 @@ let provider = TencentProvider()
 
 do {
     switch command {
+    case "check":
+        exit(try await checkQuoteData(arguments.dropFirst()))
     case "quote", "sina":
         let symbols = parseSymbols(arguments.dropFirst())
         let source: QuoteProvider = command == "sina" ? SinaProvider() : provider

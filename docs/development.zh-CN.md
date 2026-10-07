@@ -29,6 +29,14 @@ scripts/
 
 核心里的 `FailoverPolicy`、`TickerVisibility` 把时间与可见性判断和 AppKit 分开。主 App 之外的资源可在启动任务前设置 `AppLanguage.bundle`；测试检查独立翻译包后恢复原值。翻译和语言判断都跟随选中的资源包。
 
+### 行情不变量巡检
+
+`swift run stox-cli check` 按 `Sources/StoxCore/DatasourceSnapshots` 里的人工核对样本检查 A 股、港股、美股的字段数量，以及价格范围、昨收、A 股成交额/成交量、时间、52 周高点。备用源用 `--source sina`。`--save-raw response.bin` 在 HTTP 失败时也保存原始字节；`--raw response.bin --at 2026-10-07T10:00:00Z` 不联网复放响应。退出码 0 表示通过、1 表示响应存在差异、2 表示参数无效。没有人工核对格式快照的证券明确报错。
+
+StoxCore 不含节假日日历，默认时间窗口为 A 股十个自然日、港美股五个自然日，允许时间最多领先五分钟。超长休市必须显式用 `--max-age-days` 覆盖（脚本用 `STOX_QUOTE_MAX_AGE_DAYS`）；巡检报告写明界限，不推断最后一个节假日交易日期。更新快照前必须核对字段含义。
+
+Linux 的 `datasources` 工作流编译 CLI、跑离线复放测试与两家实时源断言，保留原始响应，将不变量差异追加到已有失败 issue 的报告。`ONLY` 继续按数据源与市场筛选探测。
+
 ### 界面语言
 
 显示给用户的文字在代码里写成 `L("中文原文", 参数…)`（见 `Sources/StoxCore/AppLanguage.swift`），中文原文就是 `Resources/en.lproj/Localizable.strings` 和 `Resources/zh-Hans.lproj/Localizable.strings` 里的键，`scripts/build-app.sh` 把它们复制进 App。参数用 `%@` 占位，译文里可以用 `%1$@`、`%2$@` 调换顺序。加文字或改文字时两种语言一起改，再跑一遍 `python3 scripts/check-localization.py`（`make test` 也会跑），CI 每次推送都会检查。不改系统语言也能看英文界面：
