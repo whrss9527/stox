@@ -12,6 +12,16 @@
 
 - When both quote sources fail, retries slow down and the panel shows a countdown. Quotes refresh immediately when the network returns.
 
+## 0.50.4（2026-10-07）
+
+### 中文
+
+- 盘前盘后价只在面板打开时刷新，打开时立即获取，关闭后停止，减少后台无用请求。
+
+### English
+
+- Extended-hours prices refresh only while the panel is open, fetch immediately on opening, and stop when it closes to reduce background requests.
+
 ## 0.50.3（2026-10-06）
 
 ### 中文

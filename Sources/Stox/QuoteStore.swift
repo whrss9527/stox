@@ -192,7 +192,6 @@ final class QuoteStore: ObservableObject {
             checkCloseSummaries()
             recordProfitHistory()
             await refreshRatesIfNeeded()
-            await refreshExtendedHoursIfNeeded()
         } catch {
             guard current == generation, !Task.isCancelled else { return }
             retryBackoff.failed()
@@ -215,10 +214,22 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 面板打开时独立轮询盘前盘后价；SwiftUI 任务在关闭面板或关闭设置时取消。
+    /// 每次打开立即取一轮，不沿用上次面板关闭前的刷新计时。
+    func trackExtendedHours() async {
+        extendedHoursFetched = (.distantPast, [])
+        while !Task.isCancelled {
+            await refreshExtendedHoursIfNeeded()
+            // 仍按行情轮询节奏检查时段变化，实际网络请求由下面的缓存间隔控制。
+            try? await Task.sleep(nanoseconds: UInt64(min(effectiveInterval, 60) * 1_000_000_000))
+        }
+    }
+
     /// 美股不在常规交易时取自选里美股个股的盘前盘后价，每只一个请求：盘前盘后至少隔 15 秒取一次，
     /// 美股多时按每只 2 秒放慢；休市时价格不会再变，半小时一次；自选里多了美股个股时马上取。
     /// 常规交易时段里、设置里关掉时清空，也不去取。
     private func refreshExtendedHoursIfNeeded() async {
+        guard !Task.isCancelled else { return }
         let symbols = items.map(\.symbol).filter { $0.market.region == .us && !$0.isIndex }
         let usPhase = self.phase(for: .us)
         guard settings.showExtendedHours, !symbols.isEmpty, usPhase != .trading, usPhase != .lunchBreak else {
@@ -239,6 +250,7 @@ final class QuoteStore: ObservableObject {
             for (symbol, code) in requests {
                 group.addTask {
                     do {
+                        try Task.checkCancellation()
                         let value = try await provider.fetchExtendedHours(for: symbol, exchangeCode: code)
                         return (symbol, value, true)
                     } catch {
@@ -252,7 +264,7 @@ final class QuoteStore: ObservableObject {
         }
         // 取的时候进了常规交易或者关掉了，就不要这次的结果了。
         let phaseNow = self.phase(for: .us)
-        guard settings.showExtendedHours, phaseNow != .trading, phaseNow != .lunchBreak else { return }
+        guard !Task.isCancelled, settings.showExtendedHours, phaseNow != .trading, phaseNow != .lunchBreak else { return }
         let current = Set(items.map(\.symbol))
         var updated = extendedHours.filter { current.contains($0.key) }
         for (symbol, value, ok) in results where ok && current.contains(symbol) {
