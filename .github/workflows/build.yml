@@ -59,15 +59,16 @@ jobs:
           swift run stox-cli sina sh000001 sh600519 sh510300 hk00700 hkHSI usAAPL usBRK.B us.IXIC znb_NKY
           swift run stox-cli latest-release 0.0.1
 
+      - name: Warn about live data failures
+        if: always() && steps.live-data-0.outcome == 'failure'
+        run: echo '::warning::真实行情接口冒烟失败；构建继续，请检查 Live data smoke test 日志。'
+
+
   app:
     name: macOS app
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - name: Warn about live data failures
-        if: always() && steps.live-data-0.outcome == 'failure'
-        run: echo '::warning::真实行情接口冒烟失败；构建继续，请检查 Live data smoke test 日志。'
-
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
