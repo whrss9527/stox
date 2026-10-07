@@ -17,12 +17,13 @@ public func L(_ key: String, _ arguments: Any...) -> String {
 
 public enum AppLanguage {
     /// 查翻译表的 bundle，App 里就是 Stox.app。
-    public static let bundle = Bundle.main
+    public static var bundle = Bundle.main
 
-    /// 界面用的是不是英文（大数用 K、M、B 而不是万、亿）。启动后不变，只算一次。
-    public static let isEnglish: Bool =
+    /// 界面用的是不是英文（大数用 K、M、B 而不是万、亿）。测试可换成独立资源包。
+    public static var isEnglish: Bool {
         bundle.preferredLocalizations.first?.hasPrefix("en") == true
             && bundle.path(forResource: "Localizable", ofType: "strings") != nil
+    }
 
     /// 日期、相对时间和界面用同一种语言（中文界面下是中文的“9月30日”“3分钟前”）。
     public static var locale: Locale {

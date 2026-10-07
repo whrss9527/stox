@@ -431,9 +431,9 @@ final class StatusItemController: NSObject {
 
     /// 只显示图标：手动隐藏了，或者选了“休市时只显示图标”并且菜单栏上的市场都休市了。
     private var tickerHidden: Bool {
-        if settings.hideTicker { return true }
-        guard settings.hideTickerWhenClosed, !tickerRegions.isEmpty else { return false }
-        return !tickerMarketsLive
+        TickerVisibility.isHidden(manuallyHidden: settings.hideTicker,
+                                  hideWhenClosed: settings.hideTickerWhenClosed,
+                                  hasRegions: !tickerRegions.isEmpty, marketsLive: tickerMarketsLive)
     }
 
     private func updateButton() {

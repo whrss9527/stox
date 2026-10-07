@@ -12,6 +12,7 @@ Sources/
   StoxCLI/    命令行调试工具 stox-cli
 Resources/             Info.plist，以及界面文字的英文（en.lproj）和简体中文（zh-Hans.lproj）
 Tests/StoxCoreTests/   单元测试，使用真实接口返回作为样本
+Tests/StoxTests/       macOS 应用测试，使用假提供者、可控时间与隔离设置/同步文件
 scripts/
   build-app.sh         编译并组装、签名 Stox.app（STOX_FLAVOR=appstore 时是 App Store 版）
   build-app-store.sh   App Store 版：带沙盒和描述文件签名，打成上传用的 Stox-AppStore.pkg
@@ -21,6 +22,12 @@ scripts/
   check-localization.py  检查英文和简体中文的翻译是否齐全、一致
   ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新、App Store 版在沙盒里运行
 ```
+
+### 应用单元测试
+
+`make test` 在所有平台运行 `StoxCoreTests`，在 macOS 还运行 `StoxTests`。应用测试使用假的行情提供者、`QuoteStoreClock`、独立 UserDefaults 域与临时同步文件夹，不调用真实行情接口、不读写用户的 iCloud 文件。`SyncManager` 可注入测试目录，并在验证同一套应用与推送路径时关闭文件监听。移除测试数据前先停止面板、轮询任务并关闭同步。
+
+核心里的 `FailoverPolicy`、`TickerVisibility` 把时间与可见性判断和 AppKit 分开。主 App 之外的资源可在启动任务前设置 `AppLanguage.bundle`；测试检查独立翻译包后恢复原值。翻译和语言判断都跟随选中的资源包。
 
 ### 界面语言
 

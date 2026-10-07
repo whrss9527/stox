@@ -12,6 +12,7 @@ Sources/
   StoxCLI/    The stox-cli debugging tool
 Resources/             Info.plist, and the English (en.lproj) and Simplified Chinese (zh-Hans.lproj) interface strings
 Tests/StoxCoreTests/   Unit tests, using real API responses as samples
+Tests/StoxTests/       macOS app tests with fake providers, a controlled clock and isolated settings/sync files
 scripts/
   build-app.sh           Build, assemble and sign Stox.app (the App Store edition with STOX_FLAVOR=appstore)
   build-app-store.sh     App Store edition: sign with the sandbox and provisioning profile, package Stox-AppStore.pkg for upload
@@ -21,6 +22,12 @@ scripts/
   check-localization.py  Check that the English and Simplified Chinese strings are complete and consistent
   ci-e2e.sh              CI end-to-end tests: launch, screenshots, iCloud sync, one-click update, the App Store edition in the sandbox
 ```
+
+### Application unit tests
+
+`make test` runs `StoxCoreTests` on every platform and `StoxTests` on macOS. The app tests use fake quote providers, `QuoteStoreClock`, dedicated UserDefaults suites and temporary sync folders; they never use live quote endpoints or the user's iCloud files. `SyncManager` accepts a test location and can disable file watching while exercising the same apply/push paths. Stop panel/polling tasks and disable sync before removing fixtures.
+
+The core's `FailoverPolicy` and `TickerVisibility` keep time and visibility decisions independent of AppKit. For resources outside the main app, set `AppLanguage.bundle` before starting work; tests restore it after checking their isolated translation bundle. Localization follows the selected bundle.
 
 ### Interface languages
 

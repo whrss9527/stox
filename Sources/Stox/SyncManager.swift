@@ -29,6 +29,9 @@ final class SyncManager: ObservableObject {
     private let store: QuoteStore
     private let settings: SettingsStore
     private let defaults: UserDefaults
+    private let clock: QuoteStoreClock
+    private let locationOverride: SyncLocation?
+    private let watchesChanges: Bool
     private static let lastSyncedKey = "sync.lastSynced"
     /// 上次和 iCloud 一致时的内容。保存下来，重新启动后才能分清是本机改了还是 iCloud 改了：
     /// 改完马上退出、没来得及写上去的本机改动，下次启动时写上去，而不是被 iCloud 里的旧内容覆盖。
@@ -42,7 +45,7 @@ final class SyncManager: ObservableObject {
         }
     }
     private var localUpdatedAt: Date {
-        get { defaults.object(forKey: "sync.localUpdatedAt") as? Date ?? Date() }
+        get { defaults.object(forKey: "sync.localUpdatedAt") as? Date ?? clock.now() }
         set { defaults.set(newValue, forKey: "sync.localUpdatedAt") }
     }
 
@@ -59,10 +62,14 @@ final class SyncManager: ObservableObject {
     /// 正在应用云端内容：这期间本机的“改动”不是用户改的，不要再写回去。
     private var isApplyingRemote = false
 
-    init(store: QuoteStore, settings: SettingsStore, defaults: UserDefaults = .standard) {
+    init(store: QuoteStore, settings: SettingsStore, defaults: UserDefaults = .standard,
+         clock: QuoteStoreClock? = nil, location: SyncLocation? = nil, watchesChanges: Bool = true) {
         self.store = store
         self.settings = settings
         self.defaults = defaults
+        self.clock = clock ?? QuoteStoreClock()
+        self.locationOverride = location
+        self.watchesChanges = watchesChanges
         store.onLocalEdit = { [weak self] in self?.localChanged() }
         settings.onSyncedSettingChange = { [weak self] in self?.localChanged() }
     }
@@ -72,7 +79,7 @@ final class SyncManager: ObservableObject {
     private var containerLookup: Task<Void, Never>?
 
     /// 同步文件放在哪里：App Store 版在 App 的 iCloud 容器里，GitHub 版在 iCloud 云盘/Stox 文件夹里。
-    var location: SyncLocation? { CloudFile.location(containerRoot: containerRoot) }
+    var location: SyncLocation? { locationOverride ?? CloudFile.location(containerRoot: containerRoot) }
     var folderURL: URL? { location?.folderURL }
     var fileURL: URL? { location?.fileURL }
     var available: Bool { location != nil }
@@ -99,7 +106,7 @@ final class SyncManager: ObservableObject {
 
     /// 导出的备份：和 iCloud 里的同步文件一样的格式。
     func backupData() throws -> Data {
-        try SyncDocument(updatedAt: Date(), device: CloudFile.deviceName, content: currentContent).encoded()
+        try SyncDocument(updatedAt: clock.now(), device: CloudFile.deviceName, content: currentContent).encoded()
     }
 
     /// 导入备份：替换本机的自选和设置，或者只添加本机没有的证券。和在本机改动一样，开着同步时会同步上去。
@@ -191,12 +198,12 @@ final class SyncManager: ObservableObject {
             status = .synced(remote.updatedAt, remote.device)
         case .useLocal:
             lastSynced = remote.content
-            localUpdatedAt = Date()
+            localUpdatedAt = clock.now()
             await finishEnable(push: true)
         case .merge:
             applyRemote(currentContent.merging(cloud: remote.content))
             lastSynced = remote.content
-            localUpdatedAt = Date()
+            localUpdatedAt = clock.now()
             Log.info("iCloud 同步：合并了本机和 iCloud 的自选")
             await finishEnable(push: true)
         }
@@ -245,7 +252,7 @@ final class SyncManager: ObservableObject {
 
     /// 打开面板时顺便看看云端有没有变化（距离上次检查超过 10 秒）。
     func panelWillOpen() {
-        guard enabled, Date().timeIntervalSince(lastPull) > 10 else { return }
+        guard enabled, clock.now().timeIntervalSince(lastPull) > 10 else { return }
         pullIfChanged()
     }
 
@@ -264,11 +271,11 @@ final class SyncManager: ObservableObject {
     /// 本机内容变了：稍等一下（连续改动合并成一次）再写到 iCloud。
     private func localChanged() {
         guard !isApplyingRemote else { return }
-        localUpdatedAt = Date()
+        localUpdatedAt = clock.now()
         guard enabled else { return }
         pushTask?.cancel()
         pushTask = Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            try? await self?.clock.sleep(1)
             guard !Task.isCancelled, let self else { return }
             // 写之前再读一次本机内容：这期间应用过云端的改动时，就不会把旧内容写回去。
             if SyncRules.shouldPush(local: self.currentContent, lastSynced: self.lastSynced) {
@@ -277,7 +284,7 @@ final class SyncManager: ObservableObject {
         }
     }
 
-    private func push() async {
+    func push() async {
         guard let url = fileURL else {
             status = .unavailable
             return
@@ -331,9 +338,9 @@ final class SyncManager: ObservableObject {
         }
     }
 
-    private func pull() async {
+    func pull() async {
         guard enabled else { return }
-        lastPull = Date()
+        lastPull = clock.now()
         let stampBeforeRead = fileURL.flatMap(CloudFile.stamp(of:))
         do {
             guard let remote = try await readCloud() else {
@@ -370,6 +377,7 @@ final class SyncManager: ObservableObject {
     // MARK: - 监听
 
     private func startWatching() {
+        guard watchesChanges else { return }
         stopWatching()
         guard let folder = folderURL else { return }
         try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
