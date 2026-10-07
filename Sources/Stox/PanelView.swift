@@ -38,8 +38,16 @@ extension View {
 /// 面板根视图：自选列表页和单只证券的编辑页，外面是一层玻璃。
 @MainActor
 struct PanelView: View {
+    @EnvironmentObject private var store: QuoteStore
+    @EnvironmentObject private var settings: SettingsStore
     @EnvironmentObject private var router: PanelRouter
     let actions: PanelActions
+
+    private struct ExtendedHoursTrack: Hashable {
+        var active: Bool
+        var symbols: Set<Symbol>
+        var interval: TimeInterval
+    }
 
     var body: some View {
         Group {
@@ -73,6 +81,13 @@ struct PanelView: View {
         }
         // 窗口还没跟上内容尺寸的那一瞬间，内容贴着顶部，被裁掉的是底部而不是标题。
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .task(id: ExtendedHoursTrack(
+            active: router.isOpen && settings.showExtendedHours,
+            symbols: Set(store.items.map(\.symbol)), interval: settings.refreshInterval
+        )) {
+            guard router.isOpen, settings.showExtendedHours else { return }
+            await store.trackExtendedHours()
+        }
     }
 }
 
