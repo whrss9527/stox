@@ -582,6 +582,7 @@ final class StatusItemController: NSObject {
             .map(\.symbol.rawValue)
         print("STOX_DIAG items=\(store.items.count) quotes=\(store.quotes.count) holdings=\(holdings) summary=\(summary.isEmpty ? "none" : summary) allocation=\(allocation) realized=\(realized.isEmpty ? "none" : realized) history=\(store.profitHistory.records.count) alert_log=\(store.alertLog.entries.count) untraded=\(untraded.isEmpty ? "none" : untraded.joined(separator: ",")) intraday=\(intraday) kline=\(kline) fiveday=\(fiveDay) error=\(store.lastError ?? "none")")
         let rates = store.rates.map { "USDCNY:\($0.usdCNY),HKDCNY:\($0.hkdCNY)" } ?? "none"
+        print("STOX_DIAG quote_retry_active=\(store.retryAt != nil) interval=\(Int(store.effectiveInterval))")
         print("STOX_DIAG rates=\(rates) pill=\(settings.changeDisplay.rawValue) source=\(store.usingBackup ? "backup" : "primary") alerts=\(store.firedAlertCount) summaries=\(store.closeSummaryCount)")
         print("STOX_DIAG \(extendedHoursDiagnostics)")
         let permission = Notifier.shared.permission

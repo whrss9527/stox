@@ -1,6 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 import Combine
+import Network
 import StoxCore
 
 @main
@@ -28,6 +29,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKey: HotKey?
     private var cancellables = Set<AnyCancellable>()
     private var signalSources: [DispatchSourceSignal] = []
+    private let pathMonitor = NWPathMonitor()
+    private var networkWasAvailable: Bool?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installSignalHandlers()
@@ -64,6 +67,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
 
         store.start()
+        pathMonitor.pathUpdateHandler = { [weak self] path in
+            let available = path.status == .satisfied
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if self.networkWasAvailable == false, available { self.store.networkDidRecover() }
+                self.networkWasAvailable = available
+            }
+        }
+        pathMonitor.start(queue: DispatchQueue(label: "stox.network-path"))
         sync.start()
         #if !APP_STORE
         updater.startAutomaticChecks { [weak self] in
@@ -92,6 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        pathMonitor.cancel()
         store.stop()
         sync.flushBeforeQuit()
         Log.info("Stox 已退出")

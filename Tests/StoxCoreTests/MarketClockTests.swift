@@ -53,6 +53,22 @@ final class MarketClockTests: XCTestCase {
         XCTAssertEqual(MarketClock.effectivePhase(for: .cn, at: justOpened, latestQuoteTime: lastTrade), .trading)
     }
 
+    func testQuoteFailuresBackOffAndSuccessfulRecoveryResetsTheSchedule() {
+        var retry = QuoteRetryBackoff()
+        XCTAssertEqual(retry.interval(base: 3), 3)
+        for delay in [6.0, 12, 24, 48, 60, 60, 60] {
+            retry.failed()
+            XCTAssertEqual(retry.interval(base: 3), delay)
+        }
+        retry.reset()
+        XCTAssertEqual(retry.failures, 0)
+        XCTAssertEqual(retry.interval(base: 3), 3)
+        retry.failed()
+        XCTAssertEqual(retry.interval(base: 3), 6)
+        XCTAssertEqual(retry.interval(base: 60), 60)
+        XCTAssertEqual(QuoteRetryBackoff().interval(base: 120), 120)
+    }
+
     func testRefreshPolicy() {
         XCTAssertEqual(RefreshPolicy.interval(base: 5, phases: [.closed, .trading], slowWhenIdle: true), 5)
         XCTAssertEqual(RefreshPolicy.interval(base: 5, phases: [.closed, .lunchBreak], slowWhenIdle: true), 60)

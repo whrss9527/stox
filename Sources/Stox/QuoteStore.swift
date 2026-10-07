@@ -10,6 +10,9 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var quotes: [Symbol: Quote] = [:]
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var lastError: String?
+    /// 两个行情源都失败时，面板显示下一次重试的倒计时。
+    @Published private(set) var retryAt: Date?
+    private var retryBackoff = QuoteRetryBackoff()
     @Published private(set) var isRefreshing = false
     /// 展开过的证券的分时走势。
     @Published private(set) var intraday: [Symbol: IntradaySeries] = [:]
@@ -118,6 +121,7 @@ final class QuoteStore: ObservableObject {
                 guard let self else { return }
                 await self.refresh()
                 let delay = self.effectiveInterval
+                self.retryAt = self.lastError == nil ? nil : Date().addingTimeInterval(delay)
                 try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             }
         }
@@ -132,6 +136,14 @@ final class QuoteStore: ObservableObject {
     func restart() {
         stop()
         start()
+    }
+
+    /// 网络从不可用变为可用时，马上重新尝试主源。
+    func networkDidRecover() {
+        primaryRetryAfter = .distantPast
+        retryBackoff.reset()
+        retryAt = nil
+        restart()
     }
 
     /// 打开面板时，如果数据已经不新鲜就马上刷新。
@@ -150,6 +162,8 @@ final class QuoteStore: ObservableObject {
         guard !symbols.isEmpty else {
             quotes = [:]
             lastError = nil
+            retryAt = nil
+            retryBackoff.reset()
             return
         }
         generation += 1
@@ -160,7 +174,10 @@ final class QuoteStore: ObservableObject {
         }
         do {
             let (result, source) = try await fetchQuotes(symbols)
-            guard current == generation else { return }
+            guard current == generation, !Task.isCancelled else { return }
+            if result.isEmpty { throw URLError(.cannotParseResponse) }
+            retryBackoff.reset()
+            retryAt = nil
             var merged = quotes.filter { symbols.contains($0.key) }
             merged.merge(result) { _, new in new }
             quotes = merged
@@ -177,8 +194,10 @@ final class QuoteStore: ObservableObject {
             await refreshRatesIfNeeded()
             await refreshExtendedHoursIfNeeded()
         } catch {
-            guard current == generation else { return }
+            guard current == generation, !Task.isCancelled else { return }
+            retryBackoff.failed()
             lastError = error.localizedDescription
+            Log.info("行情请求失败，\(Int(effectiveInterval)) 秒后重试")
         }
     }
 
@@ -246,7 +265,8 @@ final class QuoteStore: ObservableObject {
     /// 当前实际的刷新间隔：所有关注的市场都休市时会放宽到每分钟一次。
     var effectiveInterval: TimeInterval {
         let phases = activeRegions.map { phase(for: $0) }
-        return RefreshPolicy.interval(base: settings.refreshInterval, phases: phases, slowWhenIdle: settings.slowWhenIdle)
+        let normal = RefreshPolicy.interval(base: settings.refreshInterval, phases: phases, slowWhenIdle: settings.slowWhenIdle)
+        return retryBackoff.interval(base: normal)
     }
 
     /// 展开某只证券时调用：先取一次分时，之后交易时段内每分钟刷新，休市时十分钟一次，直到收起（任务被取消）。

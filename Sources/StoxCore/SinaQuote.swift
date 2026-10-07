@@ -11,12 +11,16 @@ import FoundationNetworking
 /// 返回 GB18030 编码的 `var hq_str_sh600519="贵州茅台,1236.000,…";`。
 public final class SinaProvider: QuoteProvider, @unchecked Sendable {
     public static let endpoint = "https://hq.sinajs.cn/list="
+    /// CI 用本地服务模拟主备行情均失败及恢复。
+    public static let endpointOverrideVariable = "STOX_SINA_QUOTE_ENDPOINT"
     public static let referer = "https://finance.sina.com.cn/"
 
+    private let endpointURL: String
     private let session: URLSession
     private let timeout: TimeInterval
 
-    public init(session: URLSession = .shared, timeout: TimeInterval = 8) {
+    public init(session: URLSession = .shared, timeout: TimeInterval = 8, endpoint: String? = nil) {
+        self.endpointURL = endpoint ?? ProcessInfo.processInfo.environment[Self.endpointOverrideVariable].flatMap { $0.isEmpty ? nil : $0 } ?? Self.endpoint
         self.session = session
         self.timeout = timeout
     }
@@ -30,7 +34,7 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
         return "gb_" + ticker.replacingOccurrences(of: ".", with: "$")
     }
 
-    public static func quoteURL(for symbols: [Symbol]) -> URL? {
+    public static func quoteURL(for symbols: [Symbol], endpoint: String = SinaProvider.endpoint) -> URL? {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "_,.$")
         let list = symbols.map(code(for:)).joined(separator: ",")
@@ -41,7 +45,7 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
     public func fetchQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote] {
         // 场外基金新浪这里没有，外汇的代码不一样，都不请求。
         let symbols = symbols.filter { !$0.isFund && $0.market != .wh }
-        guard !symbols.isEmpty, let url = Self.quoteURL(for: symbols) else { return [:] }
+        guard !symbols.isEmpty, let url = Self.quoteURL(for: symbols, endpoint: endpointURL) else { return [:] }
         let data = try await HTTP.get(url, session: session, timeout: timeout, headers: ["Referer": Self.referer])
         return SinaQuoteParser.parse(Self.decodeText(data), symbols: symbols)
     }
