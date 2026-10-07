@@ -2,8 +2,14 @@
 # 探测行情数据源是否可用，并打印解码后的原始返回，方便排查接口格式变化。
 # 用法: ./scripts/check-datasources.sh
 #       ONLY='US|pandata' ./scripts/check-datasources.sh   只跑标题里匹配这个正则的几项
-set -uo pipefail
+set -euo pipefail
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/stox-datasources.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
+FAILURES=0
+REPORT="${STOX_DATASOURCE_REPORT:-$WORK/failures.md}"
+: > "$REPORT"
 ONLY="${ONLY:-}"
 # 设置了 ONLY 时跳过标题不匹配的探测。
 wanted() {
@@ -12,17 +18,44 @@ wanted() {
 
 UA="Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
 
+# 继续收集其余接口的错误，最后统一返回失败；并行运行使用自己的临时目录。
+download() {
+  local title="$1" url="$2" enc="${3:-UTF-8}" referer="${4:-}" kind="${5:-}"
+  local args=(-f -sS -m 15 -A "$UA" -D "$WORK/headers.txt")
+  [[ -n "$referer" ]] && args+=(-H "Referer: ${referer}")
+  rm -f "$WORK/body.bin" "$WORK/error.txt"
+  local status=0
+  curl "${args[@]}" "$url" -o "$WORK/body.bin" 2> "$WORK/error.txt" || status=$?
+  if [[ "$status" = 0 ]]; then
+    local flags=()
+    [[ "$kind" != json ]] || flags+=(--json)
+    python3 "$ROOT/scripts/validate-datasource.py" "$title" "$WORK/body.bin" "$enc" ${flags[@]+"${flags[@]}"} 2> "$WORK/error.txt" || status=$?
+  fi
+  if [[ "$status" != 0 ]]; then
+    FAILURES=$((FAILURES+1))
+    echo "!! request or field check failed: $title ($url)"
+    python3 - "$REPORT" "$title" "$url" "$WORK" "$enc" <<'REPORTPY'
+import pathlib, sys
+report, title, url, work, encoding = sys.argv[1:]
+work = pathlib.Path(work)
+error = (work/'error.txt').read_text(errors='replace')[-1200:]
+body = (work/'body.bin').read_bytes()[:1200].decode(encoding, errors='replace') if (work/'body.bin').exists() else ''
+with open(report, 'a') as f:
+    f.write(f'### {title}\n\n接口：{url}\n\n```text\n{error.replace("```", "~~~")}\n{body.replace("```", "~~~")}\n```\n\n')
+REPORTPY
+    return 1
+  fi
+}
+
 fetch() {
   local title="$1" url="$2" enc="${3:-GB18030}" referer="${4:-}"
   wanted "$title" || return 0
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
-  local args=(-sS -m 15 -A "$UA" -D /tmp/stox-headers.txt)
-  [[ -n "$referer" ]] && args+=(-H "Referer: ${referer}")
-  if curl "${args[@]}" "$url" -o /tmp/stox-body.bin; then
-    grep -i -E "^(HTTP|content-type)" /tmp/stox-headers.txt
-    if [[ "$enc" == "UTF-8" ]]; then cat /tmp/stox-body.bin; else iconv -f "$enc" -t UTF-8 /tmp/stox-body.bin; fi
+  if download "$title" "$url" "$enc" "$referer"; then
+    grep -i -E "^(HTTP|content-type)" "$WORK/headers.txt"
+    if [[ "$enc" == "UTF-8" ]]; then cat "$WORK/body.bin"; else iconv -f "$enc" -t UTF-8 "$WORK/body.bin"; fi
     echo
   else
     echo "!! request failed"
@@ -50,8 +83,8 @@ minute() {
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
-  if curl -sS -m 15 -A "$UA" "$url" -o /tmp/stox-body.bin; then
-    python3 - /tmp/stox-body.bin <<'PY'
+  if download "$title" "$url" UTF-8 "" json; then
+    python3 - "$WORK/body.bin" <<'PY'
 import json, sys
 try:
     body = json.load(open(sys.argv[1]))
@@ -88,8 +121,8 @@ fields() {
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
-  if curl -sS -m 15 -A "$UA" "$url" -o /tmp/stox-body.bin; then
-    python3 - /tmp/stox-body.bin <<'PY'
+  if download "$title" "$url" UTF-8; then
+    python3 - "$WORK/body.bin" <<'PY'
 import re, sys
 text = open(sys.argv[1], "rb").read().decode("utf-8", "replace")
 for key, payload in re.findall(r'v_([^=]+)="([^"]*)"', text):
@@ -120,8 +153,8 @@ pandata() {
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
-  if curl -sS -m 15 -A "$UA" "$url" -o /tmp/stox-body.bin; then
-    python3 - /tmp/stox-body.bin <<'PY'
+  if download "$title" "$url" UTF-8 "" json; then
+    python3 - "$WORK/body.bin" <<'PY'
 import json, sys
 raw = open(sys.argv[1], "rb").read()
 try:
@@ -156,8 +189,8 @@ shape() {
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
-  if curl -sS -m 15 -A "$UA" "$url" -o /tmp/stox-body.bin; then
-    python3 - /tmp/stox-body.bin <<'PY'
+  if download "$title" "$url" UTF-8 "" json; then
+    python3 - "$WORK/body.bin" <<'PY'
 import json, sys
 raw = open(sys.argv[1], "rb").read()
 try:
@@ -186,11 +219,17 @@ PY
 shape "tencent 5-day: sh600519" "https://web.ifzq.gtimg.cn/appstock/app/day/query?code=sh600519"
 shape "tencent 5-day: hk00700" "https://web.ifzq.gtimg.cn/appstock/app/day/query?code=hk00700"
 shape "tencent 5-day: usAAPL (dayus)" "https://web.ifzq.gtimg.cn/appstock/app/dayus/query?code=usAAPL.OQ"
-shape "tencent 5-day: usAAPL (UsDay)" "https://web.ifzq.gtimg.cn/appstock/app/UsDay/query?code=usAAPL"
+# 旧的候选 UsDay 路径已不存在，应用使用上面的 dayus/query。
+if [[ "${STOX_DATASOURCE_EXPERIMENTS:-0}" = 1 ]]; then
+  shape "tencent 5-day: usAAPL (UsDay)" "https://web.ifzq.gtimg.cn/appstock/app/UsDay/query?code=usAAPL"
+fi
 
 # 新浪行情（腾讯不可用时的备用）：A 股、ETF、北交所、指数、港股、美股个股和美股指数的写法。
 fetch "sina quote (fallback)" 'https://hq.sinajs.cn/list=sh600519,sz000001,sh000001,sz399006,sh510300,bj920819,hk00700,hkHSI,gb_aapl,gb_brk.b,gb_brk$b,gb_ixic,gb_$ixic,gb_dji,gb_$dji,gb_inx,gb_$inx,sh999999' "GB18030" "https://finance.sina.com.cn/"
-fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030"
+# 缺 Referer 的请求固定 403，不属于应用实际使用的接口。
+if [[ "${STOX_DATASOURCE_EXPERIMENTS:-0}" = 1 ]]; then
+  fetch "sina quote without referer" "https://hq.sinajs.cn/list=sh600519" "GB18030"
+fi
 fetch "sina futures (fallback)" "https://hq.sinajs.cn/list=hf_XAU,hf_GC,hf_CL" "GB18030" "https://finance.sina.com.cn/"
 # 环球股指（自选里的“指”）：腾讯没有，用新浪的 znb_ 代码。字段 6、7 是北京时间的日期和时间，看是不是最近的；
 # 只有前 6 个字段的（多伦多、瑞士这些）数据停在一年前，澳洲标普200（AS51）停在前一天，都不用。
@@ -203,8 +242,8 @@ kline() {
   echo "=================================================================="
   echo "## ${title}"
   echo "## ${url}"
-  if curl -sS -m 15 -A "$UA" "$url" -o /tmp/stox-body.bin; then
-    python3 - /tmp/stox-body.bin <<'PY'
+  if download "$title" "$url" UTF-8 "" json; then
+    python3 - "$WORK/body.bin" <<'PY'
 import json, sys
 raw = open(sys.argv[1], "rb").read()
 try:
@@ -268,3 +307,8 @@ fetch "tencent rank: gainers" "${R}&sort_type=priceRatio&direct=down" "UTF-8"
 fetch "tencent rank: losers" "${R}&sort_type=priceRatio&direct=up" "UTF-8"
 fetch "tencent rank: turnover" "${R}&sort_type=turnover&direct=down" "UTF-8"
 fetch "tencent rank: industries" "https://proxy.finance.qq.com/cgi/cgi-bin/rank/pt/getRank?board_type=hy&sort_type=priceRatio&direct=down&offset=0&count=3" "UTF-8"
+
+if [[ "$FAILURES" -gt 0 ]]; then
+  echo "::error::${FAILURES} 个接口请求或字段检查失败；详见失败报告。"
+  exit 1
+fi

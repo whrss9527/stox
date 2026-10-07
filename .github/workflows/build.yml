@@ -38,6 +38,7 @@ jobs:
       - name: Unit tests
         run: swift test
       - name: Live data smoke test
+        id: live-data-0
         # 真实请求腾讯行情接口和 GitHub 的发布接口；偶尔抖动时不阻塞构建。
         continue-on-error: true
         run: |
@@ -63,6 +64,10 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     steps:
+      - name: Warn about live data failures
+        if: always() && steps.live-data-0.outcome == 'failure'
+        run: echo '::warning::真实行情接口冒烟失败；构建继续，请检查 Live data smoke test 日志。'
+
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -154,8 +159,13 @@ jobs:
         continue-on-error: true
         run: scripts/ci-annotate-image.sh 4
       - name: Live data smoke test
+        id: live-data-1
         continue-on-error: true
         run: swift run -c release stox-cli quote sh600519 hk00700 usAAPL us.IXIC
+      - name: Warn about live data failures
+        if: always() && steps.live-data-1.outcome == 'failure'
+        run: echo '::warning::真实行情接口冒烟失败；构建继续，请检查 Live data smoke test 日志。'
+
       - name: Package
         # 一键更新靠 SHA256SUMS.txt 校验下载的压缩包，发布时和 Stox.zip 一起上传。
         run: |
