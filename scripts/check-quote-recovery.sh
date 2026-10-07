@@ -8,12 +8,14 @@ WORK=$(mktemp -d "${RUNNER_TEMP:-/tmp}/stox-quote-recovery.XXXXXX")
 app_pid=""
 server_pid=""
 old_interval=$(defaults read "$DOMAIN" refreshInterval 2>/dev/null || true)
+old_watchlist=$(defaults read "$DOMAIN" watchlist.v1 2>/dev/null | tr -d '<>[:space:]' || true)
 old_idle=$(defaults read "$DOMAIN" slowWhenIdle 2>/dev/null || true)
 cleanup() {
   [ -z "$app_pid" ] || { kill "$app_pid" 2>/dev/null || true; wait "$app_pid" 2>/dev/null || true; }
   [ -z "$server_pid" ] || { kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true; }
   if [ -n "$old_interval" ]; then defaults write "$DOMAIN" refreshInterval -float "$old_interval"; else defaults delete "$DOMAIN" refreshInterval 2>/dev/null || true; fi
   if [ -n "$old_idle" ]; then defaults write "$DOMAIN" slowWhenIdle -bool "$old_idle"; else defaults delete "$DOMAIN" slowWhenIdle 2>/dev/null || true; fi
+  if [ -n "$old_watchlist" ]; then defaults write "$DOMAIN" watchlist.v1 -data "$old_watchlist"; else defaults delete "$DOMAIN" watchlist.v1 2>/dev/null || true; fi
   mkdir -p shots
   cp "$WORK"/*.log "$WORK"/*.jsonl shots/ 2>/dev/null || true
   rm -rf "$WORK"
@@ -24,28 +26,29 @@ server_pid=$!
 for _ in $(seq 1 10); do [ ! -f "$WORK/port" ] || break; sleep 1; done
 [ -f "$WORK/port" ] || { cat "$WORK/quote-recovery-server.log"; echo '行情恢复测试服务没有启动'; exit 1; }
 port=$(cat "$WORK/port")
+defaults write "$DOMAIN" watchlist.v1 -data "$(printf '%s' '[{"symbol":"sh600519","name":"Recovery fixture"}]' | xxd -p | tr -d '\n')"
 defaults write "$DOMAIN" refreshInterval -float 3
 defaults write "$DOMAIN" slowWhenIdle -bool false
 STOX_QUOTE_ENDPOINT="http://127.0.0.1:$port/primary?q=" \
 STOX_SINA_QUOTE_ENDPOINT="http://127.0.0.1:$port/backup?list=" \
   "$APP/Contents/MacOS/Stox" --show-panel > "$WORK/quote-recovery.log" 2>&1 &
 app_pid=$!
-for _ in $(seq 1 15); do
-  if [ -f "$WORK/requests.jsonl" ] && [ "$(wc -l < "$WORK/requests.jsonl")" -ge 4 ]; then break; fi
+for _ in $(seq 1 30); do
+  if [ -f "$WORK/requests.jsonl" ] && [ "$(wc -l < "$WORK/requests.jsonl")" -ge 6 ]; then break; fi
   kill -0 "$app_pid" || { echo '行情恢复测试中 App 退出'; exit 1; }
   sleep 1
 done
-# 两轮主备均失败后再恢复，确认没有继续按原来的三秒间隔请求。
+# 打开面板会立即刷新一次；第三轮才测自动轮询，不把这次用户触发的刷新当作定时重试。
 python3 - "$WORK/requests.jsonl" <<'PY'
 import json, sys
 r = [json.loads(line) for line in open(sys.argv[1])]
-assert len(r) >= 4 and all(x['status'] == 503 for x in r[:4]), r
+assert len(r) >= 6 and all(x['status'] == 503 for x in r[:6]), r
 assert '/primary' in r[0]['path'] and '/backup' in r[1]['path'], r
-assert r[2]['time'] - r[0]['time'] >= 5.5, r
+assert r[4]['time'] - r[2]['time'] >= 11.5, r
 PY
-grep -q "quote_retry_active=true interval=6" "$WORK/quote-recovery.log" || { cat "$WORK/quote-recovery.log"; echo "面板没有进入退避重试状态"; exit 1; }
+grep -Eq "quote_retry_active=true interval=(6|12|24)" "$WORK/quote-recovery.log" || { cat "$WORK/quote-recovery.log"; echo "面板没有进入退避重试状态"; exit 1; }
 touch "$WORK/recover"
-for _ in $(seq 1 25); do
+for _ in $(seq 1 35); do
   if grep -q '"status": 200' "$WORK/requests.jsonl"; then break; fi
   kill -0 "$app_pid" || { echo '等待行情恢复时 App 退出'; exit 1; }
   sleep 1
