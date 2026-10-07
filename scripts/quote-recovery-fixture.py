@@ -4,6 +4,7 @@ import http.server
 import json
 import pathlib
 import sys
+import socketserver
 import time
 
 root = pathlib.Path(sys.argv[1])
@@ -28,6 +29,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
         pass
 
 
-server = http.server.HTTPServer(("127.0.0.1", 0), Handler)
-(root / "port").write_text(str(server.server_port))
+# HTTPServer 会反查主机名，macOS CI 可能停在“本地网络”授权；只绑定回环 TCP。
+class Server(socketserver.ThreadingTCPServer):
+    daemon_threads = True
+
+
+server = Server(("127.0.0.1", 0), Handler)
+(root / "port").write_text(str(server.server_address[1]))
 server.serve_forever()

@@ -19,10 +19,10 @@ cleanup() {
   rm -rf "$WORK"
 }
 trap cleanup EXIT
-python3 scripts/quote-recovery-fixture.py "$WORK" &
+python3 scripts/quote-recovery-fixture.py "$WORK" > "$WORK/quote-recovery-server.log" 2>&1 &
 server_pid=$!
 for _ in $(seq 1 10); do [ ! -f "$WORK/port" ] || break; sleep 1; done
-[ -f "$WORK/port" ] || { echo '行情恢复测试服务没有启动'; exit 1; }
+[ -f "$WORK/port" ] || { cat "$WORK/quote-recovery-server.log"; echo '行情恢复测试服务没有启动'; exit 1; }
 port=$(cat "$WORK/port")
 defaults write "$DOMAIN" refreshInterval -float 3
 defaults write "$DOMAIN" slowWhenIdle -bool false
