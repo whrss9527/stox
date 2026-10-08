@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.0.4（2026-10-08）
+
+### 中文
+
+- 半日市行情长时间停更后按休市处理，减少无效刷新并提前记录收盘盈亏；保留正常午休，行情恢复后自动恢复交易状态。
+
+### English
+
+- Detect early market closures when quotes stop updating, reduce unnecessary refreshes, and record closing profit sooner. Normal lunch breaks are preserved, and fresh quotes restore trading status.
+
 ## 1.0.3（2026-10-08）
 
 ### 中文
