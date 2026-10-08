@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.0.3（2026-10-08）
+
+### 中文
+
+- 修复需要管理员授权的更新：保留已暂存的新版本，清理残留时优先使用本次下载的包，失败时保留旧版本供回滚。
+
+### English
+
+- Fix updates requiring administrator approval: keep the staged download, prefer the current download over leftovers, and preserve the previous version for rollback.
+
 ## 1.0.2（2026-10-08）
 
 ### 中文
