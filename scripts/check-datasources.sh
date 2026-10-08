@@ -10,6 +10,8 @@ trap 'rm -rf "$WORK"' EXIT
 FAILURES=0
 REPORT="${STOX_DATASOURCE_REPORT:-$WORK/failures.md}"
 : > "$REPORT"
+RAW="${STOX_DATASOURCE_RAW_DIR:-}"
+[[ -z "$RAW" ]] || mkdir -p "$RAW"
 ONLY="${ONLY:-}"
 # 设置了 ONLY 时跳过标题不匹配的探测。
 wanted() {
@@ -26,6 +28,11 @@ download() {
   rm -f "$WORK/body.bin" "$WORK/error.txt"
   local status=0
   curl "${args[@]}" "$url" -o "$WORK/body.bin" 2> "$WORK/error.txt" || status=$?
+  if [[ -n "$RAW" && -f "$WORK/body.bin" ]]; then
+    local raw_name
+    raw_name=$(python3 -c 'import re,sys; print(re.sub(r"[^A-Za-z0-9._-]+", "-", sys.argv[1]).strip("-"))' "$title")
+    cp "$WORK/body.bin" "$RAW/$raw_name.bin"
+  fi
   if [[ "$status" = 0 ]]; then
     local flags=()
     [[ "$kind" != json ]] || flags+=(--json)

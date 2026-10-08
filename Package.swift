@@ -9,7 +9,7 @@ var products: [Product] = [
 ]
 
 var targets: [Target] = [
-    .target(name: "StoxCore"),
+    .target(name: "StoxCore", resources: [.copy("DatasourceSnapshots")]),
     .executableTarget(name: "StoxCLI", dependencies: ["StoxCore"]),
     .testTarget(name: "StoxCoreTests", dependencies: ["StoxCore"], resources: [.copy("Fixtures")]),
 ]
