@@ -4,6 +4,46 @@ import StoxCore
 
 final class QuoteStoreTests: XCTestCase {
     @MainActor
+    func testEarlyCloseUsesNewestMarketQuoteAndRecordsSummaryOnlyOnce() async throws {
+        let context = AppTestContext()
+        defer { context.cleanup() }
+        context.settings.closeSummary = true
+        let calendar = MarketRegion.us.calendar
+        let close = calendar.date(from: DateComponents(year: 2026, month: 11, day: 27, hour: 13))!
+        let first = Symbol("usAAPL")!, second = Symbol("usMSFT")!
+        let provider = FakeQuoteProvider()
+        context.date = close
+        let stale = context.quote(first)
+        let secondClose = context.quote(second)
+        context.date = close.addingTimeInterval(11 * 60)
+        await provider.configure(values: [first: stale, second: context.quote(second)])
+        let store = try context.store(provider: provider, items: [
+            WatchItem(symbol: first, holding: Holding(shares: 10, cost: 90)),
+            WatchItem(symbol: second, holding: Holding(shares: 10, cost: 90)),
+        ])
+        defer { store.stop() }
+        await store.refresh()
+        XCTAssertEqual(store.phase(for: .us), .trading, "单只停牌不影响整个市场")
+        XCTAssertTrue(store.profitHistory.records.isEmpty)
+        XCTAssertEqual(store.closeSummaryCount, 0)
+
+        await provider.configure(values: [first: stale, second: secondClose])
+        await store.refresh()
+        XCTAssertEqual(store.phase(for: .us), .closed)
+        XCTAssertEqual(store.profitHistory.records.count, 1)
+        XCTAssertEqual(store.profitHistory.records.first?.day, "2026-11-27")
+        XCTAssertEqual(store.closeSummaryCount, 1)
+        await store.refresh()
+        XCTAssertEqual(store.profitHistory.records.count, 1)
+        XCTAssertEqual(store.closeSummaryCount, 1)
+
+        await provider.configure(values: [first: stale, second: context.quote(second)])
+        await store.refresh()
+        XCTAssertEqual(store.phase(for: .us), .trading)
+        XCTAssertEqual(store.closeSummaryCount, 1)
+    }
+
+    @MainActor
     func testBackupCooldownReturnsToPrimaryAfter120Seconds() async throws {
         let context = AppTestContext()
         defer { context.cleanup() }
@@ -106,6 +146,9 @@ final class QuoteStoreTests: XCTestCase {
         XCTAssertEqual(counts.extended, 1)
         context.delays = []
         context.date = ISO8601DateFormatter().date(from: "2026-10-07T16:00:00Z")!
+        // 时间推进到常规交易时段时也提供新行情，避免把数小时前的盘前行情当成停更。
+        await provider.configure(values: [symbol: context.quote(symbol)])
+        await store.refresh()
         let trading = Task { await store.trackExtendedHours() }
         for _ in 0..<1000 {
             if !context.delays.isEmpty { break }
