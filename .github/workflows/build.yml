@@ -92,6 +92,10 @@ jobs:
           ls -la dist/Stox.app/Contents/MacOS dist/Stox.app/Contents/Resources
           plutil -lint dist/Stox.app/Contents/Resources/*.lproj/*.strings
           codesign --verify --deep --strict --verbose=2 dist/Stox.app
+      - name: Idle footprint (stacked ticker and sparklines)
+        # 真实行情不可用时保留诊断但不影响发布；没有有效数据时不能据此判定性能问题已解决。
+        continue-on-error: true
+        run: scripts/measure-footprint.sh "$PWD/dist/Stox.app"
       - name: Launch smoke test
         # 真正启动打包好的 App：面板、详情、搜索、设置窗口，以及右键切换的“只显示图标”；最后用英文界面再截几张（shots/en-*）。
         run: scripts/ci-e2e.sh smoke
