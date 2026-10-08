@@ -80,6 +80,8 @@ dist/Stox.app/Contents/MacOS/Stox --check-update --show-panel     # 先检查一
 
 CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设置窗口并截图；用假的 iCloud 云盘文件夹测试同步；用本地的假发布把程序真正更新到 9.9.9 并确认重新启动。
 
+`scripts/measure-footprint.sh` 只在隔离的 macOS CI 运行。测量时菜单栏上下两行、面板固定打开、迷你走势线开启，每 5 秒取一次行情。确认行情和迷你走势线已加载后，稳定 30 秒，再用 60 秒窗口记录 CPU 时间增量、空闲唤醒和 RSS，退出时恢复 runner 原来的 Stox 偏好。结果和就绪日志保留为 `shots/footprint.*` 与 `shots/footprint-app.log`；网络失败表示测量不可用，不能据此声称 CPU 很低。数值包含整个 App 和真实网络活动，不是单独的菜单栏绘制耗时。不要在个人账户上运行这个脚本。
+
 定时数据源巡检在请求失败或行情关键字段缺失时返回失败，并保留接口及返回片段。main 上失败会创建或追加固定标题的 bug issue，不自动打 agent 标签。构建里的真实接口冒烟仍不阻断构建，但会输出警告；诊断中的候选代码允许返回空条目。 已知固定失败的探索项（废弃 UsDay 路径、缺少必需 Referer 的新浪请求）仅在 `STOX_DATASOURCE_EXPERIMENTS=1` 时运行；正式接口仍严格检查。
 
 ### 诊断信息与日志轮转

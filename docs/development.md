@@ -80,6 +80,8 @@ To test sync and updates, environment variables replace the real iCloud Drive an
 
 CI launches the packaged app on macOS: it opens the panel, details, search and Settings window and takes screenshots (in Chinese, then a few in English); tests sync with a fake iCloud Drive folder; and really updates the app to 9.9.9 from a local fake release and confirms it relaunches.
 
+`scripts/measure-footprint.sh` runs only in isolated macOS CI. It measures the packaged app with a stacked ticker, a pinned watchlist panel and sparklines, using 5-second quote polling. After confirming that quotes and sparklines are loaded, it settles for 30 seconds and samples CPU time, idle wakeups and RSS for 60 seconds. It restores the runner's previous Stox preferences on exit. Results and readiness logs are retained as `shots/footprint.*` and `shots/footprint-app.log`; network failures make the measurement unavailable rather than proving low CPU use. The result includes the whole app and live network activity, not just menu bar drawing. Never run this script on a personal account.
+
 The scheduled datasource probe returns a failure for request errors or missing required quote fields and retains endpoint/response excerpts. On main, failures create or comment on the fixed-title bug issue without assigning it to an agent. Build smoke failures remain non-blocking but emit a warning. Diagnostic candidate symbols may legitimately return empty records. Known-failed exploratory probes (the retired UsDay path and Sina without its required Referer) run only with `STOX_DATASOURCE_EXPERIMENTS=1`; production probes remain strict.
 
 ### Diagnostics and log rotation
