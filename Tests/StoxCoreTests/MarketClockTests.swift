@@ -53,6 +53,62 @@ final class MarketClockTests: XCTestCase {
         XCTAssertEqual(MarketClock.effectivePhase(for: .cn, at: justOpened, latestQuoteTime: lastTrade), .trading)
     }
 
+    func testHongKongHalfDayWaitsUntilAfterNormalLunchAndDelayedReopening() {
+        let calendar = MarketRegion.hk.calendar
+        func time(_ hour: Int, _ minute: Int) -> Date {
+            calendar.date(from: DateComponents(year: 2026, month: 12, day: 24, hour: hour, minute: minute))!
+        }
+        let latest = time(12, 0)
+        for minute in [0, 20, 59] {
+            XCTAssertEqual(MarketClock.effectivePhase(for: .hk, at: time(12, minute), latestQuoteTime: latest), .lunchBreak)
+        }
+        XCTAssertEqual(MarketClock.effectivePhase(for: .hk, at: time(13, 20), latestQuoteTime: latest), .trading)
+        let now = time(13, 20).addingTimeInterval(1)
+        let phase = MarketClock.effectivePhase(for: .hk, at: now, latestQuoteTime: latest)
+        XCTAssertEqual(phase, .closed)
+        XCTAssertEqual(CloseSummary.closedDay(region: .hk, phase: phase, latestQuoteTime: latest, now: now), "2026-12-24")
+        XCTAssertEqual(RefreshPolicy.interval(base: 5, phases: [phase], slowWhenIdle: true), 60)
+        // 正常交易日，下午第一批有延迟的行情仍然应当算交易中。
+        XCTAssertEqual(MarketClock.effectivePhase(for: .hk, at: now, latestQuoteTime: time(13, 5)), .trading)
+    }
+
+    func testUSEarlyCloseInStandardTimeAndRecovery() {
+        let calendar = MarketRegion.us.calendar
+        let latest = calendar.date(from: DateComponents(year: 2026, month: 11, day: 27, hour: 13))!
+        let boundary = latest.addingTimeInterval(10 * 60)
+        XCTAssertEqual(MarketClock.effectivePhase(for: .us, at: boundary, latestQuoteTime: latest), .trading)
+        let now = boundary.addingTimeInterval(1)
+        let phase = MarketClock.effectivePhase(for: .us, at: now, latestQuoteTime: latest)
+        XCTAssertEqual(phase, .closed)
+        XCTAssertEqual(CloseSummary.closedDay(region: .us, phase: phase, latestQuoteTime: latest, now: now), "2026-11-27")
+        XCTAssertEqual(MarketClock.effectivePhase(for: .us, at: now, latestQuoteTime: now), .trading)
+        XCTAssertEqual(MarketClock.effectivePhase(for: .us, at: now, latestQuoteTime: nil), .trading)
+    }
+
+    func testSameDayStalenessAndSessionGraceForEveryStockMarket() {
+        for region in [MarketRegion.cn, .hk, .us] {
+            let threshold: TimeInterval = region == .hk ? 20 * 60 : 10 * 60
+            let opened = at(region, 28, 9, 30)
+            let preopen = opened.addingTimeInterval(-60)
+            XCTAssertEqual(MarketClock.effectivePhase(for: region, at: opened.addingTimeInterval(threshold), latestQuoteTime: preopen), .trading)
+            XCTAssertEqual(MarketClock.effectivePhase(for: region, at: opened.addingTimeInterval(threshold + 1), latestQuoteTime: preopen), .closed)
+            let latest = at(region, 28, 10, 0)
+            XCTAssertEqual(MarketClock.effectivePhase(for: region, at: latest.addingTimeInterval(threshold), latestQuoteTime: latest), .trading)
+            XCTAssertEqual(MarketClock.effectivePhase(for: region, at: latest.addingTimeInterval(threshold + 1), latestQuoteTime: latest), .closed)
+        }
+        let morning = at(.cn, 28, 11, 30)
+        XCTAssertEqual(MarketClock.effectivePhase(for: .cn, at: at(.cn, 28, 12, 30), latestQuoteTime: morning), .lunchBreak)
+        XCTAssertEqual(MarketClock.effectivePhase(for: .cn, at: at(.cn, 28, 13, 10), latestQuoteTime: morning), .trading)
+        XCTAssertEqual(MarketClock.effectivePhase(for: .cn, at: at(.cn, 28, 13, 11), latestQuoteTime: morning), .closed)
+        XCTAssertEqual(MarketClock.effectivePhase(for: .cn, at: at(.cn, 28, 13, 11), latestQuoteTime: at(.cn, 28, 13, 10)), .trading)
+    }
+
+    func testExtendedSessionsAreNotClosedByStaleRegularQuotes() {
+        let latest = at(.us, 28, 16, 0)
+        XCTAssertEqual(MarketClock.effectivePhase(for: .us, at: at(.us, 28, 17, 0), latestQuoteTime: latest), .afterHours)
+        XCTAssertEqual(MarketClock.effectivePhase(for: .us, at: at(.us, 29, 8, 0), latestQuoteTime: latest), .preMarket)
+    }
+
     func testQuoteFailuresBackOffAndSuccessfulRecoveryResetsTheSchedule() {
         var retry = QuoteRetryBackoff()
         XCTAssertEqual(retry.interval(base: 3), 3)

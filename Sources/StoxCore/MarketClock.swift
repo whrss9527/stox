@@ -74,7 +74,7 @@ public enum MarketClock {
         return sessions(for: region).first(where: { minutes >= $0.start && minutes < $0.end })?.phase ?? .closed
     }
 
-    /// 结合最新行情时间修正交易时段：按时间表应在交易，但当天还没有任何行情，说明是节假日休市。
+    /// 结合最新行情时间识别整日休市和提前收市；行情恢复后立即按时间表处理。
     ///
     /// - Parameter latestQuoteTime: 该市场所有行情里最新的时间戳。
     public static func effectivePhase(for region: MarketRegion, at date: Date, latestQuoteTime: Date?) -> MarketPhase {
@@ -87,7 +87,20 @@ public enum MarketClock {
         }
         guard scheduled == .trading || scheduled == .lunchBreak, let latest = latestQuoteTime else { return scheduled }
         let calendar = region.calendar
-        if calendar.isDate(latest, inSameDayAs: date) { return scheduled }
+        if calendar.isDate(latest, inSameDayAs: date) {
+            // 午休本来就不会更新，不能据此发送收盘小结。每段连续交易重新计宽限期，
+            // 避免把午休积累的停更时间带到下午；港股还要容纳约 15 分钟的行情延迟。
+            guard scheduled == .trading else { return scheduled }
+            let c = calendar.dateComponents([.hour, .minute], from: date)
+            let minutes = (c.hour ?? 0) * 60 + (c.minute ?? 0)
+            guard let session = sessions(for: region).first(where: {
+                $0.phase == .trading && minutes >= $0.start && minutes < $0.end
+            }), let opened = calendar.date(bySettingHour: session.start / 60,
+                                           minute: session.start % 60, second: 0, of: date)
+            else { return scheduled }
+            let staleInterval: TimeInterval = region == .hk ? 20 * 60 : 10 * 60
+            return date.timeIntervalSince(max(latest, opened)) > staleInterval ? .closed : scheduled
+        }
         // 开盘后留一段宽限期，港股行情本身有约 15 分钟延时。
         let grace = region == .hk ? 20 : 5
         let c = calendar.dateComponents([.hour, .minute], from: date)
