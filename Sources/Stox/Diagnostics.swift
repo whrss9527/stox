@@ -60,6 +60,8 @@ enum Diagnostics {
         var url = URLComponents(string: "https://github.com/whrss9527/stox/issues/new")!
         url.queryItems = [URLQueryItem(name: "template", value: "bug.yml"),
                           URLQueryItem(name: "version", value: "Stox \(version); macOS \(osVersion)")]
+        // 表单查询把 + 当作空格，版本的构建标记需要保留字面加号。
+        url.percentEncodedQuery = url.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
         return url.url!
     }
 }

@@ -49,12 +49,14 @@ final class DiagnosticsTests: XCTestCase {
     }
 
     func testFeedbackPrefillsTheBugTemplateAndRoundTripsVersionAndOS() throws {
-        let url = Diagnostics.feedbackURL(version: "0.50.6-beta.1", osVersion: "26.0 (Build 25A+123)")
+        let url = Diagnostics.feedbackURL(version: "0.50.6-beta.1+build", osVersion: "26.0 (Build 25A+123)")
         let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
         XCTAssertEqual(components.host, "github.com")
         XCTAssertEqual(components.path, "/whrss9527/stox/issues/new")
         XCTAssertEqual(components.queryItems?.first(where: { $0.name == "template" })?.value, "bug.yml")
         XCTAssertEqual(components.queryItems?.first(where: { $0.name == "version" })?.value,
-                       "Stox 0.50.6-beta.1; macOS 26.0 (Build 25A+123)")
+                       "Stox 0.50.6-beta.1+build; macOS 26.0 (Build 25A+123)")
+        XCTAssertTrue(components.percentEncodedQuery?.contains("%2B") == true)
+        XCTAssertFalse(components.percentEncodedQuery?.contains("+") == true)
     }
 }
