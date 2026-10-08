@@ -328,6 +328,30 @@ public enum MenuBarProfit: String, CaseIterable, Sendable, Identifiable {
 }
 
 public enum MenuBarTicker {
+    /// 悬停时按固定顺序显示全部证券的名称、代码、现价和涨跌幅，不用菜单栏简称，也不显示持仓信息。
+    /// 右键手动隐藏时保留操作提示，避免意外泄露；休市自动隐藏和轮播不影响悬停内容。
+    public static func toolTip(
+        items: [WatchItem], quotes: [Symbol: Quote], manuallyHidden: Bool = false,
+        english: Bool = AppLanguage.isEnglish
+    ) -> String {
+        let pinned = items.filter(\.pinned)
+        guard !manuallyHidden, !pinned.isEmpty else {
+            return L("Stox 行情\n左键：打开 / 关闭行情面板\n右键：隐藏 / 显示菜单栏行情")
+        }
+        return pinned.map { item in
+            let quote = quotes[item.symbol]
+            let name = item.displayName(with: quote, english: english)
+            let code = item.symbol.displayCode
+            let label = name == code ? name : "\(name) (\(code))"
+            // 尚无有效现价时，涨跌幅也用占位符，不把未成交的默认 0 当成平盘。
+            let priced = quote.flatMap { $0.price.isFinite && $0.price > 0 ? $0 : nil }
+            let price = priced.map { QuoteFormatter.price($0.price, decimals: $0.priceDecimals) } ?? "--"
+            let percent = priced.flatMap { $0.changePercent.isFinite ? $0.changePercent : nil }
+                .map(QuoteFormatter.percent) ?? "--"
+            return "\(label)  \(price)  \(percent)"
+        }.joined(separator: "\n")
+    }
+
     /// 菜单栏上的今日盈亏，例如“今日 +¥688 -HK$120”，每种货币一段；给了汇率时折成人民币合成一段。
     /// 隐藏金额时换成相对昨日市值的比例，例如“今日 +0.62%”。没有持仓时返回空数组。
     public static func dayProfitParts(

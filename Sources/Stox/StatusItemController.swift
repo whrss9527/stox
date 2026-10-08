@@ -42,7 +42,6 @@ final class StatusItemController: NSObject {
             // 和系统菜单一样在按下鼠标时响应。
             button.sendAction(on: [.leftMouseDown, .rightMouseDown])
             button.imagePosition = .imageLeading
-            button.toolTip = L("Stox 行情\n左键：打开 / 关闭行情面板\n右键：隐藏 / 显示菜单栏行情")
         }
 
         Publishers.Merge(store.objectWillChange, settings.objectWillChange)
@@ -438,6 +437,10 @@ final class StatusItemController: NSObject {
 
     private func updateButton() {
         guard let button = statusItem.button else { return }
+        // 手动隐藏用于隐私；休市自动只显示图标时，仍可悬停查看固定的证券。
+        button.toolTip = MenuBarTicker.toolTip(
+            items: store.items, quotes: store.quotes, manuallyHidden: settings.hideTicker
+        )
         let hidden = tickerHidden
         let entries = hidden
             ? []
