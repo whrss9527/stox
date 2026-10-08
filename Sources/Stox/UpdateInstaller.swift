@@ -219,49 +219,21 @@ enum UpdateInstaller {
         let staged = parent.appendingPathComponent(".\(target.lastPathComponent).update")
         let backup = parent.appendingPathComponent(".\(target.lastPathComponent).previous")
         do {
-            try swap(newApp: newApp, target: target, staged: staged, backup: backup)
+            try UpdateReplacement.swap(newApp: newApp, target: target, staged: staged, backup: backup)
         } catch let error as NSError where isBlockedBySystem(error) {
             Log.error("替换程序被系统拒绝：\(error.localizedDescription)")
             throw UpdateError.appManagement
         } catch let error as NSError where needsAdmin(error) {
             Log.info("替换程序需要管理员权限，改用授权对话框（\(error.localizedDescription)）")
-            let source = FileManager.default.fileExists(atPath: staged.path) ? staged : newApp
+            let source = UpdateReplacement.source(newApp: newApp, staged: staged)
             try await swapPrivileged(source: source, target: target, staged: staged, backup: backup)
         } catch {
             throw UpdateError.install(error.localizedDescription)
         }
     }
 
-    private static func swap(newApp: URL, target: URL, staged: URL, backup: URL) throws {
-        let fm = FileManager.default
-        try fm.createDirectory(at: target.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? fm.removeItem(at: staged)
-        try? fm.removeItem(at: backup)
-        try fm.moveItem(at: newApp, to: staged)
-        let hadTarget = fm.fileExists(atPath: target.path)
-        if hadTarget {
-            try fm.moveItem(at: target, to: backup)
-        }
-        do {
-            try fm.moveItem(at: staged, to: target)
-        } catch {
-            if hadTarget {
-                try? fm.moveItem(at: backup, to: target)
-            }
-            throw error
-        }
-        if hadTarget {
-            try? fm.removeItem(at: backup)
-        }
-    }
-
     private static func swapPrivileged(source: URL, target: URL, staged: URL, backup: URL) async throws {
-        let q = Shell.shellQuote
-        let (s, t, b) = (q(staged.path), q(target.path), q(backup.path))
-        let script = "rm -rf \(s) \(b) && mkdir -p \(q(target.deletingLastPathComponent().path)) && mv \(q(source.path)) \(s)"
-            + " && { [ ! -e \(t) ] || mv \(t) \(b); }"
-            + " && { mv \(s) \(t) || { [ ! -e \(b) ] || mv \(b) \(t); exit 1; }; }"
-            + " && rm -rf \(b)"
+        let script = UpdateReplacement.privilegedScript(source: source, target: target, staged: staged, backup: backup)
         let appleScript = "do shell script " + Shell.appleScriptString(script) + " with administrator privileges"
         let result = try await Shell.run(osascriptPath, ["-e", appleScript], timeout: 300)
         guard result.succeeded else {
