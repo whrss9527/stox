@@ -36,6 +36,6 @@
 	<key>NSHighResolutionCapable</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>行情数据来自腾讯财经，仅供参考。</string>
+	<string>行情数据来自腾讯财经与新浪财经，仅供参考。</string>
 </dict>
 </plist>

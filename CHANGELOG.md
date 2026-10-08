@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.0.2（2026-10-08）
+
+### 中文
+
+- 关于页补充新浪财经作为环球股指与备用行情的数据来源。
+
+### English
+
+- About now credits Sina Finance for global indices and backup quotes.
+
 ## 1.0.1（2026-10-08）
 
 ### 中文
