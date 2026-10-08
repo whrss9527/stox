@@ -52,6 +52,7 @@ See [docs/app-store.md](app-store.md) (in Chinese) for how to build and submit i
 
 - **Open and close in one click**: left-click the menu bar icon to open or close the panel; clicking outside it or pressing Esc closes it too. A global shortcut, ⌃⌥S by default and changeable in Settings, toggles it from any app.
 - **Hide in one click**: right-click the menu bar icon to switch between quotes and icon only, whenever you don't want others to see your quotes.
+- **Hover for pinned quotes**: hover over the menu bar item to see every pinned symbol's full name, code, price and percentage change in watchlist order, including while rotating or automatically showing only the icon after markets close. Missing quotes show `--`; manually hiding quotes keeps the hover text private too.
 - **Pin as a floating window**: click the pin at the top right and the panel stays open even when you click elsewhere; drag it anywhere and it reopens there next time.
 - **Menu bar quotes**: show any number of symbols in the menu bar with monospaced digits that don't jump around, on one line or on two (name on the left, price above % change in a smaller font, so more fit in the same space). Rotate through several, handy with a notch, or show just the icon while markets are closed.
 - **Price colors**: red up and green down, green up and red down, or "No Red or Green", which uses the system text color everywhere for a low-key look. The panel can be set to light or dark on its own.
