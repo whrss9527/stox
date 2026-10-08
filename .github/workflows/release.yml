@@ -1,7 +1,7 @@
 name: release
 
 # 手动发版。平时不用它：推到 main 且 build 通过后，build.yml 最后的 release 会自动发布 CHANGELOG.md 最上面的新版本。
-# 用 Frit 的发布流程：打包通用版 Stox.zip，仓库的 Secrets 里有 Developer ID 证书和公证凭据时签名并公证（见 Frit 的 docs/release.md），
+# 用 Frit 的发布流程：打包通用版 Stox.zip，必须配置 Developer ID 证书和公证凭据，缺少时发布失败（见 Frit 的 docs/release.md），
 # 生成 SHA256SUMS.txt，打标签，发布说明是 CHANGELOG.md 里这个版本的一节加上安装步骤（scripts/release-notes.sh）。
 # 不填标签就发 CHANGELOG.md 最上面的版本；勾选 overwrite 可以用原标签的代码重新打包、替换附件。
 on:

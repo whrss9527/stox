@@ -1,6 +1,6 @@
 # Developing Stox
 
-[← Back to the README](../README.md) · [简体中文](guide.zh-CN.md)
+[← Back to the README](../README.md) · [简体中文](development.zh-CN.md)
 
 ## Development
 
@@ -95,7 +95,7 @@ Releases are driven by `CHANGELOG.md`, using the shared release workflow in [Fri
 1. Add a section for the new version at the top of `CHANGELOG.md`, such as `## 0.46.0`. It goes into the release notes, and the About & Updates page in the app shows this section too.
 2. Push to main (or merge into main). After the build passes, the final release job sees that there is no `v0.46.0` tag yet, packages a universal `Stox.zip`, generates the `SHA256SUMS.txt` checksum file, tags and publishes it. Installed copies of Stox offer the update at their next check.
 
-When the repository secrets hold a Developer ID certificate and notarization credentials, the release is signed with the certificate and notarized by Apple, so users can open it with a double-click; otherwise it's ad-hoc signed as before. See Frit's [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md) for the setup.
+GitHub releases require a Developer ID certificate and Apple notarization credentials in the repository secrets. Both release workflows set `require-notarization: true` and fail if those credentials are unavailable. Local development builds can still use ad-hoc signing. See Frit's [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md) for the setup.
 
 You can also run the release workflow by hand on the Actions page: leave the tag empty to release the version at the top of `CHANGELOG.md`, or check overwrite to rebuild from the existing tag and replace the assets.
 

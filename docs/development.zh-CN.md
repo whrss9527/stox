@@ -1,6 +1,6 @@
 # Stox 开发指南
 
-[← 回到 README](../README.zh-CN.md) · [English](guide.md)
+[← 回到 README](../README.zh-CN.md) · [English](development.md)
 
 ## 开发
 
@@ -95,7 +95,7 @@ CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设
 1. 在 `CHANGELOG.md` 最上面加一节新版本，比如 `## 0.46.0`，内容会放进发布说明，App 的“关于与更新”页显示的也是这一节；
 2. 推到 main（或者合并进 main）。build 通过后，最后一步 release 发现这个版本还没有 `v0.46.0` 标签，就打包通用版 `Stox.zip`、生成校验文件 `SHA256SUMS.txt`，打上标签并发布。已安装的 Stox 下一次检查时就会提示更新。
 
-仓库的 Secrets 里配了 Developer ID 证书和公证凭据时，发布的包会用证书签名并通过苹果公证，用户下载后双击就能打开；没配时照旧临时签名。配置方法见 Frit 的 [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md)。
+GitHub 正式发布需要在仓库 Secrets 中配置 Developer ID 证书与苹果公证凭据。两个发布流程都设置了 `require-notarization: true`，缺少所需凭据时会失败。本地开发构建仍可使用临时签名。配置方法见 Frit 的 [docs/release.md](https://github.com/whrss9527/frit/blob/main/docs/release.md)。
 
 也可以在 Actions 页面手动运行 release：不填标签就发 `CHANGELOG.md` 最上面的版本；勾选 overwrite 可以用原标签的代码重新打包、替换附件。
 
