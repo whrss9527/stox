@@ -146,6 +146,9 @@ final class QuoteStoreTests: XCTestCase {
         XCTAssertEqual(counts.extended, 1)
         context.delays = []
         context.date = ISO8601DateFormatter().date(from: "2026-10-07T16:00:00Z")!
+        // 时间推进到常规交易时段时也提供新行情，避免把数小时前的盘前行情当成停更。
+        await provider.configure(values: [symbol: context.quote(symbol)])
+        await store.refresh()
         let trading = Task { await store.trackExtendedHours() }
         for _ in 0..<1000 {
             if !context.delays.isEmpty { break }
