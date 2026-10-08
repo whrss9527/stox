@@ -30,7 +30,7 @@ public enum UpdateReplacement {
         let (s, t, b) = (quote(staged.path), quote(target.path), quote(backup.path))
         var script = "mkdir -p \(quote(target.deletingLastPathComponent().path))"
         // /var 与 /private/var 等路径写法不同也可能指向同一份暂存包。
-        if source.standardizedFileURL.resolvingSymlinksInPath() != staged.standardizedFileURL.resolvingSymlinksInPath() {
+        if source.standardizedFileURL.resolvingSymlinksInPath().path != staged.standardizedFileURL.resolvingSymlinksInPath().path {
             script += " && rm -rf \(s) && mv \(quote(source.path)) \(s)"
         }
         script += " && { [ ! -e \(t) ] || { rm -rf \(b) && mv \(t) \(b); }; }"

@@ -68,6 +68,7 @@ final class UpdateReplacementTests: XCTestCase {
         try f.write("new", at: f.staged); try f.write("old", at: f.target)
         let alias = f.root.appendingPathComponent("staged alias")
         try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: f.staged)
+        XCTAssertEqual(alias.resolvingSymlinksInPath().path, f.staged.resolvingSymlinksInPath().path)
         XCTAssertEqual(try execute(script(f, source: alias)), 0)
         XCTAssertEqual(try f.value(f.target), "new")
     }
