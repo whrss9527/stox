@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.0.0（2026-10-08）
+
+### 中文
+
+- 菜单栏悬停行情：显示所有固定股票的完整名称、代码、现价和涨跌幅；右键手动隐藏行情时仍不显示，保护隐私。
+
+### English
+
+- Menu bar hover quotes: see every pinned stock's full name, symbol, price and percentage change. Manually hiding quotes still keeps them private.
+
 ## 0.50.5（2026-10-07）
 
 ### 中文
