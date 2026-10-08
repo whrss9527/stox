@@ -82,6 +82,12 @@ CI launches the packaged app on macOS: it opens the panel, details, search and S
 
 The scheduled datasource probe returns a failure for request errors or missing required quote fields and retains endpoint/response excerpts. On main, failures create or comment on the fixed-title bug issue without assigning it to an agent. Build smoke failures remain non-blocking but emit a warning. Diagnostic candidate symbols may legitimately return empty records. Known-failed exploratory probes (the retired UsDay path and Sina without its required Referer) run only with `STOX_DATASOURCE_EXPERIMENTS=1`; production probes remain strict.
 
+### Diagnostics and log rotation
+
+About includes Copy diagnostics and a bug-report link that prefills the app and macOS versions. The copied report contains the release channel, sync state, current quote source and at most 200 recent log lines. It reads neither holdings nor trading data. Log message numbers, local paths, links and financial descriptions are redacted; timestamps and operational events remain. Reports stay on the clipboard until the user pastes them.
+
+When `stox.log` exceeds 1 MB, the next write moves it to `stox.log.1`, retaining only the current and previous files. Diagnostics reads both in order so a recent rotation does not discard the useful context. Temporary-file tests cover the rotation boundary, retention and redaction.
+
 ### Releasing a new version
 
 Releases are driven by `CHANGELOG.md`, using the shared release workflow in [Frit](https://github.com/whrss9527/frit):

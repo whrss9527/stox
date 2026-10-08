@@ -754,3 +754,8 @@
 "雪球" = "Xueqiu";
 
 "连不上行情，%@ 秒后重试" = "Cannot reach quotes; retrying in %@s";
+
+// 诊断信息
+"复制诊断信息" = "Copy diagnostics";
+"诊断信息已复制" = "Diagnostics copied";
+"包含版本、系统、同步状态、数据源和脱敏日志，不包含持仓数据。" = "Includes version, system, sync state, quote source and redacted logs. Holdings are excluded.";

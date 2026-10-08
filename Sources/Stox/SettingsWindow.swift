@@ -161,7 +161,7 @@ struct SettingsRootView: View {
         case .general: GeneralPage(settings: settings)
         case .display: DisplayPage(settings: settings)
         case .sync: SyncPage(sync: sync, store: store)
-        case .about: AboutPage(settings: settings)
+        case .about: AboutPage(settings: settings, store: store, sync: sync)
         }
     }
 }
@@ -694,6 +694,9 @@ struct SyncPage: View {
 @MainActor
 struct AboutPage: View {
     @ObservedObject var settings: SettingsStore
+    @ObservedObject var store: QuoteStore
+    @ObservedObject var sync: SyncManager
+    @State private var copiedDiagnostics = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -726,7 +729,7 @@ struct AboutPage: View {
                 .frame(maxWidth: 360)
             HStack(spacing: 10) {
                 Button("GitHub") { NSWorkspace.shared.open(AppInfo.repositoryURL) }
-                Button(L("反馈问题")) { NSWorkspace.shared.open(AppInfo.issuesURL) }
+                Button(L("反馈问题")) { NSWorkspace.shared.open(Diagnostics.feedbackURL(version: AppInfo.version, osVersion: ProcessInfo.processInfo.operatingSystemVersionString)) }
             }
             #if !APP_STORE
             Divider()
@@ -749,6 +752,18 @@ struct AboutPage: View {
             HStack {
                 FormNote(L("行情数据来自腾讯财经公开接口，仅供参考，港股延时约 15 分钟。"))
                 Spacer()
+                Button(copiedDiagnostics ? L("诊断信息已复制") : L("复制诊断信息")) {
+                    let snapshot = Diagnostics.snapshot(store: store, sync: sync)
+                    Task {
+                        let report = await Task.detached(priority: .utility) {
+                            Diagnostics.report(snapshot, logs: Log.recentLines())
+                        }.value
+                        NSPasteboard.general.clearContents()
+                        copiedDiagnostics = NSPasteboard.general.setString(report, forType: .string)
+                    }
+                }
+                .help(L("包含版本、系统、同步状态、数据源和脱敏日志，不包含持仓数据。"))
+                .controlSize(.small)
                 Button(L("打开日志")) {
                     if FileManager.default.fileExists(atPath: Log.fileURL.path) {
                         NSWorkspace.shared.activateFileViewerSelecting([Log.fileURL])

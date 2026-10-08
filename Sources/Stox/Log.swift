@@ -35,22 +35,42 @@ enum Log {
         queue.sync {}
     }
 
+    /// 最近的日志可跨越一次轮转；读取前先写完队列，不取配置或持仓文件。
+    static func recentLines(limit: Int = 200, at url: URL = fileURL) -> [String] {
+        queue.sync {
+            let previous = url.appendingPathExtension("1")
+            let lines = [previous, url].flatMap { file -> [String] in
+                guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [] }
+                return text.components(separatedBy: .newlines).filter { !$0.isEmpty }
+            }
+            return Array(lines.suffix(max(0, limit)))
+        }
+    }
+
+    /// 只保留当前和上一份日志；挪动失败时保留当前文件，不清空它。
+    static func appendLine(_ line: String, to url: URL, limit: Int = 1 << 20) throws {
+        let fm = FileManager.default
+        try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let attributes = try? fm.attributesOfItem(atPath: url.path),
+           let size = attributes[.size] as? Int, size > limit {
+            let previous = url.appendingPathExtension("1")
+            if fm.fileExists(atPath: previous.path) { try fm.removeItem(at: previous) }
+            try fm.moveItem(at: url, to: previous)
+        }
+        if fm.fileExists(atPath: url.path) {
+            let handle = try FileHandle(forWritingTo: url)
+            defer { try? handle.close() }
+            try handle.seekToEnd()
+            try handle.write(contentsOf: Data(line.utf8))
+        } else {
+            try line.write(to: url, atomically: true, encoding: .utf8)
+        }
+    }
+
     private static func append(_ level: String, _ message: String) {
-        let line = "\(formatter.string(from: Date())) \(level) \(message)\n"
         queue.async {
-            let url = fileURL
-            try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-               let size = attributes[.size] as? Int, size > 1 << 20 {
-                try? FileManager.default.removeItem(at: url)
-            }
-            if let handle = try? FileHandle(forWritingTo: url) {
-                handle.seekToEndOfFile()
-                handle.write(Data(line.utf8))
-                try? handle.close()
-            } else {
-                try? line.write(to: url, atomically: true, encoding: .utf8)
-            }
+            let line = "\(formatter.string(from: Date())) \(level) \(message)\n"
+            try? appendLine(line, to: fileURL)
         }
     }
 }

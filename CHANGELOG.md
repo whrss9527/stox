@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 0.50.6（2026-10-08）
+
+### 中文
+
+- 关于页可一键复制脱敏诊断信息，反馈表单自动填写版本和系统；日志轮转保留上一份，方便排查问题。
+
+### English
+
+- Copy redacted diagnostics from About, with version and system prefilled in bug reports. Log rotation retains the previous file for troubleshooting.
+
 ## 0.50.5（2026-10-07）
 
 ### 中文
