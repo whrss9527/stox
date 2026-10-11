@@ -42,7 +42,7 @@ targets:
     settings:
       base:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) APP_STORE'
-        PRODUCT_MODULE_NAME: StoxAppStore
+        PRODUCT_MODULE_NAME: Stox
   StoxTests:
     type: bundle.unit-test
     platform: macOS
