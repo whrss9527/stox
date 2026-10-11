@@ -33,6 +33,12 @@ Every branch runs all Linux core tests, localization and offline listing checks,
 
 The core's `FailoverPolicy` and `TickerVisibility` keep time and visibility decisions independent of AppKit. For resources outside the main app, set `AppLanguage.bundle` before starting work; tests restore it after checking their isolated translation bundle. Localization follows the selected bundle.
 
+### Trade fees and compatibility
+
+`Trade.fee` is an optional nonnegative amount in the trading currency. Missing fees mean zero. Initial and additional purchases capitalize fees in cost; dividend cost uses net cash, and sell/dividend records store realized profit after fees. Daily P&L subtracts the fees for the quote's local trading date exactly once, including sold-out positions; dividend cash itself keeps the existing ex-dividend calculation.
+
+Fee-bearing records encode `side` as `buy-fee-v1`, `sell-fee-v1`, or `dividend-fee-v1`, alongside `fee`; records without a fee keep the original labels. This is a new trade type within sync format 1. Clients with #74's preservation support (0.50.2 onward) retain fee-bearing records as opaque JSON through edits, backup and sync, so they cannot silently drop the fee field. Those clients do not display or calculate the opaque trades until upgraded. `TradeFeeSyncTests` exercise an actual legacy field/type schema and the original preservation mechanism.
+
 ### Quote invariant checks
 
 `swift run stox-cli check` checks the reviewed A-share, Hong Kong and US sample symbols against the field counts in `Sources/StoxCore/DatasourceSnapshots`, as well as price range, previous close, A-share turnover/volume, timestamp and 52-week high. Use `--source sina` for the backup source. `--save-raw response.bin` preserves original bytes even for HTTP errors; `--raw response.bin --at 2026-10-07T10:00:00Z` replays a response without networking. Exit status is 0 for success, 1 for response differences and 2 for invalid arguments. Symbols without a reviewed schema fail explicitly.

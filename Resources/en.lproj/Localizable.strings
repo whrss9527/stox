@@ -520,6 +520,10 @@
 "没有持仓" = "No holding";
 "成本价" = "Cost price";
 "每股成本" = "Cost per share";
+"本次费用" = "Fee for this record";
+"留空为 0" = "Blank means 0";
+"本次买入、卖出或分红的手续费与税费总额，按交易币种填写金额。买入计入成本，卖出和分红从盈亏扣除" = "Total fees and taxes for this buy, sell, or dividend, as an amount in the trading currency. Buy fees add to cost; sell and dividend fees reduce profit";
+"费用 %@ %@" = "Fees %@ %@";
 "价格高于" = "Price above";
 "价格低于" = "Price below";
 "涨幅达到" = "Rise reaches";
@@ -725,7 +729,7 @@
 /* StoxCore/Trade.swift */
 "分红" = "Dividend";
 "（每股送转 %@）" = " (bonus %@ per share)";
-"日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t已实现盈亏" = "Date\tName\tSymbol\tCurrency\tType\tShares\tPrice\tAmount\tRealized P&L";
+"日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t费用\t已实现盈亏" = "Date\tName\tSymbol\tCurrency\tType\tShares\tPrice\tAmount\tFees\tRealized P&L";
 
 /* StoxCore/Update.swift */
 "还没有发布过版本" = "No versions have been released yet";

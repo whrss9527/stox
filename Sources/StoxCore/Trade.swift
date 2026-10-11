@@ -24,18 +24,66 @@ public struct Trade: Codable, Hashable, Sendable {
     public var price: Double
     /// 哪个交易日的，交易所当地的 `2026-09-29`。
     public var day: String
-    /// 已实现盈亏（本币）：卖出是按当时的成本价算的 (卖出价 − 成本价) × 股数，分红是到手的现金。买入是 nil。
+    /// 已实现盈亏（本币，已扣费用）：卖出按当时成本价算，分红是到手的净现金。买入是 nil。
     public var profit: Double?
     /// 分红送转时每股送转几股（10 送 4 是 0.4）；没有送转、或者不是分红时为 nil。
     public var bonus: Double?
+    /// 手续费与税费的总额（交易本币的绝对金额，非负）；旧记录和未填写时为 nil，按 0 计算。
+    public var fee: Double?
 
-    public init(side: Side, shares: Double, price: Double, day: String, profit: Double? = nil, bonus: Double? = nil) {
+    public init(side: Side, shares: Double, price: Double, day: String, profit: Double? = nil, bonus: Double? = nil,
+                fee: Double? = nil) {
         self.side = side
         self.shares = shares
         self.price = price
         self.day = day
         self.profit = profit
         self.bonus = bonus
+        self.fee = fee
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case side, shares, price, day, profit, bonus, fee
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let rawSide = try c.decode(String.self, forKey: .side)
+        if let legacy = Side(rawValue: rawSide) {
+            side = legacy
+        } else if rawSide.hasSuffix("-fee-v1"), let withFee = Side(rawValue: String(rawSide.dropLast(7))) {
+            side = withFee
+        } else {
+            throw DecodingError.dataCorruptedError(forKey: .side, in: c, debugDescription: "Unknown trade side")
+        }
+        shares = try c.decode(Double.self, forKey: .shares)
+        price = try c.decode(Double.self, forKey: .price)
+        day = try c.decode(String.self, forKey: .day)
+        profit = try c.decodeIfPresent(Double.self, forKey: .profit)
+        bonus = try c.decodeIfPresent(Double.self, forKey: .bonus)
+        fee = try c.decodeIfPresent(Double.self, forKey: .fee)
+        if let fee, !fee.isFinite || fee < 0 {
+            throw DecodingError.dataCorruptedError(forKey: .fee, in: c, debugDescription: "Fee must be finite and nonnegative")
+        }
+        if rawSide.hasSuffix("-fee-v1"), fee == nil {
+            throw DecodingError.dataCorruptedError(forKey: .fee, in: c, debugDescription: "Fee trade is missing its fee")
+        }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        if let fee, !fee.isFinite || fee < 0 {
+            throw EncodingError.invalidValue(fee, .init(codingPath: encoder.codingPath,
+                                                       debugDescription: "Fee must be finite and nonnegative"))
+        }
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        // #74 的旧客户端遇到新类型会保留整条 JSON，避免已知类型的 fee 字段被静默忽略。
+        try c.encode(fee == nil ? side.rawValue : side.rawValue + "-fee-v1", forKey: .side)
+        try c.encode(shares, forKey: .shares)
+        try c.encode(price, forKey: .price)
+        try c.encode(day, forKey: .day)
+        try c.encodeIfPresent(profit, forKey: .profit)
+        try c.encodeIfPresent(bonus, forKey: .bonus)
+        try c.encodeIfPresent(fee, forKey: .fee)
     }
 
     /// 每只最多留这么多笔，旧的丢掉。
@@ -50,13 +98,14 @@ public struct Trade: Codable, Hashable, Sendable {
     }
 
     /// 卖出一笔的记录，已实现盈亏按卖出前的成本价算。
-    public static func sell(_ shares: Double, at price: Double, from holding: Holding, day: String) -> Trade {
-        Trade(side: .sell, shares: shares, price: price, day: day, profit: (price - holding.cost) * shares)
+    public static func sell(_ shares: Double, at price: Double, from holding: Holding, day: String, fee: Double? = nil) -> Trade {
+        Trade(side: .sell, shares: shares, price: price, day: day, profit: (price - holding.cost) * shares - (fee ?? 0), fee: fee)
     }
 
     /// 分红送转的记录：每股派 cash、送转 bonus 股，到手的现金算已实现盈亏。
-    public static func dividend(cash: Double, bonus: Double, holding: Holding, day: String) -> Trade {
-        Trade(side: .dividend, shares: holding.shares, price: cash, day: day, profit: holding.shares * cash, bonus: bonus > 0 ? bonus : nil)
+    public static func dividend(cash: Double, bonus: Double, holding: Holding, day: String, fee: Double? = nil) -> Trade {
+        Trade(side: .dividend, shares: holding.shares, price: cash, day: day, profit: holding.shares * cash - (fee ?? 0),
+              bonus: bonus > 0 ? bonus : nil, fee: fee)
     }
 }
 
@@ -74,7 +123,7 @@ extension Array where Element == Trade {
 
 extension Portfolio {
     /// 今日盈亏，算上今天记的买卖：昨天就有、今天没卖的按涨跌额算，今天买的按现价减买入价，今天卖的按卖出价减昨收。
-    /// 加起来正好是“现在的市值 − 昨收时的市值 − 今天净投入的钱”。今天没记买卖时就是股数 × 涨跌额。
+    /// 买入、卖出与分红的费用都从当天盈亏扣除。今天没记买卖时就是股数 × 涨跌额。
     /// “今天”是行情所在的交易日。
     public static func dayProfit(shares: Double, quote: Quote, trades: [Trade]) -> Double {
         guard !trades.isEmpty, let time = quote.timestamp else { return shares * quote.change }
@@ -82,6 +131,7 @@ extension Portfolio {
         var bought = 0.0
         var traded = 0.0
         for trade in trades where trade.day == today {
+            traded -= trade.fee ?? 0
             switch trade.side {
             case .buy:
                 bought += trade.shares
@@ -138,6 +188,7 @@ extension Portfolio {
                     QuoteFormatter.plain(trade.shares),
                     QuoteFormatter.plain(trade.price),
                     QuoteFormatter.fixed(trade.shares * trade.price, decimals: 2),
+                    trade.fee.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "",
                     trade.profit.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "",
                 ].joined(separator: "\t")
                 rows.append((trade.day, rows.count, line))
@@ -145,7 +196,7 @@ extension Portfolio {
         }
         guard !rows.isEmpty else { return "" }
         let sorted = rows.sorted { ($0.day, $0.order) < ($1.day, $1.order) }
-        return ([L("日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t已实现盈亏")] + sorted.map(\.line)).joined(separator: "\n")
+        return ([L("日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t费用\t已实现盈亏")] + sorted.map(\.line)).joined(separator: "\n")
     }
 }
 
