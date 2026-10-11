@@ -5,17 +5,19 @@ final class TraditionalChineseLocalizationTests: XCTestCase {
     func testTraditionalBundleSelectsLanguageLocaleAndRealTranslations() throws {
         let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".bundle")
-        let resources = folder.appendingPathComponent("Resources/zh-Hant.lproj")
+        let resources = folder.appendingPathComponent("Contents/Resources/zh-Hant.lproj")
         try FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         try FileManager.default.copyItem(at: root.appendingPathComponent("Resources/zh-Hant.lproj/Localizable.strings"),
                                         to: resources.appendingPathComponent("Localizable.strings"))
-        let info = ["CFBundleDevelopmentRegion": "zh-Hant", "CFBundleLocalizations": ["zh-Hant"]] as [String: Any]
+        let info = ["CFBundleIdentifier": "stox.tests.\(UUID().uuidString)",
+                    "CFBundleDevelopmentRegion": "zh-Hant", "CFBundleLocalizations": ["zh-Hant"]] as [String: Any]
         try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
-            .write(to: folder.appendingPathComponent("Resources/Info.plist"))
+            .write(to: folder.appendingPathComponent("Contents/Info.plist"))
         let original = AppLanguage.bundle
         defer { AppLanguage.bundle = original }
         AppLanguage.bundle = try XCTUnwrap(Bundle(path: folder.path))
+        XCTAssertEqual(AppLanguage.bundle.localizations, ["zh-Hant"])
         XCTAssertTrue(AppLanguage.isTraditionalChinese)
         XCTAssertFalse(AppLanguage.isEnglish)
         XCTAssertEqual(AppLanguage.locale.identifier, "zh_Hant_HK")
