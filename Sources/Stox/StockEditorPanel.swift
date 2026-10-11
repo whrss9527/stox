@@ -25,6 +25,7 @@ struct StockEditorPanel: View {
     @State private var group = ""
     @State private var tradeShares = ""
     @State private var tradePrice = ""
+    @State private var tradeFee = ""
     /// 分红送转：A 股填每 10 股派多少、送转多少，港股美股填每股派多少。
     @State private var dividendCash = ""
     @State private var dividendBonus = ""
@@ -102,6 +103,8 @@ struct StockEditorPanel: View {
                                     .font(.system(size: 12.5, weight: .semibold))
                                 numberField(L("持有数量"), text: $shares, unit: shareUnit, placeholder: L("没有持仓"))
                                 numberField(L("成本价"), text: $cost, unit: currency, placeholder: L("每股成本"), allowZero: true)
+                                numberField(L("本次费用"), text: $tradeFee, unit: currency, placeholder: L("留空为 0"), allowZero: true)
+                                    .help(L("本次买入、卖出或分红的手续费与税费总额，按交易币种填写金额。买入计入成本，卖出和分红从盈亏扣除"))
                                 tradeRow
                                 dividendRow
                                 Text(holdingFooter)
@@ -215,9 +218,9 @@ struct StockEditorPanel: View {
                 .multilineTextAlignment(.trailing)
                 .frame(width: 72)
             Button(L("买入"), action: buy)
-                .disabled(tradeAmount == nil || tradeUnitPrice == nil || holdingState == .invalid)
+                .disabled(tradeAmount == nil || tradeUnitPrice == nil || holdingState == .invalid || !isTradeFeeValid)
             Button(L("卖出"), action: sell)
-                .disabled(tradeAmount == nil || tradeUnitPrice == nil || !canSell)
+                .disabled(tradeAmount == nil || tradeUnitPrice == nil || !canSell || !isTradeFeeValid)
         }
         .controlSize(.small)
         .help(L("按成交记一笔：买入按加权平均重新算成本价，卖出只减少数量、按成本价算出赚了多少。记完检查一下，点保存才生效"))
@@ -286,7 +289,7 @@ struct StockEditorPanel: View {
 
     /// 填好的分红送转，换算成每股：(现金, 送转)。没填、填错或者没有持仓时为 nil。
     private var dividendInput: (cash: Double, bonus: Double)? {
-        guard case .valid(let holding) = holdingState else { return nil }
+        guard case .valid(let holding) = holdingState, isTradeFeeValid else { return nil }
         let scale = perTen ? 10.0 : 1.0
         var values: [Double] = []
         for text in [dividendCash, perTen ? dividendBonus : ""] {
@@ -296,21 +299,22 @@ struct StockEditorPanel: View {
             case .invalid: return nil
             }
         }
-        guard holding.applyingDividend(cash: values[0], bonus: values[1]) != nil else { return nil }
+        guard holding.applyingDividend(cash: values[0], bonus: values[1], fee: feeAmount ?? 0) != nil else { return nil }
         return (values[0], values[1])
     }
 
     private func recordDividend() {
         guard case .valid(let holding) = holdingState, let input = dividendInput,
-              let updated = holding.applyingDividend(cash: input.cash, bonus: input.bonus)
+              let updated = holding.applyingDividend(cash: input.cash, bonus: input.bonus, fee: feeAmount ?? 0)
         else { return }
-        let trade = Trade.dividend(cash: input.cash, bonus: input.bonus, holding: holding, day: tradeDay)
+        let trade = Trade.dividend(cash: input.cash, bonus: input.bonus, holding: holding, day: tradeDay, fee: feeAmount)
         trades = trades.appending([trade])
         shares = QuoteFormatter.plain(updated.shares)
         cost = QuoteFormatter.plain(updated.cost)
         tradeMessage = L("%@，到手 %@：持有 %@ %@，成本摊薄到 %@。点保存生效", dividendText(trade), QuoteFormatter.money(trade.profit ?? 0), shares, shareUnit, cost)
         dividendCash = ""
         dividendBonus = ""
+        tradeFee = ""
     }
 
     /// “10 派 25、送 4”或“每股派 0.5”。
@@ -377,6 +381,7 @@ struct StockEditorPanel: View {
         }
         .font(.system(size: 11).monospacedDigit())
         .lineLimit(1)
+        .help(trade.fee.map { L("费用 %@ %@", QuoteFormatter.fixed($0, decimals: 2), currency) } ?? "")
     }
 
     /// 今年的只写月日。
@@ -413,31 +418,40 @@ struct StockEditorPanel: View {
         return holding.selling(shares: amount) != nil
     }
 
+    private var isTradeFeeValid: Bool { parse(tradeFee, allowZero: true) != .invalid }
+
+    private var feeAmount: Double? {
+        if case .value(let amount) = parse(tradeFee, allowZero: true) { return amount }
+        return nil
+    }
+
     private func buy() {
-        guard let amount = tradeAmount, let price = tradeUnitPrice else { return }
+        guard let amount = tradeAmount, let price = tradeUnitPrice, isTradeFeeValid else { return }
         let updated: Holding
         switch holdingState {
         case .valid(let holding):
-            guard let bought = holding.buying(shares: amount, at: price) else { return }
+            guard let bought = holding.buying(shares: amount, at: price, fee: feeAmount ?? 0) else { return }
             updated = bought
         case .none:
-            updated = Holding(shares: amount, cost: price)
+            guard let bought = Holding.purchase(shares: amount, at: price, fee: feeAmount ?? 0) else { return }
+            updated = bought
         case .invalid:
             return
         }
         shares = QuoteFormatter.plain(updated.shares)
         cost = QuoteFormatter.plain(updated.cost)
-        trades = trades.appending([Trade(side: .buy, shares: amount, price: price, day: tradeDay)])
+        trades = trades.appending([Trade(side: .buy, shares: amount, price: price, day: tradeDay, fee: feeAmount)])
         tradeMessage = L("买入 %@ %@ @ %@：持有 %@ %@，成本 %@。点保存生效", QuoteFormatter.plain(amount), shareUnit, QuoteFormatter.plain(price), shares, shareUnit, cost)
         tradeShares = ""
         tradePrice = ""
+        tradeFee = ""
     }
 
     private func sell() {
-        guard case .valid(let holding) = holdingState, let amount = tradeAmount, let price = tradeUnitPrice,
+        guard case .valid(let holding) = holdingState, let amount = tradeAmount, let price = tradeUnitPrice, isTradeFeeValid,
               let remaining = holding.selling(shares: amount)
         else { return }
-        let trade = Trade.sell(amount, at: price, from: holding, day: tradeDay)
+        let trade = Trade.sell(amount, at: price, from: holding, day: tradeDay, fee: feeAmount)
         trades = trades.appending([trade])
         let realized = L("已实现 ") + QuoteFormatter.signedMoney(trade.profit ?? 0)
         if remaining.isValid {
@@ -450,6 +464,7 @@ struct StockEditorPanel: View {
         }
         tradeShares = ""
         tradePrice = ""
+        tradeFee = ""
     }
 
     private var item: WatchItem? { store.item(for: symbol) }

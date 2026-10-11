@@ -87,6 +87,78 @@ final class PortfolioTests: XCTestCase {
         XCTAssertEqual(QuoteFormatter.plain(0.1234), "0.1234")
         XCTAssertEqual(QuoteFormatter.plain(1_234_567.891), "1234567.891", "不用科学计数法，也不丢精度")
     }
+
+    func testBuyFeesAreIncludedInInitialAndWeightedCost() throws {
+        let initial = try XCTUnwrap(Holding.purchase(shares: 100, at: 10, fee: 5))
+        XCTAssertEqual(initial.costValue, 1005, accuracy: 1e-9)
+        let added = try XCTUnwrap(initial.buying(shares: 50, at: 12, fee: 10))
+        XCTAssertEqual(added.shares, 150)
+        XCTAssertEqual(added.costValue, 1615, accuracy: 1e-9)
+        XCTAssertEqual(Holding.purchase(shares: 100, at: 10), Holding(shares: 100, cost: 10))
+        XCTAssertEqual(Holding.purchase(shares: 10, at: 0, fee: 2)?.cost, 0.2)
+    }
+
+    func testSellAndDividendFeesReduceRealizedProfitAndNetDividendCost() throws {
+        let holding = Holding(shares: 100, cost: 10)
+        let sold = Trade.sell(50, at: 12, from: holding, day: "2026-09-29", fee: 3)
+        XCTAssertEqual(sold.profit, 97)
+        XCTAssertEqual(sold.fee, 3)
+        let paid = Trade.dividend(cash: 0.5, bonus: 0.2, holding: holding, day: "2026-09-29", fee: 4)
+        XCTAssertEqual(paid.profit, 46)
+        let afterDividend = try XCTUnwrap(holding.applyingDividend(cash: 0.5, bonus: 0.2, fee: 4))
+        XCTAssertEqual(afterDividend.shares, 120)
+        XCTAssertEqual(afterDividend.costValue, 954, accuracy: 1e-9)
+        let item = WatchItem(symbol: Symbol("sh600519")!, trades: [sold, paid])
+        XCTAssertEqual(Portfolio.realizedProfit(items: [item], since: "2026-01-01").first?.profit, 143,
+                       "已保存的 profit 已扣费用，不再次扣除")
+        XCTAssertEqual(Trade.dividend(cash: 0, bonus: 0.1, holding: holding, day: "2026-09-29", fee: 4).profit, -4)
+    }
+
+    func testTradeFeesReduceTodayProfitAndIgnoreOtherDays() throws {
+        let symbol = Symbol("sh600519")!
+        let time = MarketRegion.cn.calendar.date(from: DateComponents(year: 2026, month: 9, day: 29, hour: 10))!
+        let quote = Quote(symbol: symbol, name: "", price: 12, previousClose: 11, timestamp: time)
+        let trades = [
+            Trade(side: .buy, shares: 100, price: 11.5, day: "2026-09-29", fee: 4),
+            Trade.sell(50, at: 12.5, from: Holding(shares: 100, cost: 10), day: "2026-09-29", fee: 5),
+            Trade.dividend(cash: 0.5, bonus: 0, holding: Holding(shares: 150, cost: 10), day: "2026-09-29", fee: 2),
+            Trade(side: .buy, shares: 100, price: 8, day: "2026-09-28", fee: 100),
+        ]
+        XCTAssertEqual(Portfolio.dayProfit(shares: 150, quote: quote, trades: trades), 164, accuracy: 1e-9)
+        let item = WatchItem(symbol: symbol, holding: Holding(shares: 150, cost: 10), trades: trades)
+        XCTAssertEqual(Portfolio.summaries(items: [item], quotes: [symbol: quote]).first?.dayProfit, 164)
+    }
+
+    func testSoldOutTodayIncludesSellFee() throws {
+        let symbol = Symbol("usAAPL")!
+        let time = MarketRegion.us.calendar.date(from: DateComponents(year: 2026, month: 9, day: 29, hour: 10))!
+        let quote = Quote(symbol: symbol, name: "", price: 12, previousClose: 11, timestamp: time)
+        let sold = Trade.sell(100, at: 12.5, from: Holding(shares: 100, cost: 10), day: "2026-09-29", fee: 7)
+        let item = WatchItem(symbol: symbol, trades: [sold])
+        let summary = try XCTUnwrap(Portfolio.summaries(items: [item], quotes: [symbol: quote]).first)
+        XCTAssertEqual(summary.dayProfit, 143)
+        XCTAssertEqual(summary.count, 0)
+    }
+
+    func testFeeAmountsStayInTheirTradingCurrency() {
+        let items = ["sh600519", "hk00700", "usAAPL"].enumerated().map { index, raw in
+            WatchItem(symbol: Symbol(raw)!, trades: [
+                Trade.sell(10, at: 12, from: Holding(shares: 10, cost: 10), day: "2026-09-29", fee: Double(index + 1))
+            ])
+        }
+        let realized = Portfolio.realizedProfit(items: items, since: "2026-01-01")
+        XCTAssertEqual(realized.map(\.region), [.cn, .hk, .us])
+        XCTAssertEqual(realized.map(\.profit), [19, 18, 17])
+    }
+
+    func testHoldingRejectsInvalidFees() {
+        let holding = Holding(shares: 100, cost: 10)
+        for fee in [-1.0, Double.infinity, Double.nan] {
+            XCTAssertNil(Holding.purchase(shares: 10, at: 12, fee: fee))
+            XCTAssertNil(holding.buying(shares: 10, at: 12, fee: fee))
+            XCTAssertNil(holding.applyingDividend(cash: 0.5, bonus: 0, fee: fee))
+        }
+    }
 }
 
 final class SymbolListTests: XCTestCase {
