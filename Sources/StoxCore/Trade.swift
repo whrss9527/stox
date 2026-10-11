@@ -182,7 +182,7 @@ extension Portfolio {
                 let line = [
                     trade.day,
                     item.displayName,
-                    item.symbol.displayCode,
+                    item.symbol.rawValue,
                     item.symbol.market.region.currency,
                     kind,
                     QuoteFormatter.plain(trade.shares),

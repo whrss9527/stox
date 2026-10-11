@@ -640,6 +640,7 @@ enum PanelRoute: Equatable {
     case rank
     /// 盈亏日历。
     case calendar
+    case tableImport
 
     /// 诊断信息里的写法。
     var name: String {
@@ -650,6 +651,7 @@ enum PanelRoute: Equatable {
         case .alerts: return "alerts"
         case .rank: return "rank"
         case .calendar: return "calendar"
+        case .tableImport: return "table-import"
         }
     }
 }

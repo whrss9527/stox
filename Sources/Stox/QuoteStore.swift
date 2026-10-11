@@ -582,13 +582,16 @@ final class QuoteStore: ObservableObject {
     /// 用 iCloud 同步来的自选替换本机的。提醒条件变了的证券清掉当天的提醒记录。
     func replaceWatchlist(_ newItems: [WatchItem]) {
         guard newItems != items else { return }
-        let oldAlerts = Dictionary(items.map { ($0.symbol, $0.alert) }, uniquingKeysWith: { first, _ in first })
+        let oldItems = Dictionary(items.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
         let symbols = Set(newItems.map(\.symbol))
         items = newItems
         quotes = quotes.filter { symbols.contains($0.key) }
         extendedHours = extendedHours.filter { symbols.contains($0.key) }
-        for item in newItems where oldAlerts[item.symbol] != item.alert {
-            alertEngine.reset(item.symbol)
+        for item in newItems {
+            let old = oldItems[item.symbol]
+            if old?.alert != item.alert || (old?.holding != item.holding && (item.alert.profitAbove != nil || item.alert.lossBelow != nil)) {
+                alertEngine.reset(item.symbol)
+            }
         }
         save()
         saveAlertState()
