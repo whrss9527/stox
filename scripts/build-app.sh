@@ -19,6 +19,7 @@ FLAVOR="${STOX_FLAVOR:-github}"
 # 两个版本用不同的编译目录，互相不会冲掉对方的编译缓存。
 SCHEME="Stox"
 DERIVED_DATA=".build/xcode/github"
+PRODUCT_SUBDIR=""
 case "$FLAVOR" in
   github)
     DIST="dist"
@@ -27,6 +28,7 @@ case "$FLAVOR" in
     DIST="dist/appstore"
     SCHEME="StoxAppStore"
     DERIVED_DATA=".build/xcode/appstore"
+    PRODUCT_SUBDIR="/AppStore"
     ;;
   *)
     echo "error: STOX_FLAVOR 只能是 github 或 appstore（现在是 ${FLAVOR}）" >&2
@@ -55,7 +57,7 @@ xcodebuild build -project Stox.xcodeproj -scheme "$SCHEME" -configuration Releas
 echo "==> 组装 $APP"
 rm -rf "$APP"
 mkdir -p "$DIST"
-ditto "$DERIVED_DATA/Build/Products/Release/$APP_NAME.app" "$APP"
+ditto "$DERIVED_DATA/Build/Products/Release$PRODUCT_SUBDIR/$APP_NAME.app" "$APP"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP/Contents/Info.plist"

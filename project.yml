@@ -43,6 +43,8 @@ targets:
       base:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) APP_STORE'
         PRODUCT_MODULE_NAME: Stox
+        # XCTest discovers hosts by product name even with implicit builds disabled.
+        CONFIGURATION_BUILD_DIR: '$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/AppStore'
   StoxTests:
     type: bundle.unit-test
     platform: macOS
