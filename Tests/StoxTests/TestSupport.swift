@@ -8,6 +8,10 @@ actor FakeQuoteProvider: QuoteProvider {
     var quotesRequested = 0
     var intradayRequested = 0
     var extendedRequested = 0
+    var klineValues: [Symbol: KlineSeries] = [:]
+    var klineRequests: [(symbol: Symbol, period: KlinePeriod, count: Int)] = []
+    var klineWaiter: CheckedContinuation<Void, Never>?
+    var suspendKlines = false
     func configure(fails: Bool = false, values: [Symbol: Quote] = [:]) { self.fails = fails; self.values = values }
     func fetchQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote] {
         quotesRequested += 1
@@ -17,6 +21,17 @@ actor FakeQuoteProvider: QuoteProvider {
     func search(_ query: String) async throws -> [SearchResult] { [] }
     func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? { intradayRequested += 1; return nil }
     func fetchExtendedHours(for symbol: Symbol, exchangeCode: String?) async throws -> ExtendedHoursQuote? { extendedRequested += 1; return nil }
+    func configureKlines(_ values: [Symbol: KlineSeries], suspended: Bool = false) {
+        klineValues = values
+        suspendKlines = suspended
+    }
+    func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? {
+        klineRequests.append((symbol, period, count))
+        if suspendKlines { await withCheckedContinuation { klineWaiter = $0 } }
+        return klineValues[symbol]
+    }
+    func requestedKlines() -> [(symbol: Symbol, period: KlinePeriod, count: Int)] { klineRequests }
+    func releaseKline() { suspendKlines = false; klineWaiter?.resume(); klineWaiter = nil }
     func counts() -> (quotes: Int, intraday: Int, extended: Int) { (quotesRequested, intradayRequested, extendedRequested) }
 }
 

@@ -30,6 +30,7 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var fundFlowLoaded: Set<Symbol> = []
     /// 每个交易日收盘后记下的持仓盈亏，只在这台 Mac 上。
     @Published private(set) var profitHistory: ProfitHistory
+    @Published private(set) var isBackfillingProfitHistory = false
     /// 最近发过的提醒，面板里可以翻看。
     @Published private(set) var alertLog: AlertLog
     /// 美股个股盘前盘后的最新成交。美股常规交易时段里是空的。
@@ -633,6 +634,31 @@ final class QuoteStore: ObservableObject {
         }
     }
 
+    /// 仅在打开盈亏日历时取日 K；关闭面板取消，不启动后台轮询。
+    func backfillProfitHistory() async {
+        guard !isBackfillingProfitHistory else { return }
+        isBackfillingProfitHistory = true
+        defer { isBackfillingProfitHistory = false }
+        let snapshot = items
+        var series: [Symbol: KlineSeries] = [:]
+        for item in snapshot where item.symbol.canHold && (item.holding != nil || !item.trades.isEmpty) {
+            guard !Task.isCancelled else { return }
+            do {
+                series[item.symbol] = try await provider.fetchKline(
+                    for: item.symbol, period: .day, count: ProfitHistory.backfillFetchCount,
+                    exchangeCode: quotes[item.symbol]?.exchangeCode
+                )
+            } catch {
+                // 数据不齐的市场保留空白，下次打开日历再试。
+            }
+        }
+        // 等网络时持仓或买卖可能已改；已记的收盘记录则始终以最新的为准。
+        guard !Task.isCancelled, snapshot == items else { return }
+        var history = profitHistory
+        history.backfill(items: snapshot, series: series, now: clock.now())
+        saveProfitHistory(history)
+    }
+
     /// 收盘后把各市场的持仓盈亏记下来，同一天再记就更新。和收盘小结不同，不管开没开通知都记。
     private func recordProfitHistory() {
         var history = profitHistory
@@ -643,6 +669,10 @@ final class QuoteStore: ObservableObject {
             else { continue }
             history.record(summary, day: day)
         }
+        saveProfitHistory(history)
+    }
+
+    private func saveProfitHistory(_ history: ProfitHistory) {
         guard history != profitHistory else { return }
         profitHistory = history
         if let data = try? JSONEncoder().encode(history) {

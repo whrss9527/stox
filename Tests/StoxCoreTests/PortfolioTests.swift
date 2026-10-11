@@ -592,10 +592,10 @@ final class ProfitHistoryTests: XCTestCase {
         history.record(summary(.cn, day: 100), day: "2026-09-28")
         history.record(summary(.cn, day: -30), day: "2026-09-25")
         XCTAssertEqual(history.tableText, [
-            "日期\t币种\t今日盈亏\t持仓盈亏\t市值",
-            "2026-09-25\tCNY\t-30.00\t10000.00\t100000.00",
-            "2026-09-28\tCNY\t100.00\t10000.00\t100000.00",
-            "2026-09-28\tHKD\t-50.50\t10000.00\t100000.00",
+            "日期\t币种\t今日盈亏\t持仓盈亏\t市值\t估算",
+            "2026-09-25\tCNY\t-30.00\t10000.00\t100000.00\t",
+            "2026-09-28\tCNY\t100.00\t10000.00\t100000.00\t",
+            "2026-09-28\tHKD\t-50.50\t10000.00\t100000.00\t",
         ].joined(separator: "\n"))
     }
 

@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.2.0（2026-10-11）
+
+### 中文
+
+- 打开盈亏日历时，用日 K 补齐最近最多 60 个交易日的缺失盈亏；估算格用浅色标明并计入合计，保留已有记录，跳过买卖、分红当天和数据不齐的市场。
+
+### English
+
+- Opening the P&L calendar fills missing daily P&L from up to 60 recent trading days of candlesticks. Lighter cells mark estimates included in totals; existing records, trade and dividend days, and markets with incomplete data are preserved or skipped.
+
 ## 1.1.0（2026-10-11）
 
 ### 中文
