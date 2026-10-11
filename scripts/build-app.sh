@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 构建 Stox.app：swift build (release) → 组装 .app → 生成图标 → 签名。
+# 构建 Stox.app：xcodebuild (Release) → 组装 .app → 生成图标 → 签名。
 #
 #   scripts/build-app.sh                 本机架构
 #   UNIVERSAL=1 scripts/build-app.sh     Apple 芯片 + Intel 通用版（需要完整 Xcode）
@@ -17,14 +17,16 @@ cd "$(dirname "$0")/.."
 APP_NAME="Stox"
 FLAVOR="${STOX_FLAVOR:-github}"
 # 两个版本用不同的编译目录，互相不会冲掉对方的编译缓存。
-SWIFT_FLAGS=""
+SCHEME="Stox"
+DERIVED_DATA=".build/xcode/github"
 case "$FLAVOR" in
   github)
     DIST="dist"
     ;;
   appstore)
     DIST="dist/appstore"
-    SWIFT_FLAGS="-Xswiftc -DAPP_STORE --scratch-path .build/appstore"
+    SCHEME="StoxAppStore"
+    DERIVED_DATA=".build/xcode/appstore"
     ;;
   *)
     echo "error: STOX_FLAVOR 只能是 github 或 appstore（现在是 ${FLAVOR}）" >&2
@@ -40,22 +42,20 @@ fi
 VERSION="${VERSION:-0.1.0}"
 BUILD_NUMBER="${BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 
-# 用普通字符串而不是数组：macOS 自带的 bash 3.2 在 set -u 下展开空数组会报错。
-ARCH_FLAGS=""
+ARCH_FLAGS=(ONLY_ACTIVE_ARCH=YES)
 if [[ "${UNIVERSAL:-0}" == "1" ]]; then
-  ARCH_FLAGS="--arch arm64 --arch x86_64"
+  ARCH_FLAGS=("ARCHS=arm64 x86_64" ONLY_ACTIVE_ARCH=NO)
 fi
 
-echo "==> 编译 $APP_NAME $VERSION ($BUILD_NUMBER) $FLAVOR ${ARCH_FLAGS}"
-# shellcheck disable=SC2086
-swift build -c release --product "$APP_NAME" $ARCH_FLAGS $SWIFT_FLAGS
-# shellcheck disable=SC2086
-BIN_DIR="$(swift build -c release --product "$APP_NAME" $ARCH_FLAGS $SWIFT_FLAGS --show-bin-path)"
-
+scripts/generate-project.sh
+echo "==> 编译 $APP_NAME $VERSION ($BUILD_NUMBER) $FLAVOR"
+xcodebuild build -project Stox.xcodeproj -scheme "$SCHEME" -configuration Release \
+  -derivedDataPath "$DERIVED_DATA" CODE_SIGNING_ALLOWED=NO \
+  "MARKETING_VERSION=$VERSION" "CURRENT_PROJECT_VERSION=$BUILD_NUMBER" "${ARCH_FLAGS[@]}"
 echo "==> 组装 $APP"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp "$BIN_DIR/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
+mkdir -p "$DIST"
+ditto "$DERIVED_DATA/Build/Products/Release/$APP_NAME.app" "$APP"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$VERSION" "$APP/Contents/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP/Contents/Info.plist"

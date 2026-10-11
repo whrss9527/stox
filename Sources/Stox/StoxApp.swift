@@ -8,6 +8,11 @@ import StoxCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static func main() {
+        // Xcode 单元测试宿主不初始化真实设置、行情、热键或同步。
+        if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
+            NSApplication.shared.run()
+            return
+        }
         // 设置里点了“立即重新启动”打开的新实例：先等旧的退出。
         LanguageSetting.waitForPreviousInstance(arguments: ProcessInfo.processInfo.arguments)
         _ = LanguageSetting.atLaunch

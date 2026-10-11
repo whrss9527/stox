@@ -9,3 +9,5 @@ DerivedData/
 .netrc
 __pycache__/
 /shots/
+
+/Stox.xcodeproj/

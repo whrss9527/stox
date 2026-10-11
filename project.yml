@@ -1,0 +1,72 @@
+name: Stox
+options:
+  minimumXcodeGenVersion: 2.44.1
+  deploymentTarget:
+    macOS: '13.0'
+  developmentLanguage: en
+packages:
+  StoxPackage:
+    path: .
+settings:
+  base:
+    SWIFT_VERSION: '5.0'
+    MACOSX_DEPLOYMENT_TARGET: '13.0'
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGNING_ALLOWED: NO
+    MARKETING_VERSION: '0.1.0'
+    CURRENT_PROJECT_VERSION: '1'
+targetTemplates:
+  StoxApplication:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/Stox
+      - path: Resources
+        excludes: [Info.plist, '*.entitlements']
+        buildPhase: resources
+    dependencies:
+      - package: StoxPackage
+        product: StoxCore
+    settings:
+      base:
+        PRODUCT_NAME: Stox
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.whrss9527.stox
+        INFOPLIST_FILE: Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_HARDENED_RUNTIME: YES
+targets:
+  Stox:
+    templates: [StoxApplication]
+  StoxAppStore:
+    templates: [StoxApplication]
+    settings:
+      base:
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) APP_STORE'
+        PRODUCT_MODULE_NAME: StoxAppStore
+  StoxTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [Tests/StoxTests]
+    dependencies:
+      - target: Stox
+      - package: StoxPackage
+        product: StoxCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.whrss9527.stox.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: '$(BUILT_PRODUCTS_DIR)/Stox.app/Contents/MacOS/Stox'
+        BUNDLE_LOADER: '$(TEST_HOST)'
+schemes:
+  Stox:
+    build:
+      targets:
+        Stox: all
+        StoxTests: [test]
+    test:
+      targets: [StoxTests]
+      language: zh-Hans
+  StoxAppStore:
+    build:
+      targets:
+        StoxAppStore: all
