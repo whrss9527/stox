@@ -36,7 +36,22 @@ jobs:
           python3 scripts/app-store-connect.py check
           python3 -m unittest discover -s scripts -p 'test_*.py'
       - name: Unit tests
-        run: swift test
+        id: unit-tests
+        shell: bash
+        run: swift test 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
+      - name: Unit test failure details
+        if: failure() && steps.unit-tests.outcome == 'failure'
+        # 网络受限的开发环境未必能下载 Actions 日志；保留具体编译/断言错误供 API 读取。
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          lines = Path(os.environ["RUNNER_TEMP"], "stox-unit-tests.log").read_text().splitlines()
+          failures = [line for line in lines if "error:" in line or " failed" in line]
+          for line in failures[:40]:
+              message = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::error title=Unit test failure::{message}")
+          PY
       - name: Live data smoke test
         if: github.ref == 'refs/heads/main'
         id: live-data-0
@@ -94,7 +109,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift') }}-
       - name: Unit tests
-        run: swift test
+        id: unit-tests
+        shell: bash
+        run: swift test 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
+      - name: Unit test failure details
+        if: failure() && steps.unit-tests.outcome == 'failure'
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          lines = Path(os.environ["RUNNER_TEMP"], "stox-unit-tests.log").read_text().splitlines()
+          failures = [line for line in lines if "error:" in line or " failed" in line]
+          for line in failures[:40]:
+              message = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+              print(f"::error title=Unit test failure::{message}")
+          PY
       - name: Build Stox.app
         env:
           UNIVERSAL: ${{ github.ref == 'refs/heads/main' && '1' || '0' }}
