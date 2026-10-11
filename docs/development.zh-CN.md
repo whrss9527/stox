@@ -10,7 +10,7 @@ Sources/
               发布信息解析与安装位置判断（Linux 上也能编译测试）
   Stox/       菜单栏 App：NSStatusItem + 玻璃面板（NSPanel）+ SwiftUI，设置窗口、iCloud 同步、更新
   StoxCLI/    命令行调试工具 stox-cli
-Resources/             Info.plist，以及界面文字的英文（en.lproj）和简体中文（zh-Hans.lproj）
+Resources/             Info.plist，以及界面文字的英文（en.lproj）、简体中文（zh-Hans.lproj）和繁体中文（zh-Hant.lproj）
 Tests/StoxCoreTests/   单元测试，使用真实接口返回作为样本
 Tests/StoxTests/       macOS 应用测试，使用假提供者、可控时间与隔离设置/同步文件
 scripts/
@@ -19,7 +19,7 @@ scripts/
   app-store-connect.py 把 docs/app-store/listing 里的资料填进 App Store Connect、选构建、提交审核（App Store Connect API）
   make-icon.swift      生成 App 图标
   check-datasources.sh 打印行情接口的原始返回，排查格式变化
-  check-localization.py  检查英文和简体中文的翻译是否齐全、一致
+  check-localization.py  检查英文、简体和繁体中文的翻译是否齐全、一致
   ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新、App Store 版在沙盒里运行
 ```
 
@@ -53,7 +53,7 @@ Linux 的 `datasources` 工作流编译 CLI、跑离线复放测试与两家实�
 
 ### 界面语言
 
-显示给用户的文字在代码里写成 `L("中文原文", 参数…)`（见 `Sources/StoxCore/AppLanguage.swift`），中文原文就是 `Resources/en.lproj/Localizable.strings` 和 `Resources/zh-Hans.lproj/Localizable.strings` 里的键，`scripts/build-app.sh` 把它们复制进 App。参数用 `%@` 占位，译文里可以用 `%1$@`、`%2$@` 调换顺序。加文字或改文字时两种语言一起改，再跑一遍 `python3 scripts/check-localization.py`（`make test` 也会跑），CI 每次推送都会检查。不改系统语言也能看英文界面：
+显示给用户的文字在代码里写成 `L("中文原文", 参数…)`（见 `Sources/StoxCore/AppLanguage.swift`），中文原文就是 `Resources/{en,zh-Hans,zh-Hant}.lproj/Localizable.strings` 三张表 里的键，`scripts/build-app.sh` 把它们复制进 App。参数用 `%@` 占位，译文里可以用 `%1$@`、`%2$@` 调换顺序。加文字或改文字时三种语言一起改，再跑一遍 `python3 scripts/check-localization.py`（`make test` 也会跑），CI 每次推送都会检查。不改系统语言也能看英文界面：
 
 ```bash
 dist/Stox.app/Contents/MacOS/Stox --show-panel -AppleLanguages '(en)'
@@ -116,3 +116,5 @@ GitHub 正式发布需要在仓库 Secrets 中配置 Developer ID 证书与苹�
 App Store 版不自动发布：GitHub 版发布以后，写好英文的“此版本的新增内容”（`docs/app-store/listing/en-US/whats_new/<版本号>.txt`），在 Actions 页面手动运行 app-store：构建、签名并上传，按 `docs/app-store/listing/` 填好 App Store Connect 上的资料、选上构建，勾了 submit 时提交审核，见 [docs/app-store.md](app-store.md)。
 
 设计取舍见 [docs/DESIGN.md](DESIGN.md)。
+
+繁体表沿用简体源文键，界面用语核对为“代號、設定、選單列、貼上、匯入”等。`AppLanguage.securityName` 仅在显示边界使用 Foundation 简繁转换，模型和同步保留源名称及代码。Info.plist 注册 zh-Hant，InterfaceLanguage 识别繁体及台湾、香港、澳门语言选择。Linux 测试覆盖转换、资源和持久化；Apple Bundle 的系统语言匹配由 macOS 原生测试及 zh-TW/zh-HK 启动用例验证，Linux Foundation 不支持相同的匹配算法。 分支精简集也运行 zh-TW/zh-HK 面板启动和已保存的繁体语言设置，共十一例界面启动检查。

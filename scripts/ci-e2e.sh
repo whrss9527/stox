@@ -126,6 +126,8 @@ quick() {
   run_case en-settings-general --show-settings general
   grep -q 'english=true interface_language=english' shots/en-settings-general.log || fail "设置里的界面语言应该是英文"
   defaults delete "$DOMAIN" 2>/dev/null || true
+  traditional
+  defaults delete "$DOMAIN" 2>/dev/null || true
 }
 
 smoke() {
@@ -506,6 +508,21 @@ smoke() {
   grep -q "STOX_DIAG late us_phase=[a-zA-Z]* extended=0 " shots/plain.log || fail "关掉盘前盘后价以后不应该再取"
 
   english
+  traditional
+}
+
+# 繁體系統偏好和 Stox 自己儲存的語言選擇都要載入 zh-Hant 資源。
+traditional() {
+  defaults write "$DOMAIN" AppleLanguages -array zh-Hant
+  run_case hant-panel --show-panel -AppleLanguages '(zh-TW)'
+  check_fits hant-panel
+  grep -q 'english=false sample="設定…"' shots/hant-panel.log || fail "zh-TW 沒有選到繁體資源"
+  run_case hant-hk-panel --show-panel -AppleLanguages '(zh-HK)'
+  check_fits hant-hk-panel
+  grep -q 'english=false sample="設定…"' shots/hant-hk-panel.log || fail "zh-HK 沒有選到繁體資源"
+  run_case hant-settings --show-settings general
+  grep -q 'interface_language=traditionalChinese' shots/hant-settings.log || fail "設定沒有還原繁體語言選項"
+  defaults delete "$DOMAIN" AppleLanguages
 }
 
 # 英文界面：系统语言是英文时，面板、详情、编辑页、设置窗口都是英文，截图放在 shots/en-*.png。

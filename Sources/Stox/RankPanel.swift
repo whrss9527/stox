@@ -154,11 +154,11 @@ struct RankPanel: View {
                     .foregroundStyle(.tertiary)
                     .frame(width: 18, alignment: .trailing)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(industry.name)
+                    Text(AppLanguage.securityName(industry.name))
                         .font(.system(size: 12.5, weight: .medium))
                         .lineLimit(1)
                     if let leader {
-                        Text(L("领涨 %@ %@", leader.name, QuoteFormatter.percent(leader.changePercent)))
+                        Text(L("领涨 %@ %@", AppLanguage.securityName(leader.name), QuoteFormatter.percent(leader.changePercent)))
                             .font(.system(size: 10).monospacedDigit())
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -177,7 +177,7 @@ struct RankPanel: View {
         .buttonStyle(.plain)
         .disabled(leader == nil)
         .help(leader.map { added ? L("%@已在自选里，点一下回到列表并展开", $0.name) : L("把领涨的%@加到自选", $0.name) } ?? "")
-        .accessibilityLabel("\(index + 1) \(industry.name) \(QuoteFormatter.percent(industry.changePercent))")
+        .accessibilityLabel("\(index + 1) \(AppLanguage.securityName(industry.name)) \(QuoteFormatter.percent(industry.changePercent))")
     }
 
     /// 涨跌幅色块。
@@ -206,7 +206,7 @@ struct RankPanel: View {
                     .foregroundStyle(.tertiary)
                     .frame(width: 18, alignment: .trailing)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(entry.name)
+                    Text(AppLanguage.securityName(entry.name))
                         .font(.system(size: 12.5, weight: .medium))
                         .lineLimit(1)
                     Text(detail(entry))
@@ -229,7 +229,7 @@ struct RankPanel: View {
         }
         .buttonStyle(.plain)
         .help(added ? L("已在自选里，点一下回到列表并展开") : L("加到自选"))
-        .accessibilityLabel("\(index + 1) \(entry.name) \(QuoteFormatter.percent(entry.changePercent))")
+        .accessibilityLabel("\(index + 1) \(AppLanguage.securityName(entry.name)) \(QuoteFormatter.percent(entry.changePercent))")
     }
 
     /// 代码，成交额榜上再写成交额，别的榜写换手率。

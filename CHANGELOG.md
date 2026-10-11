@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.4.0（2026-10-11）
+
+### 中文
+
+- 新增繁體中文介面與語言選項，支援港台系統語言；行情、自選、搜尋和榜單名稱按繁體顯示，保留儲存及同步中的原始名稱與證券代號。
+
+### English
+
+- Add a Traditional Chinese interface and language option, including Taiwan and Hong Kong language preferences. Security names display in Traditional Chinese while stored and synced source names and symbols stay unchanged.
+
 ## 1.3.0（2026-10-11）
 
 ### 中文
