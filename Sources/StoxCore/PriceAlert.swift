@@ -56,8 +56,8 @@ public enum AlertCondition: String, Codable, CaseIterable, Sendable {
 
     func isMet(by quote: Quote, holding: Holding?, threshold: Double) -> Bool {
         switch self {
-        case .priceAbove: return quote.price >= threshold
-        case .priceBelow: return quote.price <= threshold
+        case .priceAbove: return quote.alertHigh >= threshold
+        case .priceBelow: return quote.alertLow <= threshold
         case .riseAbove: return quote.changePercent >= abs(threshold)
         case .fallBelow: return quote.changePercent <= -abs(threshold)
         case .profitAbove, .lossBelow:
@@ -142,6 +142,14 @@ public struct AlertTrigger: Sendable, Equatable {
         }
         var text = price
         switch condition {
+        case .priceAbove:
+            if quote.timestamp != nil {
+                text += L("今天最高 %@，", QuoteFormatter.price(quote.alertHigh, decimals: quote.priceDecimals))
+            }
+        case .priceBelow:
+            if quote.timestamp != nil {
+                text += L("今天最低 %@，", QuoteFormatter.price(quote.alertLow, decimals: quote.priceDecimals))
+            }
         case .yearHigh:
             text += L("今天最高 %@，", QuoteFormatter.price(quote.high, decimals: quote.priceDecimals))
         case .yearLow:
@@ -172,9 +180,12 @@ public struct AlertEngine: Codable, Sendable, Equatable {
     ) -> [AlertTrigger] {
         var triggers: [AlertTrigger] = []
         for item in items where !item.alert.isEmpty || limitAlerts || yearAlerts {
-            guard let quote = quotes[item.symbol], quote.price > 0, quote.hasTraded else { continue }
+            guard let quote = quotes[item.symbol], quote.price.isFinite, quote.price > 0, quote.hasTraded else { continue }
             let day = Self.dayKey(quote.timestamp ?? now, region: item.symbol.market.region)
             for condition in AlertCondition.allCases {
+                // 昨天的收盘行情不能在今天重新触发价格提醒；日期按交易所时区判断。
+                if condition == .priceAbove || condition == .priceBelow,
+                   day != Self.dayKey(now, region: item.symbol.market.region) { continue }
                 let threshold: Double?
                 switch condition {
                 case .limitUp, .limitDown:
@@ -215,5 +226,16 @@ public struct AlertEngine: Codable, Sendable, Equatable {
     static func dayKey(_ date: Date, region: MarketRegion) -> String {
         let c = region.calendar.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", c.year ?? 0, c.month ?? 0, c.day ?? 0)
+    }
+}
+
+private extension Quote {
+    // 无日期或无有效最高/最低价的接口继续只判断现价，避免把 0 当作跌破阈值。
+    var alertHigh: Double {
+        timestamp != nil && high.isFinite && high > 0 ? max(price, high) : price
+    }
+
+    var alertLow: Double {
+        timestamp != nil && low.isFinite && low > 0 ? min(price, low) : price
     }
 }
