@@ -23,6 +23,10 @@ scripts/
   ci-e2e.sh              CI end-to-end tests: launch, screenshots, iCloud sync, one-click update, the App Store edition in the sandbox
 ```
 
+### CI validation tiers
+
+Every branch runs all Linux core tests, localization and offline listing checks, and all native macOS unit tests. The macOS job builds the runner architecture and runs `ci-e2e.sh quick` (eight English/Chinese panel, detail, search and settings cases) plus the complete fake-iCloud sync tests. It has a 20-minute execution limit. SwiftPM build outputs are cached by compiler version, runner architecture and manifest. Main retains the universal build, full smoke suite, update tests, live-data probes, App Store sandbox and store screenshots. Branches save diagnostic logs; screenshots are optional with `[screenshots]` in the commit message. `run_case` waits up to 20 seconds for `STOX_DIAG late ready=true`, emitted after all late panel diagnostics or settings diagnostics, and fails on timeout or early exit. The same readiness check replaces the fixed sync-panel wait. `scripts/test_ci_readiness.py` exercises this contract offline; actual macOS job duration must be checked in Actions.
+
 ### Application unit tests
 
 `make test` runs `StoxCoreTests` on every platform and `StoxTests` on macOS. The app tests use fake quote providers, `QuoteStoreClock`, dedicated UserDefaults suites and temporary sync folders; they never use live quote endpoints or the user's iCloud files. `SyncManager` accepts a test location and can disable file watching while exercising the same apply/push paths. Stop panel/polling tasks and disable sync before removing fixtures.

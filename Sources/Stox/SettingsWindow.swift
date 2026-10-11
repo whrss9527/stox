@@ -110,6 +110,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let frame = window.frame
         print("STOX_DIAG settings_page=\(navigation.page.rawValue) english=\(AppLanguage.isEnglish) interface_language=\(LanguageSetting.current.rawValue)")
         print("STOX_DIAG capture_frame=\(Int(frame.minX)) \(Int(screenHeight - frame.maxY)) \(Int(frame.width)) \(Int(frame.height))")
+        print("STOX_DIAG late ready=true")
         fflush(stdout)
     }
 }

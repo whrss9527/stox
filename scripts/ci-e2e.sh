@@ -2,6 +2,7 @@
 # CI 端到端测试：真正启动打包好的 dist/Stox.app，检查面板、设置窗口、iCloud 同步和一键更新，顺便截图。
 #
 #   scripts/ci-e2e.sh smoke    面板、详情、搜索、设置窗口、右键隐藏行情，以及英文界面
+#   scripts/ci-e2e.sh quick    分支用：中文/英文面板、详情、搜索和设置；同步仍单独运行 sync
 #   scripts/ci-e2e.sh sync     假的 iCloud 云盘文件夹：启动时拉取、运行中收到改动、文件被删后写回
 #   scripts/ci-e2e.sh update   本地假发布 9.9.9：发现新版本、原地更新、从临时位置运行时装进“应用程序”
 #   scripts/ci-e2e.sh appstore App Store 版（dist/appstore/Stox.app，ad-hoc 签名带沙盒）：在沙盒里运行、取到行情、
@@ -12,6 +13,7 @@
 # 截图（*-full.png）、App 输出（*.log，含 STOX_DIAG 诊断行）都放在 shots/ 下，后面的步骤负责裁剪。
 set -euo pipefail
 cd "$(dirname "$0")/.."
+source scripts/ci-wait-ready.sh
 
 APP="$PWD/dist/Stox.app"
 DOMAIN="io.github.whrss9527.stox"
@@ -55,25 +57,28 @@ write_watchlist() {
   defaults write "${2:-$DOMAIN}" watchlist.v1 -data "$(printf '%s' "$1" | xxd -p | tr -d '\n')"
 }
 
-# 启动一次（直接运行 .app 里的二进制，环境变量才能传进去），14 秒后记下内存、截屏、退出。
+# 启动一次，最多等 20 秒，直到本次启动的 late 诊断全部打印完，再记内存、截屏、退出。
 # 用法: [变量=值 ...] run_case 名字 [参数...]
 run_case() {
   local name="$1"
   shift
   "$APP/Contents/MacOS/Stox" "$@" > "shots/$name.log" 2>&1 &
   local pid=$!
-  sleep 14
-  if ! kill -0 "$pid" 2>/dev/null; then
+  if ! wait_for_stox_ready "$pid" "shots/$name.log"; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
     cat "shots/$name.log"
     ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | head -5
-    fail "Stox exited during launch ($name)"
+    fail "Stox did not become ready during launch ($name)"
   fi
   {
     echo "STOX_DIAG rss_kb=$(ps -o rss= -p "$pid" | tr -d ' ')"
     echo "STOX_DIAG $(vmmap -summary "$pid" 2>/dev/null | grep -m1 'Physical footprint:' | tr -s ' ')"
   } > "shots/$name-memory.log"
   grep -h STOX_DIAG "shots/$name.log" "shots/$name-memory.log" || true
-  screencapture -x "shots/$name-full.png" || echo "screencapture failed"
+  if [[ "${STOX_E2E_SCREENSHOTS:-1}" == 1 ]]; then
+    screencapture -x "shots/$name-full.png" || echo "screencapture failed"
+  fi
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
 }
@@ -92,6 +97,35 @@ check_fits() {
   if (( frame_h > available + 1 || fitting > available + 1 )); then
     fail "${name}：面板比屏幕能放的高（窗口 ${frame_h}，内容 ${fitting}，屏幕 ${available}），底下的按钮会看不到"
   fi
+}
+
+quick() {
+  use_chinese
+  defaults write "$DOMAIN" update.autoCheck -bool false
+  defaults write "$DOMAIN" tips.dismissed -bool true
+  run_case panel --show-panel
+  check_fits panel
+  grep -q 'english=false sample="设置…"' shots/panel.log || fail "界面应该是中文"
+  grep -q 'image=false color=redUp' shots/panel.log || fail "默认菜单栏显示或涨跌颜色不对"
+  run_case detail --show-panel --expand sh600519
+  check_fits detail
+  run_case search --show-panel --search 腾讯
+  run_case settings-general --show-settings general
+  grep -q 'english=false interface_language=simplifiedChinese' shots/settings-general.log || fail "设置里的界面语言应该是简体中文"
+  run_case settings-display --show-settings display
+  grep -q 'settings_page=display' shots/settings-display.log || fail "设置窗口没有打开"
+
+  defaults delete "$DOMAIN" watchlist.v1 2>/dev/null || true
+  run_case en-panel --show-panel -AppleLanguages '(en)'
+  check_fits en-panel
+  grep -q 'english=true sample="Settings…"' shots/en-panel.log || fail "英文界面没有启用"
+  grep -q 'items=8 ' shots/en-panel.log || fail "英文默认自选应该有 8 只"
+  run_case en-detail --show-panel --expand usAAPL -AppleLanguages '(en)'
+  check_fits en-detail
+  defaults write "$DOMAIN" AppleLanguages -array en
+  run_case en-settings-general --show-settings general
+  grep -q 'english=true interface_language=english' shots/en-settings-general.log || fail "设置里的界面语言应该是英文"
+  defaults delete "$DOMAIN" 2>/dev/null || true
 }
 
 smoke() {
@@ -553,9 +587,15 @@ JSON
   STOX_SYNC_DIR="$cloud" "$APP/Contents/MacOS/Stox" --show-panel > shots/sync-panel.log 2>&1 &
   local pid=$!
   wait_for 20 log_has "应用了来自 另一台 Mac 的改动（3 只）" || fail "没有从假 iCloud 拉到自选"
-  # 面板在启动 4 秒后打开，等行情回来再截图。
-  sleep 10
-  screencapture -x shots/sync-panel-full.png || echo "screencapture failed"
+  if ! wait_for_stox_ready "$pid" shots/sync-panel.log; then
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    cat shots/sync-panel.log
+    fail "同步面板没有完成启动"
+  fi
+  if [[ "${STOX_E2E_SCREENSHOTS:-1}" == 1 ]]; then
+    screencapture -x shots/sync-panel-full.png || echo "screencapture failed"
+  fi
   grep -h STOX_DIAG shots/sync-panel.log || true
   grep -q "items=3" shots/sync-panel.log || fail "自选没有换成 iCloud 里的 3 只"
   grep -q "color=neutral" shots/sync-panel.log || fail "涨跌颜色没有同步成“不显示红绿”"
@@ -976,13 +1016,14 @@ PY
 }
 
 case "${1:-}" in
+  quick) quick ;;
   smoke) smoke ;;
   sync) sync_test ;;
   update) update_test ;;
   appstore) appstore_test ;;
   appstore-shots) appstore_shots ;;
   *)
-    echo "用法: $0 smoke|sync|update|appstore|appstore-shots" >&2
+    echo "用法: $0 quick|smoke|sync|update|appstore|appstore-shots" >&2
     exit 2
     ;;
 esac

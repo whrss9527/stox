@@ -1,7 +1,7 @@
 name: build
 
-# 每次推送（任何分支）：Linux 上跑 StoxCore 测试，macOS 上打包通用版 App、启动测试、同步测试和一键更新测试；
-# 另外打一个 App Store 版（沙盒，ad-hoc 签名）启动测试。上传 App Store 用 app-store.yml（手动运行）。
+# 每次推送：Linux 与 macOS 上跑单元测试；分支打包本机架构并跑精简启动集、同步测试（20 分钟上限）。
+# main 打包通用版、跑全量启动/更新测试与截图，另打 App Store 沙盒版。上传用 app-store.yml（手动运行）。
 # 推到 main 且都通过后，看 CHANGELOG.md 最上面的版本有没有发布过，没有就用 Frit 的发布流程发布（见最后的 release）。
 # 不用 pull_request 触发：合并请求显示的就是它分支上这次推送的结果；两个都开的话同一个提交要跑两遍，
 # macOS runner 排队的时间也翻倍（[screenshots] 也只在推送时才有提交信息可看）。
@@ -38,6 +38,7 @@ jobs:
       - name: Unit tests
         run: swift test
       - name: Live data smoke test
+        if: github.ref == 'refs/heads/main'
         id: live-data-0
         # 真实请求腾讯行情接口和 GitHub 的发布接口；偶尔抖动时不阻塞构建。
         continue-on-error: true
@@ -67,12 +68,15 @@ jobs:
   app:
     name: macOS app
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: ${{ github.ref == 'refs/heads/main' && 45 || 20 }}
+    env:
+      STOX_E2E_SCREENSHOTS: ${{ (github.ref == 'refs/heads/main' || contains(github.event.head_commit.message, '[screenshots')) && '1' || '0' }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Toolchain
+        id: toolchain
         # 用 runner 上最新的正式版 Xcode：用 Xcode 26 编译时，面板在 macOS 26 上会换成系统的 Liquid Glass。
         run: |
           latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -iv -e beta -e release_candidate -e '_rc' | sort -V | tail -1 || true)
@@ -81,11 +85,20 @@ jobs:
           fi
           xcodebuild -version
           swift --version
+          echo "cache-key=$(swift --version | shasum -a 256 | cut -d ' ' -f1)" >> "$GITHUB_OUTPUT"
           echo "::notice title=toolchain::$(xcodebuild -version | head -1), $(swift --version 2>&1 | head -1)"
+      - uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift') }}-
       - name: Unit tests
         run: swift test
-      - name: Build Stox.app (universal)
-        run: UNIVERSAL=1 ./scripts/build-app.sh
+      - name: Build Stox.app
+        env:
+          UNIVERSAL: ${{ github.ref == 'refs/heads/main' && '1' || '0' }}
+        run: ./scripts/build-app.sh
       - name: Inspect bundle
         run: |
           plutil -p dist/Stox.app/Contents/Info.plist
@@ -93,16 +106,17 @@ jobs:
           plutil -lint dist/Stox.app/Contents/Resources/*.lproj/*.strings
           codesign --verify --deep --strict --verbose=2 dist/Stox.app
       - name: Launch smoke test
-        # 真正启动打包好的 App：面板、详情、搜索、设置窗口，以及右键切换的“只显示图标”；最后用英文界面再截几张（shots/en-*）。
-        run: scripts/ci-e2e.sh smoke
+        # 分支跑八个中英文面板、详情、搜索、设置用例；main 跑包含更多功能和截图的全量。
+        run: scripts/ci-e2e.sh ${{ github.ref == 'refs/heads/main' && 'smoke' || 'quick' }}
       - name: iCloud sync test
         # 用一个假的 iCloud 云盘文件夹走一遍同步：启动时拉取、运行中收到改动、文件被删后写回。
         run: scripts/ci-e2e.sh sync
       - name: One-click update test
+        if: github.ref == 'refs/heads/main'
         # 本地假发布 9.9.9：发现新版本、下载校验替换并重新启动，以及从临时位置运行时装进“应用程序”。
         run: scripts/ci-e2e.sh update
       - name: Crop screenshots
-        if: always()
+        if: always() && env.STOX_E2E_SCREENSHOTS == '1'
         continue-on-error: true
         run: |
           swiftc -O scripts/ci-screenshot.swift -o "$RUNNER_TEMP/crop"
@@ -160,6 +174,7 @@ jobs:
         continue-on-error: true
         run: scripts/ci-annotate-image.sh 4
       - name: Live data smoke test
+        if: github.ref == 'refs/heads/main'
         id: live-data-1
         continue-on-error: true
         run: swift run -c release stox-cli quote sh600519 hk00700 usAAPL us.IXIC
@@ -183,6 +198,7 @@ jobs:
 
   appstore:
     name: App Store edition (sandbox)
+    if: github.ref == 'refs/heads/main'
     # App Store 版：ad-hoc 签名、带沙盒 entitlement（不需要证书），在沙盒里启动一遍，确认取得到行情、面板打得开、
     # 同步文件写得进去、没有一键更新的代码，顺便做 App Store 尺寸的截图。和上面的 macOS app 并行，不拖慢它。
     runs-on: macos-15
