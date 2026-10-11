@@ -47,6 +47,7 @@ struct ProfitCalendarPanel: View {
             .controlSize(.regular)
             .padding(.horizontal, 2)
         }
+        .task { await store.backfillProfitHistory() }
     }
 
     private var header: some View {
@@ -61,7 +62,7 @@ struct ProfitCalendarPanel: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(L("盈亏日历"))
                     .font(.system(size: 14, weight: .semibold))
-                Text(L("每个交易日收盘后记下的今日盈亏，只在这台 Mac 上"))
+                Text(store.isBackfillingProfitHistory ? L("正在补齐最近的盈亏记录…") : L("浅色格为日 K 估算，合计包含估算值；只在这台 Mac 上"))
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
                     .lineLimit(2)
@@ -315,16 +316,16 @@ struct ProfitCalendarPanel: View {
         .frame(height: Self.cellHeight)
         .background(
             RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(profit == nil ? Color.primary.opacity(0.03) : color.opacity(0.08 + 0.3 * strength))
+                .fill(profit == nil ? Color.primary.opacity(0.03) : color.opacity((0.08 + 0.3 * strength) * (cell.estimated ? 0.45 : 1)))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .strokeBorder(Color.accentColor.opacity(isToday ? 0.8 : 0), lineWidth: 1)
         )
-        .help(profit.map { L("%@ 今日盈亏 ", cell.date) + amount(QuoteFormatter.signedMoney($0)) } ?? L("%@ 没有记录", cell.date))
+        .help(profit.map { L("%@ 今日盈亏 ", cell.date) + amount(QuoteFormatter.signedMoney($0)) + (cell.estimated ? L("（估算）") : "") } ?? L("%@ 没有记录", cell.date))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L("%@ 日", cell.day))
-        .accessibilityValue(profit.map { L("今日盈亏 ") + amount(QuoteFormatter.signedMoney($0)) } ?? L("没有记录"))
+        .accessibilityValue(profit.map { L("今日盈亏 ") + amount(QuoteFormatter.signedMoney($0)) + (cell.estimated ? L("（估算）") : "") } ?? L("没有记录"))
     }
 
     private func summary(_ calendar: ProfitCalendar) -> some View {

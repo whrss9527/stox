@@ -201,7 +201,6 @@
 /* Stox/ProfitCalendarPanel.swift */
 "还没有盈亏记录：填了持仓以后，每个交易日收盘后会记一笔" = "No P&L history yet. Once you enter holdings, one entry is recorded after each close";
 "盈亏日历" = "P&L Calendar";
-"每个交易日收盘后记下的今日盈亏，只在这台 Mac 上" = "Today’s P&L recorded after each close, on this Mac only";
 "按月或按年" = "By Month or Year";
 "月" = "Month";
 "年" = "Year";
@@ -697,7 +696,7 @@
 "日" = "S";
 
 /* StoxCore/ProfitHistory.swift */
-"日期\t币种\t今日盈亏\t持仓盈亏\t市值" = "Date\tCurrency\tToday’s P&L\tTotal P&L\tValue";
+"日期\t币种\t今日盈亏\t持仓盈亏\t市值\t估算" = "Date\tCurrency\tDay P&L\tTotal P&L\tValue\tEstimated";
 
 /* StoxCore/QuoteProvider.swift */
 "服务器返回 HTTP %@" = "The server returned HTTP %@";
@@ -763,3 +762,7 @@
 "复制诊断信息" = "Copy diagnostics";
 "诊断信息已复制" = "Diagnostics copied";
 "包含版本、系统、同步状态、数据源和脱敏日志，不包含持仓数据。" = "Includes version, system, sync state, quote source and redacted logs. Holdings are excluded.";
+"估算" = "Estimated";
+"（估算）" = " (estimated)";
+"正在补齐最近的盈亏记录…" = "Filling recent P&L history…";
+"浅色格为日 K 估算，合计包含估算值；只在这台 Mac 上" = "Lighter cells are candlestick estimates, included in totals. Stored on this Mac only.";
