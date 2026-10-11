@@ -126,6 +126,8 @@ quick() {
   run_case en-settings-general --show-settings general
   grep -q 'english=true interface_language=english' shots/en-settings-general.log || fail "设置里的界面语言应该是英文"
   defaults delete "$DOMAIN" 2>/dev/null || true
+  traditional
+  defaults delete "$DOMAIN" 2>/dev/null || true
 }
 
 smoke() {
