@@ -1,10 +1,14 @@
-.PHONY: build test app run install zip clean
+.PHONY: build test project app run install zip clean
 
 build:
 	swift build
 
+project:
+	./scripts/generate-project.sh
+
 test:
-	swift test
+	swift test --filter StoxCoreTests
+	@if [ "$$(uname -s)" = Darwin ]; then ./scripts/test-app.sh; fi
 	python3 scripts/check-localization.py
 	python3 scripts/app-store-connect.py check
 	python3 -m unittest discover -s scripts -p 'test_*.py'

@@ -23,6 +23,14 @@ scripts/
   ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新、App Store 版在沙盒里运行
 ```
 
+### Xcode 工程与工具版本
+
+macOS App 使用 XcodeGen 2.44.1 生成工程；`make project` 下载固定版本并核对上游附件的 SHA-256，工具保存在 `.build/tools/`，生成的 `Stox.xcodeproj` 不提交。需要完整 Xcode 与 macOS 13 以上系统。Linux 仍可独立使用 SwiftPM 测试 StoxCore 和运行 stox-cli，不下载 XcodeGen。
+
+`make test` 先运行 SwiftPM 的 Core 测试，macOS 再通过 `scripts/test-app.sh` 运行 Xcode 的 StoxTests。测试宿主不初始化真实设置、行情、快捷键和同步。两个工程 scheme 为 `Stox` 和 `StoxAppStore`；后者以 `APP_STORE` 条件编译，保留原有沙盒/更新差异。
+
+`make app` 和 `scripts/build-app-store.sh` 使用 Xcode 构建，再沿用原有图标、签名、描述文件、公证和打包流程。普通版与 App Store 版分别使用 `.build/xcode/github` 和 `.build/xcode/appstore`，不共享构建产物；通用包继续包含 arm64 与 x86_64。版本与证书从既有环境参数注入，工程内不保存个人签名材料。此迁移不新增 iOS、小组件或 Watch target。
+
 ### 应用单元测试
 
 `make test` 在所有平台运行 `StoxCoreTests`，在 macOS 还运行 `StoxTests`。应用测试使用假的行情提供者、`QuoteStoreClock`、独立 UserDefaults 域与临时同步文件夹，不调用真实行情接口、不读写用户的 iCloud 文件。`SyncManager` 可注入测试目录，并在验证同一套应用与推送路径时关闭文件监听。移除测试数据前先停止面板、轮询任务并关闭同步。

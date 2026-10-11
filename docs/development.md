@@ -23,6 +23,14 @@ scripts/
   ci-e2e.sh              CI end-to-end tests: launch, screenshots, iCloud sync, one-click update, the App Store edition in the sandbox
 ```
 
+### Xcode project and tool version
+
+The macOS app uses XcodeGen 2.44.1. `make project` downloads the pinned release and verifies its upstream SHA-256; tools live in `.build/tools/`, and the generated `Stox.xcodeproj` is ignored. A full Xcode installation and macOS 13 or later are required. Linux continues to test StoxCore and run stox-cli through SwiftPM without downloading XcodeGen.
+
+`make test` runs the SwiftPM Core suite, then runs Xcode-hosted StoxTests through `scripts/test-app.sh` on macOS. The test host does not initialize real preferences, quotes, hotkeys or sync. The schemes are `Stox` and `StoxAppStore`; the latter defines `APP_STORE` and preserves the sandbox/update differences.
+
+`make app` and `scripts/build-app-store.sh` build with Xcode before the existing icon, signing, provisioning and packaging steps. GitHub and App Store builds use separate `.build/xcode/github` and `.build/xcode/appstore` directories. Universal packages retain arm64 and x86_64. Existing environment arguments supply versions and signing credentials; the project contains no personal signing material. This migration adds no iOS, widget or Watch target.
+
 ### Application unit tests
 
 `make test` runs `StoxCoreTests` on every platform and `StoxTests` on macOS. The app tests use fake quote providers, `QuoteStoreClock`, dedicated UserDefaults suites and temporary sync folders; they never use live quote endpoints or the user's iCloud files. `SyncManager` accepts a test location and can disable file watching while exercising the same apply/push paths. Stop panel/polling tasks and disable sync before removing fixtures.
