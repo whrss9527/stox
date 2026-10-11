@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.0.5（2026-10-11）
+
+### 中文
+
+- 价格提醒会检查当日最高、最低价，补上睡眠或离线期间已触及的目标；通知显示触及的价格，每个条件每天仍只提醒一次。
+
+### English
+
+- Price alerts now check the day's high and low to catch targets reached while your Mac was asleep or offline. Notifications show the touched price, with each condition still firing only once per day.
+
 ## 1.0.4（2026-10-08）
 
 ### 中文

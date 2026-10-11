@@ -69,54 +69,119 @@ final class AlertEngineTests: XCTestCase {
     func testFiresOncePerDay() {
         var engine = AlertEngine()
         let items = [item(PriceAlert(priceAbove: 105))]
-        let now = Date()
+        let now = quote(price: 100).timestamp!
 
         XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: quote(price: 104)], now: now).isEmpty)
 
         let fired = engine.evaluate(items: items, quotes: [symbol: quote(price: 106)], now: now)
         XCTAssertEqual(fired.map(\.condition), [.priceAbove])
         XCTAssertEqual(fired.first?.title, "贵州茅台 价格涨到 105.00")
-        XCTAssertEqual(fired.first?.body, "现价 106.00，涨跌 +6.00（+6.00%）")
+        XCTAssertEqual(fired.first?.body, "现价 106.00，今天最高 106.00，涨跌 +6.00（+6.00%）")
 
         // 同一天价格回落再突破，不再重复提醒。
         XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: quote(price: 104)], now: now).isEmpty)
         XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: quote(price: 107)], now: now).isEmpty)
 
         // 下一个交易日可以再次提醒。
-        let nextDay = engine.evaluate(items: items, quotes: [symbol: quote(price: 107, day: 29)], now: now)
+        let nextDay = engine.evaluate(items: items, quotes: [symbol: quote(price: 107, day: 29)], now: now.addingTimeInterval(86400))
         XCTAssertEqual(nextDay.count, 1)
     }
 
     func testAllConditions() {
         var engine = AlertEngine()
         let alert = PriceAlert(priceAbove: 200, priceBelow: 95, riseAbove: 3, fallBelow: 4)
-        let down = engine.evaluate(items: [item(alert)], quotes: [symbol: quote(price: 94)], now: Date())
+        let down = engine.evaluate(items: [item(alert)], quotes: [symbol: quote(price: 94)], now: quote(price: 100).timestamp!)
         XCTAssertEqual(Set(down.map(\.condition)), [.priceBelow, .fallBelow])
         XCTAssertEqual(down.first(where: { $0.condition == .fallBelow })?.title, "贵州茅台 跌幅达到 4.00%")
 
         var engine2 = AlertEngine()
-        let up = engine2.evaluate(items: [item(alert)], quotes: [symbol: quote(price: 103)], now: Date())
+        let up = engine2.evaluate(items: [item(alert)], quotes: [symbol: quote(price: 103)], now: quote(price: 100).timestamp!)
         XCTAssertEqual(up.map(\.condition), [.riseAbove])
+    }
+
+    func testTouchesDuringSleepStillTriggerAfterPriceReturns() throws {
+        var engine = AlertEngine()
+        var recovered = quote(price: 100, hour: 14)
+        recovered.high = 106
+        recovered.low = 94
+        let items = [item(PriceAlert(priceAbove: 105, priceBelow: 95))]
+        let now = recovered.timestamp!
+        let fired = engine.evaluate(items: items, quotes: [symbol: recovered], now: now)
+        XCTAssertEqual(fired.map(\.condition), [.priceAbove, .priceBelow])
+        XCTAssertEqual(fired[0].body, "现价 100.00，今天最高 106.00，涨跌 0.00（0.00%）")
+        XCTAssertEqual(fired[1].body, "现价 100.00，今天最低 94.00，涨跌 0.00（0.00%）")
+        XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: recovered], now: now).isEmpty)
+        let restored = try JSONDecoder().decode(AlertEngine.self, from: JSONEncoder().encode(engine))
+        XCTAssertEqual(restored, engine, "补发提醒也保存每日去重状态")
+    }
+
+    func testPreviousDayExtremesDoNotFireAndNextDayCanFire() {
+        var engine = AlertEngine()
+        var yesterday = quote(price: 100)
+        yesterday.high = 110
+        yesterday.low = 90
+        let items = [item(PriceAlert(priceAbove: 105, priceBelow: 95))]
+        let today = yesterday.timestamp!.addingTimeInterval(86400)
+        XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: yesterday], now: today).isEmpty)
+        XCTAssertTrue(engine.firedDays.isEmpty)
+        var fresh = yesterday
+        fresh.timestamp = today
+        XCTAssertEqual(engine.evaluate(items: items, quotes: [symbol: fresh], now: today).count, 2)
+        fresh.timestamp = today.addingTimeInterval(86400)
+        XCTAssertEqual(engine.evaluate(items: items, quotes: [symbol: fresh], now: fresh.timestamp!).count, 2)
+    }
+
+    func testMissingInvalidOrUndatedExtremesUseCurrentPrice() {
+        let items = [item(PriceAlert(priceAbove: 105, priceBelow: 95))]
+        for invalid in [0.0, -1, Double.nan, Double.infinity] {
+            var engine = AlertEngine()
+            var fresh = quote(price: 100)
+            fresh.high = invalid
+            fresh.low = invalid
+            XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: fresh], now: fresh.timestamp!).isEmpty)
+        }
+        var engine = AlertEngine()
+        var undated = quote(price: 100)
+        let now = undated.timestamp!
+        undated.timestamp = nil
+        undated.high = 110
+        undated.low = 90
+        XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: undated], now: now).isEmpty)
+        undated.price = 106
+        XCTAssertEqual(engine.evaluate(items: items, quotes: [symbol: undated], now: now).map(\.condition), [.priceAbove])
+    }
+
+    func testExchangeDateRatherThanUTCDate() {
+        let us = Symbol("usAAPL")!
+        let localTime = MarketRegion.us.calendar.date(from: DateComponents(year: 2026, month: 9, day: 28, hour: 16))!
+        let fresh = Quote(symbol: us, name: "Apple", price: 100, previousClose: 100, open: 100,
+                          high: 106, low: 94, timestamp: localTime)
+        var engine = AlertEngine()
+        // UTC 已跨日，但纽约仍是同一交易日。
+        let now = localTime.addingTimeInterval(5 * 3600)
+        let items = [WatchItem(symbol: us, alert: PriceAlert(priceAbove: 105, priceBelow: 95))]
+        XCTAssertEqual(engine.evaluate(items: items, quotes: [us: fresh], now: now).count, 2)
+        XCTAssertEqual(engine.firedDays["usAAPL|priceAbove"], "2026-09-28")
     }
 
     func testResetAllowsRefire() {
         var engine = AlertEngine()
         let items = [item(PriceAlert(priceAbove: 105))]
-        XCTAssertEqual(engine.evaluate(items: items, quotes: [symbol: quote(price: 106)], now: Date()).count, 1)
+        XCTAssertEqual(engine.evaluate(items: items, quotes: [symbol: quote(price: 106)], now: quote(price: 100).timestamp!).count, 1)
         engine.reset(symbol)
-        XCTAssertEqual(engine.evaluate(items: items, quotes: [symbol: quote(price: 106)], now: Date()).count, 1)
+        XCTAssertEqual(engine.evaluate(items: items, quotes: [symbol: quote(price: 106)], now: quote(price: 100).timestamp!).count, 1)
     }
 
     func testSkipsQuotesWithoutTrades() {
         var engine = AlertEngine()
         let suspended = Quote(symbol: symbol, name: "贵州茅台", price: 100, previousClose: 100)
         let items = [item(PriceAlert(priceBelow: 101))]
-        XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: suspended], now: Date()).isEmpty)
+        XCTAssertTrue(engine.evaluate(items: items, quotes: [symbol: suspended], now: quote(price: 100).timestamp!).isEmpty)
     }
 
     func testCodableRoundTrip() throws {
         var engine = AlertEngine()
-        _ = engine.evaluate(items: [item(PriceAlert(priceAbove: 1))], quotes: [symbol: quote(price: 106)], now: Date())
+        _ = engine.evaluate(items: [item(PriceAlert(priceAbove: 1))], quotes: [symbol: quote(price: 106)], now: quote(price: 100).timestamp!)
         let decoded = try JSONDecoder().decode(AlertEngine.self, from: JSONEncoder().encode(engine))
         XCTAssertEqual(decoded, engine)
         XCTAssertEqual(decoded.firedDays["sh600519|priceAbove"], "2026-09-28")
