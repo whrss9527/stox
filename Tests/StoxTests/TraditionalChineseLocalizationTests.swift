@@ -17,10 +17,13 @@ final class TraditionalChineseLocalizationTests: XCTestCase {
         let original = AppLanguage.bundle
         defer { AppLanguage.bundle = original }
         AppLanguage.bundle = try XCTUnwrap(Bundle(path: folder.path))
-        XCTAssertEqual(AppLanguage.bundle.localizations, ["zh-Hant"])
+        XCTAssertEqual(Set(AppLanguage.bundle.localizations), ["zh-Hant"])
         XCTAssertTrue(AppLanguage.isTraditionalChinese)
         XCTAssertFalse(AppLanguage.isEnglish)
-        XCTAssertEqual(AppLanguage.locale.identifier, "zh_Hant_HK")
+        // Foundation 允许省略地区默认的文字体系（macOS 为 zh_HK）；验证语义而非规范化写法。
+        XCTAssertEqual(AppLanguage.locale.language.languageCode?.identifier, "zh")
+        XCTAssertEqual(AppLanguage.locale.language.script?.identifier, "Hant")
+        XCTAssertEqual(AppLanguage.locale.region?.identifier, "HK")
         XCTAssertEqual(L("设置…"), "設定…")
         XCTAssertEqual(L("名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组").components(separatedBy: "\t")[1], "代號")
         XCTAssertEqual(L("第 %@ 行", 3), "第 3 行")
