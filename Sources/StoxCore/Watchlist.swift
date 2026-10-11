@@ -50,31 +50,37 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
 
     public var id: String { symbol.rawValue }
 
-    public var displayName: String { name.isEmpty ? symbol.displayCode : name }
+    public var displayName: String { AppLanguage.securityName(name.isEmpty ? symbol.displayCode : name) }
 
     /// 菜单栏上显示的名字：优先用户设置的简称，否则截断全称。
     public var tickerName: String { tickerName(with: nil, english: false) }
 
     /// 列表、提醒里显示的名称：有行情时用行情里的名称，否则用记下的名称或代码。
     /// 英文界面里能换成英文的换成英文（见 EnglishName），A 股、场外基金照旧是中文。
-    public func displayName(with quote: Quote?, english: Bool = AppLanguage.isEnglish) -> String {
+    public func displayName(with quote: Quote?, english: Bool = AppLanguage.isEnglish,
+                            traditional: Bool = AppLanguage.isTraditionalChinese) -> String {
         if english, let name = EnglishName.name(symbol, quote: quote) { return name }
-        if let name = quote?.name, !name.isEmpty { return name }
-        return displayName
+        let source: String
+        if let latest = quote?.name, !latest.isEmpty { source = latest }
+        else { source = name.isEmpty ? symbol.displayCode : name }
+        return AppLanguage.securityName(source, traditional: traditional && !english)
     }
 
     /// 菜单栏上显示的名字：优先用户设置的简称，否则见 automaticTickerName(with:english:)。
-    public func tickerName(with quote: Quote?, english: Bool = AppLanguage.isEnglish) -> String {
+    public func tickerName(with quote: Quote?, english: Bool = AppLanguage.isEnglish,
+                           traditional: Bool = AppLanguage.isTraditionalChinese) -> String {
         if let alias, !alias.trimmingCharacters(in: .whitespaces).isEmpty {
-            return alias.trimmingCharacters(in: .whitespaces)
+            return AppLanguage.securityName(alias.trimmingCharacters(in: .whitespaces), traditional: traditional && !english)
         }
-        return automaticTickerName(with: quote, english: english)
+        return automaticTickerName(with: quote, english: english, traditional: traditional)
     }
 
     /// 没有设简称时菜单栏上的名字：截断全称；英文界面里是英文简称（S&P 500、AAPL、Gold）。
-    public func automaticTickerName(with quote: Quote?, english: Bool = AppLanguage.isEnglish) -> String {
+    public func automaticTickerName(with quote: Quote?, english: Bool = AppLanguage.isEnglish,
+                                    traditional: Bool = AppLanguage.isTraditionalChinese) -> String {
         if english, let name = EnglishName.shortName(symbol, quote: quote) { return name }
-        return NameAbbreviator.abbreviate(displayName)
+        return NameAbbreviator.abbreviate(AppLanguage.securityName(name.isEmpty ? symbol.displayCode : name,
+                                                                  traditional: traditional && !english))
     }
 }
 

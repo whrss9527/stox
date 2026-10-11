@@ -10,7 +10,7 @@ Sources/
               formatting, sync file format and merge rules, release info and install location (builds and tests on Linux)
   Stox/       The menu bar app: NSStatusItem + glass panel (NSPanel) + SwiftUI, Settings window, iCloud sync, updates
   StoxCLI/    The stox-cli debugging tool
-Resources/             Info.plist, and the English (en.lproj) and Simplified Chinese (zh-Hans.lproj) interface strings
+Resources/             Info.plist, and English (en.lproj), Simplified Chinese (zh-Hans.lproj) and Traditional Chinese (zh-Hant.lproj) strings
 Tests/StoxCoreTests/   Unit tests, using real API responses as samples
 Tests/StoxTests/       macOS app tests with fake providers, a controlled clock and isolated settings/sync files
 scripts/
@@ -19,7 +19,7 @@ scripts/
   app-store-connect.py   Fill in the App Store listing from docs/app-store/listing, pick the build, submit for review (App Store Connect API)
   make-icon.swift        Generate the app icon
   check-datasources.sh   Print raw quote API responses to spot format changes
-  check-localization.py  Check that the English and Simplified Chinese strings are complete and consistent
+  check-localization.py  Check that the English, Simplified Chinese and Traditional Chinese strings are complete and consistent
   ci-e2e.sh              CI end-to-end tests: launch, screenshots, iCloud sync, one-click update, the App Store edition in the sandbox
 ```
 
@@ -53,7 +53,7 @@ The Linux `datasources` workflow builds the CLI, runs replay tests and both live
 
 ### Interface languages
 
-User-visible text is written in Chinese as `L("中文原文", arguments…)` (see `Sources/StoxCore/AppLanguage.swift`). The Chinese source is the key in `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings`, which `scripts/build-app.sh` copies into the app. Arguments use `%@` placeholders, and translations can reorder them with `%1$@`, `%2$@`. When you add or change text, update both tables and run `python3 scripts/check-localization.py` (`make test` runs it too); CI runs it on every push. To try the English interface without changing your system language:
+User-visible text is written in Chinese as `L("中文原文", arguments…)` (see `Sources/StoxCore/AppLanguage.swift`). The Chinese source is the key in the three `Resources/{en,zh-Hans,zh-Hant}.lproj/Localizable.strings` tables, which `scripts/build-app.sh` copies into the app. Arguments use `%@` placeholders, and translations can reorder them with `%1$@`, `%2$@`. When you add or change text, update all three tables and run `python3 scripts/check-localization.py` (`make test` runs it too); CI runs it on every push. To try the English interface without changing your system language:
 
 ```bash
 dist/Stox.app/Contents/MacOS/Stox --show-panel -AppleLanguages '(en)'
@@ -116,3 +116,5 @@ You can also run the release workflow by hand on the Actions page: leave the tag
 The App Store edition is not released automatically. After a GitHub release, add the English What's New (`docs/app-store/listing/en-US/whats_new/<version>.txt`) and run the app-store workflow by hand on the Actions page: it builds, signs and uploads the app, fills in the listing on App Store Connect from `docs/app-store/listing/`, picks the build and, when asked, submits it for review; see [docs/app-store.md](app-store.md) (in Chinese).
 
 See [docs/DESIGN.md](DESIGN.md) (in Chinese) for the design decisions.
+
+Traditional Chinese uses the same Simplified Chinese source keys, with reviewed interface terms such as 代號, 設定, 選單列, 貼上 and 匯入. `AppLanguage.securityName` uses Foundation’s Simplified–Traditional transform only at display boundaries; models and sync retain source names and codes. `Info.plist` registers zh-Hant, and InterfaceLanguage recognizes zh-Hant, Taiwan, Hong Kong and Macau choices. Linux tests verify conversion, resources and persistence; macOS native tests and the zh-TW/zh-HK launch cases verify Apple bundle selection, because Linux Foundation does not implement the same language matching.

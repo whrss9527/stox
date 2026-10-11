@@ -12,7 +12,9 @@ final class InterfaceLanguageTests: XCTestCase {
         XCTAssertEqual(InterfaceLanguage(appleLanguages: "en"), .english)
         // 系统设置里给 Stox 单独选了别的语言：当作跟随系统。
         XCTAssertEqual(InterfaceLanguage(appleLanguages: ["fr"]), .system)
-        XCTAssertEqual(InterfaceLanguage(appleLanguages: ["zh-Hant"]), .system)
+        for code in ["zh-Hant", "zh-Hant-TW", "zh-Hant-HK", "zh-TW", "zh-HK", "zh_MO", "zh_Hant_TW"] {
+            XCTAssertEqual(InterfaceLanguage(appleLanguages: [code]), .traditionalChinese)
+        }
         XCTAssertEqual(InterfaceLanguage(appleLanguages: 42), .system)
     }
 
@@ -22,11 +24,13 @@ final class InterfaceLanguageTests: XCTestCase {
         }
         XCTAssertNil(InterfaceLanguage.system.appleLanguages)
         XCTAssertEqual(InterfaceLanguage.simplifiedChinese.appleLanguages, ["zh-Hans"])
+        XCTAssertEqual(InterfaceLanguage.traditionalChinese.appleLanguages, ["zh-Hant"])
     }
 
     func testLanguagesAreNamedInTheirOwnLanguage() {
         XCTAssertEqual(InterfaceLanguage.english.title, "English")
         XCTAssertEqual(InterfaceLanguage.simplifiedChinese.title, "简体中文")
+        XCTAssertEqual(InterfaceLanguage.traditionalChinese.title, "繁體中文")
         XCTAssertEqual(InterfaceLanguage.system.title, "跟随系统")
     }
 
