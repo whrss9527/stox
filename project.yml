@@ -60,6 +60,8 @@ targets:
 schemes:
   Stox:
     build:
+      # Both editions intentionally produce Stox.app; select only this edition.
+      buildImplicitDependencies: false
       targets:
         Stox: all
         StoxTests: [test]
@@ -68,5 +70,6 @@ schemes:
       language: zh-Hans
   StoxAppStore:
     build:
+      buildImplicitDependencies: false
       targets:
         StoxAppStore: all
