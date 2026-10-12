@@ -23,6 +23,14 @@ scripts/
   ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新、App Store 版在沙盒里运行
 ```
 
+### Xcode 工程与工具版本
+
+macOS App 使用 XcodeGen 2.44.1 生成工程；`make project` 下载固定版本并核对上游附件的 SHA-256，工具保存在 `.build/tools/`，生成的 `Stox.xcodeproj` 不提交。需要完整 Xcode 与 macOS 13 以上系统。Linux 仍可独立使用 SwiftPM 测试 StoxCore 和运行 stox-cli，不下载 XcodeGen。
+
+`make test` 先运行 SwiftPM 的 Core 测试，macOS 再通过 `scripts/test-app.sh` 运行 Xcode 的 StoxTests。测试宿主不初始化真实设置、行情、快捷键和同步。两个工程 scheme 为 `Stox` 和 `StoxAppStore`；后者以 `APP_STORE` 条件编译，保留原有沙盒/更新差异。
+
+`make app` 和 `scripts/build-app-store.sh` 使用 Xcode 构建，再沿用原有图标、签名、描述文件、公证和打包流程。普通版与 App Store 版分别使用 `.build/xcode/github` 和 `.build/xcode/appstore`，不共享构建产物；通用包继续包含 arm64 与 x86_64。版本与证书从既有环境参数注入，工程内不保存个人签名材料。此迁移不新增 iOS、小组件或 Watch target。
+
 ### CI 验证分级
 
 所有分支都运行 Linux 核心单元测试、翻译和离线商店资料检查，以及 macOS 应用单元测试。分支的 macOS 任务只编译 runner 本机架构，运行 `ci-e2e.sh quick`（中英文面板、详情、搜索和设置共八例）以及完整的假 iCloud 同步测试，执行上限 20 分钟。SwiftPM 编译产物按编译器版本、runner 架构和清单缓存。main 保留通用版、全量启动、一键更新、实时接口巡检、App Store 沙盒和商店截图。分支保存诊断日志；提交信息加 `[screenshots]` 可选截图。`run_case` 最多等 20 秒，直到晚到的面板诊断或设置诊断全部打印后的 `STOX_DIAG late ready=true`；超时或进程提前退出会失败。同步面板也使用同一个就绪检查。`scripts/test_ci_readiness.py` 离线验证这个约定，macOS 实际运行时长需要在 Actions 查看。
@@ -93,6 +101,8 @@ dist/Stox.app/Contents/MacOS/Stox --check-update --show-panel     # 先检查一
 `scripts/check-quote-recovery.sh` 用本地 HTTP 服务让主备行情都失败，再恢复主源，检查退避、面板重试状态和恢复后的正常间隔。仅在 CI 的隔离环境运行，会启动 App 并临时修改刷新设置。
 
 CI 会在 macOS 上启动打包好的 App：打开面板、详情、搜索和设置窗口并截图；用假的 iCloud 云盘文件夹测试同步；用本地的假发布把程序真正更新到 9.9.9 并确认重新启动。
+
+`scripts/measure-footprint.sh` 只在隔离的 macOS CI 运行。测量时菜单栏上下两行、面板固定打开、迷你走势线开启，每 5 秒取一次行情。确认行情和迷你走势线已加载后，稳定 30 秒，再用 60 秒窗口记录 CPU 时间增量、空闲唤醒和 RSS，退出时恢复 runner 原来的 Stox 偏好。结果和就绪日志保留为 `shots/footprint.*` 与 `shots/footprint-app.log`；网络失败表示测量不可用，不能据此声称 CPU 很低。数值包含整个 App 和真实网络活动，不是单独的菜单栏绘制耗时。不要在个人账户上运行这个脚本。
 
 定时数据源巡检在请求失败或行情关键字段缺失时返回失败，并保留接口及返回片段。main 上失败会创建或追加固定标题的 bug issue，不自动打 agent 标签。构建里的真实接口冒烟仍不阻断构建，但会输出警告；诊断中的候选代码允许返回空条目。 已知固定失败的探索项（废弃 UsDay 路径、缺少必需 Referer 的新浪请求）仅在 `STOX_DATASOURCE_EXPERIMENTS=1` 时运行；正式接口仍严格检查。
 
