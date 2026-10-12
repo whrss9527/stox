@@ -23,6 +23,14 @@ scripts/
   ci-e2e.sh            CI 端到端测试：启动、截图、iCloud 同步、一键更新、App Store 版在沙盒里运行
 ```
 
+### Xcode 工程与工具版本
+
+macOS App 使用 XcodeGen 2.44.1 生成工程；`make project` 下载固定版本并核对上游附件的 SHA-256，工具保存在 `.build/tools/`，生成的 `Stox.xcodeproj` 不提交。需要完整 Xcode 与 macOS 13 以上系统。Linux 仍可独立使用 SwiftPM 测试 StoxCore 和运行 stox-cli，不下载 XcodeGen。
+
+`make test` 先运行 SwiftPM 的 Core 测试，macOS 再通过 `scripts/test-app.sh` 运行 Xcode 的 StoxTests。测试宿主不初始化真实设置、行情、快捷键和同步。两个工程 scheme 为 `Stox` 和 `StoxAppStore`；后者以 `APP_STORE` 条件编译，保留原有沙盒/更新差异。
+
+`make app` 和 `scripts/build-app-store.sh` 使用 Xcode 构建，再沿用原有图标、签名、描述文件、公证和打包流程。普通版与 App Store 版分别使用 `.build/xcode/github` 和 `.build/xcode/appstore`，不共享构建产物；通用包继续包含 arm64 与 x86_64。版本与证书从既有环境参数注入，工程内不保存个人签名材料。此迁移不新增 iOS、小组件或 Watch target。
+
 ### CI 验证分级
 
 所有分支都运行 Linux 核心单元测试、翻译和离线商店资料检查，以及 macOS 应用单元测试。分支的 macOS 任务只编译 runner 本机架构，运行 `ci-e2e.sh quick`（中英文面板、详情、搜索和设置共八例）以及完整的假 iCloud 同步测试，执行上限 20 分钟。SwiftPM 编译产物按编译器版本、runner 架构和清单缓存。main 保留通用版、全量启动、一键更新、实时接口巡检、App Store 沙盒和商店截图。分支保存诊断日志；提交信息加 `[screenshots]` 可选截图。`run_case` 最多等 20 秒，直到晚到的面板诊断或设置诊断全部打印后的 `STOX_DIAG late ready=true`；超时或进程提前退出会失败。同步面板也使用同一个就绪检查。`scripts/test_ci_readiness.py` 离线验证这个约定，macOS 实际运行时长需要在 Actions 查看。

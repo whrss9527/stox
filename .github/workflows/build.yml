@@ -38,7 +38,8 @@ jobs:
       - name: Unit tests
         id: unit-tests
         shell: bash
-        run: swift test 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
+        run: |
+          { swift test --filter StoxCoreTests && scripts/test-app.sh; } 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
       - name: Unit test failure details
         if: failure() && steps.unit-tests.outcome == 'failure'
         # 网络受限的开发环境未必能下载 Actions 日志；保留具体编译/断言错误供 API 读取。
@@ -105,13 +106,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .build
-          key: ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift') }}-${{ github.sha }}
+          key: ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift', 'project.yml', 'scripts/test-app.sh', 'scripts/build-app.sh') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift') }}-
+            ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift', 'project.yml', 'scripts/test-app.sh', 'scripts/build-app.sh') }}-
       - name: Unit tests
         id: unit-tests
         shell: bash
-        run: swift test 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
+        run: |
+          { swift test --filter StoxCoreTests && scripts/test-app.sh; } 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
       - name: Unit test failure details
         if: failure() && steps.unit-tests.outcome == 'failure'
         run: |
