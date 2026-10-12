@@ -6,19 +6,35 @@ public struct ProfitRecord: Codable, Equatable, Sendable {
     public var day: String
     public var region: MarketRegion
     public var dayProfit: Double
-    public var totalProfit: Double
-    public var marketValue: Double
+    /// 日 K 只能估算每日变化，不能可靠还原历史成本、市值。
+    public var totalProfit: Double?
+    public var marketValue: Double?
+    public var estimated: Bool
 
-    public init(day: String, region: MarketRegion, dayProfit: Double, totalProfit: Double, marketValue: Double) {
+    public init(day: String, region: MarketRegion, dayProfit: Double, totalProfit: Double? = nil,
+                marketValue: Double? = nil, estimated: Bool = false) {
         self.day = day
         self.region = region
         self.dayProfit = dayProfit
         self.totalProfit = totalProfit
         self.marketValue = marketValue
+        self.estimated = estimated
+    }
+
+    private enum CodingKeys: String, CodingKey { case day, region, dayProfit, totalProfit, marketValue, estimated }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        day = try c.decode(String.self, forKey: .day)
+        region = try c.decode(MarketRegion.self, forKey: .region)
+        dayProfit = try c.decode(Double.self, forKey: .dayProfit)
+        totalProfit = try c.decodeIfPresent(Double.self, forKey: .totalProfit)
+        marketValue = try c.decodeIfPresent(Double.self, forKey: .marketValue)
+        estimated = try c.decodeIfPresent(Bool.self, forKey: .estimated) ?? false
     }
 }
 
-/// 每个交易日收盘后记下的持仓盈亏，按市场分开，只在这台 Mac 上。Mac 一整天都没开的日子没有记录。
+/// 每个交易日收盘后记下的持仓盈亏，按市场分开，只在这台 Mac 上；缺失日期可用日 K 估算补齐。
 public struct ProfitHistory: Codable, Equatable, Sendable {
     /// 每个市场最多留这么多个交易日，大约一年。
     public static let keepDays = 250
@@ -37,6 +53,10 @@ public struct ProfitHistory: Codable, Equatable, Sendable {
         )
         records.removeAll { $0.day == day && $0.region == summary.region }
         records.append(record)
+        sortAndPrune()
+    }
+
+    mutating func sortAndPrune() {
         records.sort { $0.day == $1.day ? $0.region.rawValue < $1.region.rawValue : $0.day < $1.day }
         for region in MarketRegion.allCases {
             let days = records.filter { $0.region == region }.map(\.day)
@@ -44,6 +64,11 @@ public struct ProfitHistory: Codable, Equatable, Sendable {
             let dropped = Set(days.prefix(days.count - Self.keepDays))
             records.removeAll { $0.region == region && dropped.contains($0.day) }
         }
+    }
+
+    mutating func appendEstimated(_ record: ProfitRecord) {
+        guard !records.contains(where: { $0.day == record.day && $0.region == record.region }) else { return }
+        records.append(record)
     }
 
     /// 全部记录，制表符分隔，按日期从早到晚，粘贴到 Numbers、Excel 就是一张表；没有记录时是空的。
@@ -54,11 +79,12 @@ public struct ProfitHistory: Codable, Equatable, Sendable {
                 record.day,
                 record.region.currency,
                 QuoteFormatter.fixed(record.dayProfit, decimals: 2),
-                QuoteFormatter.fixed(record.totalProfit, decimals: 2),
-                QuoteFormatter.fixed(record.marketValue, decimals: 2),
+                record.totalProfit.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "",
+                record.marketValue.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "",
+                record.estimated ? L("估算") : "",
             ].joined(separator: "\t")
         }
-        return ([L("日期\t币种\t今日盈亏\t持仓盈亏\t市值")] + lines).joined(separator: "\n")
+        return ([L("日期\t币种\t今日盈亏\t持仓盈亏\t市值\t估算")] + lines).joined(separator: "\n")
     }
 
     /// 有记录的市场，按 A 股、港股、美股排。

@@ -11,6 +11,7 @@ public struct ProfitCalendar: Equatable, Sendable {
         public var dayProfit: Double?
         /// 是不是周六、周日。
         public var isWeekend: Bool
+        public var estimated: Bool = false
 
         public var id: String { date }
     }
@@ -31,8 +32,8 @@ public struct ProfitCalendar: Equatable, Sendable {
         let days = calendar.range(of: .day, in: .month, for: first)?.count ?? 30
         // weekday：周日是 1、周一是 2……周六是 7。
         let weekday = calendar.component(.weekday, from: first)
-        let profits = Dictionary(
-            history.records.filter { $0.region == region }.map { ($0.day, $0.dayProfit) },
+        let records = Dictionary(
+            history.records.filter { $0.region == region }.map { ($0.day, $0) },
             uniquingKeysWith: { _, last in last }
         )
         self.year = year
@@ -41,7 +42,8 @@ public struct ProfitCalendar: Equatable, Sendable {
         self.cells = (1...max(days, 1)).map { day in
             let date = String(format: "%04d-%02d-%02d", year, month, day)
             let column = ((weekday + 5) % 7 + day - 1) % 7
-            return Cell(day: day, date: date, dayProfit: profits[date], isWeekend: column >= 5)
+            return Cell(day: day, date: date, dayProfit: records[date]?.dayProfit, isWeekend: column >= 5,
+                        estimated: records[date]?.estimated ?? false)
         }
     }
 

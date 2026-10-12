@@ -1111,7 +1111,9 @@ struct PanelFooter: View {
                 Button(L("最近的提醒…")) { router.route = .alerts }
                     .disabled(store.alertLog.entries.isEmpty)
                 Button(L("盈亏日历…")) { router.route = .calendar }
-                    .disabled(store.profitHistory.records.isEmpty)
+                    .disabled(store.profitHistory.records.isEmpty && !store.items.contains {
+                        $0.symbol.canHold && ($0.holding != nil || !$0.trades.isEmpty)
+                    })
                 Button(L("A 股涨跌榜…")) { router.route = .rank }
             } label: {
                 Image(systemName: settings.sortMode == .custom ? "arrow.up.arrow.down" : "arrow.up.arrow.down.circle.fill")
