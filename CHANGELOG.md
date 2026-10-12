@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.3.0（2026-10-11）
+
+### 中文
+
+- 可粘贴导入持仓和买卖表格，预览逐行错误后选择合并或替换；支持费用、分红送转和去重，确认后保存并同步。导出代码保留市场前缀，避免重新导入时混淆证券。
+
+### English
+
+- Paste holdings and trade tables, preview row errors, and choose merge or replace. Fees, bonus dividends and deduplication are supported; confirmed imports save and sync. Exported symbols retain market prefixes for reliable re-import.
+
 ## 1.2.0（2026-10-11）
 
 ### 中文

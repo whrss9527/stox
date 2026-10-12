@@ -235,7 +235,7 @@ extension Portfolio {
             let name = item.displayName(with: quote)
             lines.append([
                 name,
-                item.symbol.displayCode,
+                item.symbol.rawValue,
                 item.symbol.market.region.currency,
                 QuoteFormatter.plain(holding.shares),
                 QuoteFormatter.plain(holding.cost),

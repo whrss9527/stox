@@ -64,6 +64,8 @@ struct PanelView: View {
                 RankPanel()
             case .calendar:
                 ProfitCalendarPanel()
+            case .tableImport:
+                TableImportPanel()
             }
         }
         .padding(12)
@@ -1101,6 +1103,7 @@ struct PanelFooter: View {
                     .disabled(store.items.isEmpty)
                 Button(L("复制持仓表格")) { copyHoldings() }
                     .disabled(!store.items.contains { $0.holding != nil })
+                Button(L("导入持仓表格…")) { router.route = .tableImport }
                 Button(L("复制买卖记录")) { copyTrades() }
                     .disabled(!store.items.contains { !$0.trades.isEmpty })
                 Button(L("复制盈亏记录")) { copyProfitHistory() }
