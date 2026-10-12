@@ -75,6 +75,8 @@
 
 用 [Homebrew](https://brew.sh) 安装：
 
+macOS 14 起可添加[行情小组件](docs/widgets.zh-CN.md)，在桌面或通知中心查看单股和自选列表。组件显示带时间的缓存行情，打开 Stox 后获取新行情。
+
 ```sh
 brew install --cask whrss9527/tap/stox
 ```

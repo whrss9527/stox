@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.1.0（2026-10-12）
+
+### 中文
+
+- 行情小组件：macOS 14 起可在桌面或通知中心查看单只证券和自选列表，显示行情时间与缓存状态，点击回到 Stox。
+
+### English
+
+- Quote widgets: view a stock or your watchlist on the desktop or in Notification Center on macOS 14 and later, with quote timestamps and cached-data indicators. Click to open Stox.
+
 ## 1.0.5（2026-10-11）
 
 ### 中文

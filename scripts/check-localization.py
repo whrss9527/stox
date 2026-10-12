@@ -16,7 +16,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-SOURCES = [ROOT / "Sources" / "Stox", ROOT / "Sources" / "StoxCore"]
+SOURCES = [ROOT / "Sources" / name for name in ["Stox", "StoxCore", "StoxWidgets"]]
 RESOURCES = ROOT / "Resources"
 # 中文（汉字和全角标点）。
 CHINESE = re.compile(r"[\u3000-\u303f\u4e00-\u9fff\uff00-\uffef“”‘’…]")

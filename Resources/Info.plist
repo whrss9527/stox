@@ -21,6 +21,15 @@
 	</array>
 	<key>CFBundleName</key>
 	<string>Stox</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>io.github.whrss9527.stox.widgets</string>
+			<key>CFBundleURLSchemes</key>
+			<array><string>stox</string></array>
+		</dict>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
