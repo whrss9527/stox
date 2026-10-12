@@ -31,7 +31,7 @@ targetTemplates:
     settings:
       base:
         INFOPLIST_FILE: WidgetResources/Info.plist
-        GENERATE_INFOPLIST_FILE: NO
+        GENERATE_INFOPLIST_FILE: YES
         APPLICATION_EXTENSION_API_ONLY: YES
         SKIP_INSTALL: YES
         MACOSX_DEPLOYMENT_TARGET: '14.0'
