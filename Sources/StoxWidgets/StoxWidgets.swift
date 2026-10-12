@@ -14,7 +14,7 @@ private enum WidgetData {
 }
 
 struct WidgetStock: AppEntity {
-    static var typeDisplayRepresentation: TypeDisplayRepresentation { .init(name: "\(L("证券"))") }
+    static let typeDisplayRepresentation = TypeDisplayRepresentation(name: "证券") // l10n-ignore
     static var defaultQuery = WidgetStockQuery()
     let id: String
     let name: String
@@ -35,7 +35,7 @@ struct WidgetStockQuery: EntityQuery {
 }
 
 struct QuotesConfiguration: WidgetConfigurationIntent {
-    static var title: LocalizedStringResource { "\(L("自选行情"))" }
+    static let title: LocalizedStringResource = "自选行情" // l10n-ignore
     @Parameter(title: "证券") var stocks: [WidgetStock]? // l10n-ignore
 }
 
