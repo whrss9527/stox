@@ -3,6 +3,7 @@
 import argparse
 import plistlib
 import subprocess
+import time
 from pathlib import Path
 
 GROUP = "group.io.github.whrss9527.stox.widgets"
@@ -36,8 +37,14 @@ def main():
     subprocess.run(["codesign", "--verify", "--deep", "--strict", str(args.app)], check=True)
     if args.register:
         try:
+            subprocess.run(["/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister",
+                            "-f", str(args.app.resolve())], check=True)
             subprocess.run(["pluginkit", "-a", str(widget.resolve())], check=True)
-            listing = subprocess.run(["pluginkit", "-m", "-A", "-D", "-v", "-i", identifier], capture_output=True, text=True, check=True)
+            for attempt in range(15):
+                listing = subprocess.run(["pluginkit", "-m", "-A", "-D", "-v", "-i", identifier], capture_output=True, text=True, check=True)
+                if identifier in listing.stdout:
+                    break
+                time.sleep(1)
             assert identifier in listing.stdout, "pluginkit could not discover widget"
         finally:
             subprocess.run(["pluginkit", "-r", str(widget.resolve())], check=False, capture_output=True)
