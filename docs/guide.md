@@ -82,7 +82,8 @@ See [docs/app-store.md](app-store.md) (in Chinese) for how to build and submit i
 - **iCloud sync and backup**: your watchlist, each symbol's alerts and short name, and settings such as refresh and colors sync between Macs through iCloud Drive; without iCloud you can export them to a file and import it on another Mac.
 - **Update checks and one-click updates**: when a new version is out, an "Update" button appears at the bottom of the panel; one click downloads, verifies, replaces and relaunches. If you skipped a few versions, it lists what changed in each of them.
 - **Power saving**: refreshes only once a minute while markets are closed or at lunch, recognizes holidays from the quotes, and stops requesting while the Mac sleeps.
-- **More**: launch at login; Settings has its own window, opened with the gear at the bottom of the panel; the interface is in English or Simplified Chinese, following your system language unless you choose one under Settings → General → Language (Stox relaunches to switch).
+- **More**: launch at login; Settings has its own window, opened with the gear at the bottom of the panel; the interface supports English, Simplified Chinese and Traditional Chinese, following your system language unless you choose one under Settings → General → Language (Stox relaunches to switch).
+- **Traditional Chinese**: choose 繁體中文 under Settings → General → Language and relaunch, or follow a Taiwan or Hong Kong system language. Quotes, watchlist, search results and rankings display converted names such as 恆生指數 and 騰訊控股; source names and security codes remain unchanged in saved watchlists and sync.
 
 Quotes come from Tencent Finance's public API (Sina Finance as a fallback): free, with no sign-up or API key. Hong Kong quotes are delayed by about 15 minutes. The data is for reference only and is not investment advice. Stock names come from the quote API and are shown in Chinese; the changelog and release notes are written in Chinese.
 

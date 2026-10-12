@@ -47,7 +47,7 @@ struct TableImportPanel: View {
                         HStack {
                             Text(L("第 %@ 行", row.line)).foregroundStyle(.secondary)
                             Text(row.symbol.rawValue).monospaced()
-                            Text(row.name).lineLimit(1)
+                            Text(AppLanguage.securityName(row.name)).lineLimit(1)
                             Spacer(minLength: 0)
                             if let holding = row.holding {
                                 Text(QuoteFormatter.plain(holding.shares) + " × " + QuoteFormatter.plain(holding.cost))

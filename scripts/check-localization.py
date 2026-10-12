@@ -112,6 +112,10 @@ def main():
         print(problem)
         status = 1
     tables = {p.parent.name: parse_strings(p) for p in sorted(RESOURCES.glob("*.lproj/Localizable.strings"))}
+    required = {"en.lproj", "zh-Hans.lproj", "zh-Hant.lproj"}
+    for missing in sorted(required - tables.keys()):
+        print(f"Resources 缺少 {missing}/Localizable.strings")
+        status = 1
     if not tables:
         print("Resources 里没有 Localizable.strings")
         return 1

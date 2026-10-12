@@ -16,9 +16,10 @@ public struct SearchResult: Sendable, Hashable, Identifiable {
 
     /// 搜索结果里显示的名称：英文界面里能换成英文的换成英文（见 EnglishName；美股、港股的英文名在行情里，
     /// 查到行情之前是代码），别的用搜索接口给的名称。
-    public func displayName(quote: Quote?, english: Bool = AppLanguage.isEnglish) -> String {
+    public func displayName(quote: Quote?, english: Bool = AppLanguage.isEnglish,
+                            traditional: Bool = AppLanguage.isTraditionalChinese) -> String {
         if english, let name = EnglishName.name(symbol, quote: quote) { return name }
-        return name
+        return AppLanguage.securityName(name, traditional: traditional && !english)
     }
 
     public var typeLabel: String {

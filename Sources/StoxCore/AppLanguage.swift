@@ -25,9 +25,20 @@ public enum AppLanguage {
             && bundle.path(forResource: "Localizable", ofType: "strings") != nil
     }
 
+    public static var isTraditionalChinese: Bool {
+        InterfaceLanguage(appleLanguages: bundle.preferredLocalizations.first) == .traditionalChinese
+            && bundle.path(forResource: "Localizable", ofType: "strings") != nil
+    }
+
+    /// 只用于名称显示，不改行情、自选、同步或证券代码。Foundation 使用系统的 ICU 转换表。
+    public static func securityName(_ name: String, traditional: Bool = isTraditionalChinese) -> String {
+        guard traditional else { return name }
+        return name.applyingTransform(StringTransform("Simplified-Traditional"), reverse: false) ?? name
+    }
+
     /// 日期、相对时间和界面用同一种语言（中文界面下是中文的“9月30日”“3分钟前”）。
     public static var locale: Locale {
-        Locale(identifier: isEnglish ? "en" : "zh_CN")
+        Locale(identifier: isEnglish ? "en" : (isTraditionalChinese ? "zh_Hant_HK" : "zh_CN"))
     }
 
     /// 月份的名字：中文界面是 `9月`，英文界面是 `Sep`（full 时是 `September`）。

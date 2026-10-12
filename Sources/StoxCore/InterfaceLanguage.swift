@@ -9,6 +9,7 @@ public enum InterfaceLanguage: String, CaseIterable, Identifiable, Sendable {
     case system
     case english
     case simplifiedChinese
+    case traditionalChinese
 
     public var id: String { rawValue }
 
@@ -23,10 +24,12 @@ public enum InterfaceLanguage: String, CaseIterable, Identifiable, Sendable {
             self = .system
             return
         }
-        let code = first.lowercased()
+        let code = first.lowercased().replacingOccurrences(of: "_", with: "-")
         if code == "en" || code.hasPrefix("en-") || code.hasPrefix("en_") {
             self = .english
-        } else if code == "zh-hans" || code.hasPrefix("zh-hans-") || code == "zh-cn" || code == "zh_cn" || code == "zh" {
+        } else if code == "zh-hant" || code.hasPrefix("zh-hant-") || ["zh-tw", "zh-hk", "zh-mo"].contains(code) {
+            self = .traditionalChinese
+        } else if code == "zh-hans" || code.hasPrefix("zh-hans-") || ["zh-cn", "zh-sg", "zh"].contains(code) {
             self = .simplifiedChinese
         } else {
             self = .system
@@ -39,6 +42,7 @@ public enum InterfaceLanguage: String, CaseIterable, Identifiable, Sendable {
         case .system: return nil
         case .english: return ["en"]
         case .simplifiedChinese: return ["zh-Hans"]
+        case .traditionalChinese: return ["zh-Hant"]
         }
     }
 
@@ -48,6 +52,7 @@ public enum InterfaceLanguage: String, CaseIterable, Identifiable, Sendable {
         case .system: return L("跟随系统")
         case .english: return "English"
         case .simplifiedChinese: return "简体中文"  // l10n-ignore
+        case .traditionalChinese: return "繁體中文"  // l10n-ignore
         }
     }
 }
