@@ -74,6 +74,8 @@ The three at the top show the expanded detail (intraday chart and average price 
 
 Stox needs macOS 13 Ventura or later, on Apple silicon or Intel.
 
+On macOS 14 or later, [quote widgets](docs/widgets.md) show a stock or your watchlist on the desktop and in Notification Center. They show cached quotes with timestamps; open Stox to update them.
+
 With [Homebrew](https://brew.sh):
 
 ```sh

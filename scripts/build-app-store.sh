@@ -74,6 +74,9 @@ else
   PROFILE_CONTAINERS="$(plist_value "$WORK/profile.plist" Entitlements:com.apple.developer.icloud-container-identifiers)"
   [[ "$PROFILE_CONTAINERS" == *"$CONTAINER"* ]] \
     || fail "描述文件里没有 iCloud 容器 ${CONTAINER}：在开发者网站给 App ID 打开 iCloud 并添加这个容器，再重新生成描述文件"
+  PROFILE_GROUPS="$(plist_value "$WORK/profile.plist" Entitlements:com.apple.security.application-groups)"
+  [[ "$PROFILE_GROUPS" == *"group.io.github.whrss9527.stox.widgets"* ]] \
+    || fail "主程序描述文件缺少行情小组件的 App Group，请注册并给主程序与扩展启用同一组"
 
   sed "s/__TEAM_ID__/$TEAM_ID/g" "$TEMPLATE" > "$ENTITLEMENTS"
 fi

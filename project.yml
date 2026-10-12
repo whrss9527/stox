@@ -16,6 +16,25 @@ settings:
     MARKETING_VERSION: '0.1.0'
     CURRENT_PROJECT_VERSION: '1'
 targetTemplates:
+  StoxWidget:
+    type: app-extension
+    platform: macOS
+    deploymentTarget: '14.0'
+    sources:
+      - path: Sources/StoxWidgets
+      - path: Resources
+        excludes: [Info.plist, '*.entitlements']
+        buildPhase: resources
+    dependencies:
+      - package: StoxPackage
+        product: StoxCore
+    settings:
+      base:
+        INFOPLIST_FILE: WidgetResources/Info.plist
+        GENERATE_INFOPLIST_FILE: YES
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        MACOSX_DEPLOYMENT_TARGET: '14.0'
   StoxApplication:
     type: application
     platform: macOS
@@ -37,8 +56,24 @@ targetTemplates:
 targets:
   Stox:
     templates: [StoxApplication]
+    dependencies:
+      - target: StoxWidgets
+        embed: true
+  StoxWidgets:
+    templates: [StoxWidget]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.whrss9527.stox.widgets
+  StoxAppStoreWidgets:
+    templates: [StoxWidget]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.whrss9527.stox.widgets.store
   StoxAppStore:
     templates: [StoxApplication]
+    dependencies:
+      - target: StoxAppStoreWidgets
+        embed: true
     settings:
       base:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) APP_STORE'

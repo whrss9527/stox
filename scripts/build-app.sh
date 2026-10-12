@@ -96,14 +96,28 @@ fi
 if [[ -n "${CODESIGN_KEYCHAIN:-}" ]]; then
   SIGN_ARGS+=(--keychain "$CODESIGN_KEYCHAIN")
 fi
+# 扩展必须先签名，再签主程序；不能只给外层 App 签名。
+WIDGET_ENTITLEMENTS="$(mktemp)"
+trap 'rm -f "$WIDGET_ENTITLEMENTS"' EXIT
+python3 scripts/widget-entitlements.py --output "$WIDGET_ENTITLEMENTS" \
+  --profile "${WIDGET_PROVISIONING_PROFILE:-}" --flavor "$FLAVOR" --identity "$IDENTITY"
+for widget in "$APP"/Contents/PlugIns/*.appex; do
+  [[ -d "$widget" ]] || { echo "error: 行情小组件没有嵌入 App" >&2; exit 1; }
+  if [[ -n "${WIDGET_PROVISIONING_PROFILE:-}" ]]; then
+    cp "$WIDGET_PROVISIONING_PROFILE" "$widget/Contents/embedded.provisionprofile"
+  fi
+  codesign "${SIGN_ARGS[@]}" --entitlements "$WIDGET_ENTITLEMENTS" "$widget"
+done
 if [[ -n "${CODESIGN_ENTITLEMENTS:-}" ]]; then
   SIGN_ARGS+=(--entitlements "$CODESIGN_ENTITLEMENTS")
 elif [[ "$FLAVOR" == "appstore" ]]; then
   echo "error: App Store 版必须带沙盒的 entitlement 签名，请用 scripts/build-app-store.sh" >&2
   exit 2
+else
+  SIGN_ARGS+=(--entitlements Resources/Stox.entitlements)
 fi
 codesign "${SIGN_ARGS[@]}" "$APP"
-codesign --verify --strict --verbose=2 "$APP"
+codesign --verify --deep --strict --verbose=2 "$APP"
 
 if [[ "${ZIP:-0}" == "1" ]]; then
   (cd "$DIST" && rm -f "$APP_NAME.zip" && ditto -c -k --keepParent "$APP_NAME.app" "$APP_NAME.zip")

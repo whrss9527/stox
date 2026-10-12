@@ -36,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var signalSources: [DispatchSourceSignal] = []
     private let pathMonitor = NWPathMonitor()
     private var networkWasAvailable: Bool?
+    private let widgetPublisher = WidgetPublisher()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installSignalHandlers()
@@ -43,6 +44,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controller = StatusItemController(store: store, settings: settings, sync: sync)
         statusController = controller
         SettingsWindowController.shared.configure(settings: settings, store: store, sync: sync)
+
+        store.$items.combineLatest(store.$quotes)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] items, quotes in self?.widgetPublisher.publish(items: items, quotes: quotes) }
+            .store(in: &cancellables)
 
         Notifier.shared.setUp()
         Notifier.shared.onOpen = { [weak self] route in
@@ -106,6 +112,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         SettingsWindowController.shared.show(page: nil)
         return false
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard url.scheme == "stox", url.host == "widget",
+                  let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { continue }
+            let symbols = components.queryItems?.filter { $0.name == "symbol" } ?? []
+            if symbols.count == 1, let raw = symbols.first?.value, let symbol = Symbol(raw),
+               store.items.contains(where: { $0.symbol == symbol }) {
+                statusController?.reveal(symbol)
+            } else {
+                statusController?.openPanel()
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

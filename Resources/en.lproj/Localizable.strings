@@ -759,3 +759,10 @@
 "复制诊断信息" = "Copy diagnostics";
 "诊断信息已复制" = "Diagnostics copied";
 "包含版本、系统、同步状态、数据源和脱敏日志，不包含持仓数据。" = "Includes version, system, sync state, quote source and redacted logs. Holdings are excluded.";
+
+// Widgets
+"自选行情" = "Watchlist quotes";
+"缓存行情" = "Cached quotes";
+"行情时间" = "Quote time";
+"打开 Stox 获取自选行情" = "Open Stox to load your watchlist";
+"查看单只证券或自选列表，点击打开 Stox。" = "View a stock or your watchlist. Click to open Stox.";

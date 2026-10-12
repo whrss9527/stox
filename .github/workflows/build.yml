@@ -94,6 +94,7 @@ jobs:
           ls -la dist/Stox.app/Contents/MacOS dist/Stox.app/Contents/Resources
           plutil -lint dist/Stox.app/Contents/Resources/*.lproj/*.strings
           codesign --verify --deep --strict --verbose=2 dist/Stox.app
+          python3 scripts/check-widget-bundle.py dist/Stox.app --register
       - name: Launch smoke test
         # 真正启动打包好的 App：面板、详情、搜索、设置窗口，以及右键切换的“只显示图标”；最后用英文界面再截几张（shots/en-*）。
         run: scripts/ci-e2e.sh smoke
@@ -206,6 +207,7 @@ jobs:
         run: |
           plutil -p dist/appstore/Stox.app/Contents/Info.plist
           codesign -d --entitlements - dist/appstore/Stox.app
+          python3 scripts/check-widget-bundle.py dist/appstore/Stox.app --register
           lipo -info dist/appstore/Stox.app/Contents/MacOS/Stox
           pkgutil --payload-files dist/Stox-AppStore.pkg | head -20
       - name: Sandbox launch test
