@@ -23,6 +23,14 @@ scripts/
   ci-e2e.sh              CI end-to-end tests: launch, screenshots, iCloud sync, one-click update, the App Store edition in the sandbox
 ```
 
+### Xcode project and tool version
+
+The macOS app uses XcodeGen 2.44.1. `make project` downloads the pinned release and verifies its upstream SHA-256; tools live in `.build/tools/`, and the generated `Stox.xcodeproj` is ignored. A full Xcode installation and macOS 13 or later are required. Linux continues to test StoxCore and run stox-cli through SwiftPM without downloading XcodeGen.
+
+`make test` runs the SwiftPM Core suite, then runs Xcode-hosted StoxTests through `scripts/test-app.sh` on macOS. The test host does not initialize real preferences, quotes, hotkeys or sync. The schemes are `Stox` and `StoxAppStore`; the latter defines `APP_STORE` and preserves the sandbox/update differences.
+
+`make app` and `scripts/build-app-store.sh` build with Xcode before the existing icon, signing, provisioning and packaging steps. GitHub and App Store builds use separate `.build/xcode/github` and `.build/xcode/appstore` directories. Universal packages retain arm64 and x86_64. Existing environment arguments supply versions and signing credentials; the project contains no personal signing material. This migration adds no iOS, widget or Watch target.
+
 ### CI validation tiers
 
 Every branch runs all Linux core tests, localization and offline listing checks, and all native macOS unit tests. The macOS job builds the runner architecture and runs `ci-e2e.sh quick` (eight English/Chinese panel, detail, search and settings cases) plus the complete fake-iCloud sync tests. It has a 20-minute execution limit. SwiftPM build outputs are cached by compiler version, runner architecture and manifest. Main retains the universal build, full smoke suite, update tests, live-data probes, App Store sandbox and store screenshots. Branches save diagnostic logs; screenshots are optional with `[screenshots]` in the commit message. `run_case` waits up to 20 seconds for `STOX_DIAG late ready=true`, emitted after all late panel diagnostics or settings diagnostics, and fails on timeout or early exit. The same readiness check replaces the fixed sync-panel wait. `scripts/test_ci_readiness.py` exercises this contract offline; actual macOS job duration must be checked in Actions.
@@ -89,6 +97,8 @@ To test sync and updates, environment variables replace the real iCloud Drive an
 `scripts/check-quote-recovery.sh` uses a local HTTP server to fail both quote sources and then restore the primary. It checks backoff, the panel retry state, and the normal cadence after recovery. Run it only in isolated CI: it launches the app and temporarily changes refresh settings.
 
 CI launches the packaged app on macOS: it opens the panel, details, search and Settings window and takes screenshots (in Chinese, then a few in English); tests sync with a fake iCloud Drive folder; and really updates the app to 9.9.9 from a local fake release and confirms it relaunches.
+
+`scripts/measure-footprint.sh` runs only in isolated macOS CI. It measures the packaged app with a stacked ticker, a pinned watchlist panel and sparklines, using 5-second quote polling. After confirming that quotes and sparklines are loaded, it settles for 30 seconds and samples CPU time, idle wakeups and RSS for 60 seconds. It restores the runner's previous Stox preferences on exit. Results and readiness logs are retained as `shots/footprint.*` and `shots/footprint-app.log`; network failures make the measurement unavailable rather than proving low CPU use. The result includes the whole app and live network activity, not just menu bar drawing. Never run this script on a personal account.
 
 The scheduled datasource probe returns a failure for request errors or missing required quote fields and retains endpoint/response excerpts. On main, failures create or comment on the fixed-title bug issue without assigning it to an agent. Build smoke failures remain non-blocking but emit a warning. Diagnostic candidate symbols may legitimately return empty records. Known-failed exploratory probes (the retired UsDay path and Sina without its required Referer) run only with `STOX_DATASOURCE_EXPERIMENTS=1`; production probes remain strict.
 

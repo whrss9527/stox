@@ -38,7 +38,8 @@ jobs:
       - name: Unit tests
         id: unit-tests
         shell: bash
-        run: swift test 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
+        run: |
+          swift test --filter StoxCoreTests 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
       - name: Unit test failure details
         if: failure() && steps.unit-tests.outcome == 'failure'
         # 网络受限的开发环境未必能下载 Actions 日志；保留具体编译/断言错误供 API 读取。
@@ -105,13 +106,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: .build
-          key: ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift') }}-${{ github.sha }}
+          key: ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift', 'project.yml', 'scripts/test-app.sh', 'scripts/build-app.sh') }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift') }}-
+            ${{ runner.os }}-${{ runner.arch }}-swiftpm-${{ steps.toolchain.outputs.cache-key }}-${{ hashFiles('Package.swift', 'project.yml', 'scripts/test-app.sh', 'scripts/build-app.sh') }}-
       - name: Unit tests
         id: unit-tests
         shell: bash
-        run: swift test 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
+        run: |
+          { swift test --filter StoxCoreTests && scripts/test-app.sh; } 2>&1 | tee "$RUNNER_TEMP/stox-unit-tests.log"
       - name: Unit test failure details
         if: failure() && steps.unit-tests.outcome == 'failure'
         run: |
@@ -134,6 +136,10 @@ jobs:
           ls -la dist/Stox.app/Contents/MacOS dist/Stox.app/Contents/Resources
           plutil -lint dist/Stox.app/Contents/Resources/*.lproj/*.strings
           codesign --verify --deep --strict --verbose=2 dist/Stox.app
+      - name: Idle footprint (stacked ticker and sparklines)
+        # 真实行情不可用时保留诊断但不影响发布；没有有效数据时不能据此判定性能问题已解决。
+        continue-on-error: true
+        run: scripts/measure-footprint.sh "$PWD/dist/Stox.app"
       - name: Launch smoke test
         # 分支跑八个中英文面板、详情、搜索、设置用例；main 跑包含更多功能和截图的全量。
         run: scripts/ci-e2e.sh ${{ github.ref == 'refs/heads/main' && 'smoke' || 'quick' }}
