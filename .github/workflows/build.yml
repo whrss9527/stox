@@ -83,7 +83,9 @@ jobs:
           swift --version
           echo "::notice title=toolchain::$(xcodebuild -version | head -1), $(swift --version 2>&1 | head -1)"
       - name: Unit tests
-        run: swift test
+        run: |
+          swift test --filter StoxCoreTests
+          scripts/test-app.sh
       - name: Build Stox.app (universal)
         run: UNIVERSAL=1 ./scripts/build-app.sh
       - name: Inspect bundle

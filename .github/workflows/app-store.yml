@@ -134,7 +134,9 @@ jobs:
           fi
 
       - name: Unit tests
-        run: swift test
+        run: |
+          swift test --filter StoxCoreTests
+          scripts/test-app.sh
 
       - name: Import certificates and profile
         run: |
