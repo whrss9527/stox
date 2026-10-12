@@ -140,6 +140,7 @@ final class StatusItemController: NSObject {
                         print("STOX_DIAG late \(self.extendedHoursDiagnostics)")
                         self.panelDiagnostics().forEach { print("STOX_DIAG late " + $0) }
                         print("STOX_DIAG late flow=\(self.fundFlowDiagnostics) sparklines=\(self.store.sparklines.count)")
+                        print("STOX_DIAG late ready=true")
                         fflush(stdout)
                     }
                 }

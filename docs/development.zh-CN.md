@@ -31,6 +31,10 @@ macOS App 使用 XcodeGen 2.44.1 生成工程；`make project` 下载固定版�
 
 `make app` 和 `scripts/build-app-store.sh` 使用 Xcode 构建，再沿用原有图标、签名、描述文件、公证和打包流程。普通版与 App Store 版分别使用 `.build/xcode/github` 和 `.build/xcode/appstore`，不共享构建产物；通用包继续包含 arm64 与 x86_64。版本与证书从既有环境参数注入，工程内不保存个人签名材料。此迁移不新增 iOS、小组件或 Watch target。
 
+### CI 验证分级
+
+所有分支都运行 Linux 核心单元测试、翻译和离线商店资料检查，以及 macOS 应用单元测试。分支的 macOS 任务只编译 runner 本机架构，运行 `ci-e2e.sh quick`（中英文面板、详情、搜索和设置共八例）以及完整的假 iCloud 同步测试，执行上限 20 分钟。SwiftPM 编译产物按编译器版本、runner 架构和清单缓存。main 保留通用版、全量启动、一键更新、实时接口巡检、App Store 沙盒和商店截图。分支保存诊断日志；提交信息加 `[screenshots]` 可选截图。`run_case` 最多等 20 秒，直到晚到的面板诊断或设置诊断全部打印后的 `STOX_DIAG late ready=true`；超时或进程提前退出会失败。同步面板也使用同一个就绪检查。`scripts/test_ci_readiness.py` 离线验证这个约定，macOS 实际运行时长需要在 Actions 查看。
+
 ### 应用单元测试
 
 `make test` 在所有平台运行 `StoxCoreTests`，在 macOS 还运行 `StoxTests`。应用测试使用假的行情提供者、`QuoteStoreClock`、独立 UserDefaults 域与临时同步文件夹，不调用真实行情接口、不读写用户的 iCloud 文件。`SyncManager` 可注入测试目录，并在验证同一套应用与推送路径时关闭文件监听。移除测试数据前先停止面板、轮询任务并关闭同步。
