@@ -17,11 +17,19 @@ public struct Holding: Codable, Hashable, Sendable {
 
     public var costValue: Double { shares * cost }
 
+    /// 第一笔买入：费用摊进每股成本。
+    public static func purchase(shares: Double, at price: Double, fee: Double = 0) -> Holding? {
+        guard shares > 0, price >= 0, fee >= 0, shares.isFinite, price.isFinite, fee.isFinite else { return nil }
+        let holding = Holding(shares: shares, cost: price + fee / shares)
+        return holding.isValid ? holding : nil
+    }
+
     /// 买入一笔：数量相加，成本价按加权平均重新算（摊薄或摊高）。
-    public func buying(shares extra: Double, at price: Double) -> Holding? {
-        guard isValid, extra > 0, price >= 0, extra.isFinite, price.isFinite else { return nil }
+    public func buying(shares extra: Double, at price: Double, fee: Double = 0) -> Holding? {
+        guard isValid, extra > 0, price >= 0, extra.isFinite, price.isFinite, fee.isFinite, fee >= 0 else { return nil }
         let total = shares + extra
-        return Holding(shares: total, cost: (costValue + extra * price) / total)
+        let updated = Holding(shares: total, cost: (costValue + extra * price + fee) / total)
+        return updated.isValid ? updated : nil
     }
 
     /// 卖出一笔：成本价不变，数量减少。卖得比持有的还多时返回 nil；全部卖出时数量为 0，由调用方清掉持仓。
@@ -32,10 +40,12 @@ public struct Holding: Codable, Hashable, Sendable {
 
     /// 分红送转：每股派 cash、送转 bonus 股。到手的现金从总成本里扣掉，送转以后数量变多，成本价跟着摊薄；
     /// 分红比总成本还多时成本价是 0。两样都没有时返回 nil。
-    public func applyingDividend(cash: Double, bonus: Double) -> Holding? {
-        guard isValid, cash >= 0, bonus >= 0, cash.isFinite, bonus.isFinite, cash > 0 || bonus > 0 else { return nil }
+    public func applyingDividend(cash: Double, bonus: Double, fee: Double = 0) -> Holding? {
+        guard isValid, cash >= 0, bonus >= 0, cash.isFinite, bonus.isFinite, fee.isFinite, fee >= 0,
+              cash > 0 || bonus > 0 else { return nil }
         let total = shares * (1 + bonus)
-        return Holding(shares: total, cost: max((costValue - shares * cash) / total, 0))
+        let updated = Holding(shares: total, cost: max((costValue - shares * cash + fee) / total, 0))
+        return updated.isValid ? updated : nil
     }
 }
 

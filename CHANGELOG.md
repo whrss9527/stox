@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.1.0（2026-10-11）
+
+### 中文
+
+- 买卖和分红可记录手续费与税费：买入费用计入成本，卖出和分红按净额记录盈亏，当天费用计入今日盈亏；导出表格包含费用。
+
+### English
+
+- Record fees and taxes for buys, sells, and dividends. Buy fees add to cost, sell and dividend profit is net of fees, today's fees count toward daily P&L, and exports include fees.
+
 ## 1.0.5（2026-10-11）
 
 ### 中文
