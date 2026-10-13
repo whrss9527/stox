@@ -108,19 +108,29 @@ private final class SyncSessionFixture {
     let context = AppTestContext()
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
     let io = HeldSyncFiles()
+    let clock: QuoteStoreClock
     let store: QuoteStore
     let symbol = Symbol("usAAPL")!
     var file: URL { folder.appendingPathComponent("sync.json") }
     init() throws {
-        store = try context.store(provider: FakeQuoteProvider(), items: [
+        // 取消的轮询可能还在退出；专用 clock 保留 context，避免共享 helper 的 unowned 引用悬空。
+        let state = context
+        clock = QuoteStoreClock(now: { state.date }, sleep: { interval in
+            state.delays.append(interval)
+            try await Task.sleep(nanoseconds: 3_600_000_000_000)
+        })
+        let items = [
             WatchItem(symbol: symbol, name: "Local", holding: Holding(shares: 1, cost: 100))
-        ])
+        ]
+        context.defaults.set(try JSONEncoder().encode(items), forKey: "watchlist.v1")
+        store = QuoteStore(settings: context.settings, provider: FakeQuoteProvider(), backup: nil,
+                           defaults: context.defaults, clock: clock)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     }
     func manager(requiresContainer: Bool = false) async -> SyncManager {
         let access = await io.access(requiresContainer: requiresContainer)
         return SyncManager(store: store, settings: context.settings, defaults: context.defaults,
-                           clock: context.clock, location: .override(folder), watchesChanges: false, files: access)
+                           clock: clock, location: .override(folder), watchesChanges: false, files: access)
     }
     func writeRemote(note: String, interval: Double = 10) throws -> SyncDocument {
         var settings = context.settings.syncedSettings
