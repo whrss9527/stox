@@ -45,6 +45,10 @@ Every branch runs all Linux core tests, localization and offline listing checks,
 
 The core's `FailoverPolicy` and `TickerVisibility` keep time and visibility decisions independent of AppKit. For resources outside the main app, set `AppLanguage.bundle` before starting work; tests restore it after checking their isolated translation bundle. Localization follows the selected bundle.
 
+### Sync session lifetime
+
+Each sync start/enable owns a session generation. Stopping, canceling initial setup, or starting another session invalidates pending discovery, choices, debounce tasks and their results. Within a session, each file read/write also has an operation generation so older results cannot replace a newer checkpoint. Apply and error paths check ownership after awaiting IO; startup container availability can still be discovered while sync is off. `SyncFileAccess` keeps real coordinated IO as the default and lets native tests pause results after reading or committing an isolated file. Stopping does not undo a coordinated write that already began. Exit flushing and the sync document format retain their existing behavior.
+
 ### Trade fees and compatibility
 
 `Trade.fee` is an optional nonnegative amount in the trading currency. Missing fees mean zero. Initial and additional purchases capitalize fees in cost; dividend cost uses net cash, and sell/dividend records store realized profit after fees. Daily P&L subtracts the fees for the quote's local trading date exactly once, including sold-out positions; dividend cash itself keeps the existing ex-dividend calculation.

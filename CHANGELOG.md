@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.4.2（未发布）
+
+### 中文
+
+- 关闭或重新开启 iCloud 同步后，丢弃旧会话的迟到结果和错误，避免旧持仓、设置或同步状态覆盖当前内容；首次开启的取消和开机容器查找也按会话处理。已开始的协调文件写入可能仍会完成。
+
+### English
+
+- Discard delayed results and errors from previous iCloud sync sessions after stopping or restarting sync. Canceled initial setup and startup container discovery also keep their session boundaries. Coordinated file writes that have already started may still complete.
+
 ## 1.4.1（未发布）
 
 ### 中文
