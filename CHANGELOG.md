@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.4.1（未发布）
+
+### 中文
+
+- 复制持仓和买卖表格时保留股数、成本、价格、费用、盈亏和每股送转的原始数值精度；微小持仓及显式零送转可重新导入，重复导入不会因舍入或零值缺失增加交易。
+
+### English
+
+- Preserve the original numeric precision of shares, costs, prices, fees, realized profit and bonus shares in copied holdings and trade tables. Tiny positions and explicit zero bonuses can be re-imported without duplicate trades caused by rounding or omitted zero values.
+
 ## 1.4.0（2026-10-11）
 
 ### 中文

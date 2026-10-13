@@ -225,7 +225,7 @@ extension MarketRegion {
 }
 
 extension Portfolio {
-    /// 持仓表格，制表符分隔，粘贴到 Numbers、Excel 就是一张表。金额不用万、亿，保留两位小数，方便再计算。
+    /// 持仓表格，制表符分隔；数量和成本保留可重新导入的精度，展示金额保留两位小数。
     public static func tableText(items: [WatchItem], quotes: [Symbol: Quote]) -> String {
         var lines = [L("名称\t代码\t币种\t持有\t成本价\t现价\t市值\t持仓盈亏\t盈亏比例\t今日盈亏\t分组")]
         for item in items {
@@ -237,8 +237,8 @@ extension Portfolio {
                 name,
                 item.symbol.rawValue,
                 item.symbol.market.region.currency,
-                QuoteFormatter.plain(holding.shares),
-                QuoteFormatter.plain(holding.cost),
+                String(holding.shares),
+                String(holding.cost),
                 QuoteFormatter.fixed(quote.price, decimals: quote.priceDecimals),
                 QuoteFormatter.fixed(position.marketValue, decimals: 2),
                 QuoteFormatter.fixed(position.totalProfit, decimals: 2),
