@@ -60,6 +60,8 @@ final class SyncManager: ObservableObject {
     private var timer: Timer?
     private var pushTask: Task<Void, Never>?
     private var pullTask: Task<Void, Never>?
+    /// 恢复负责安装监听；面板检查和文件通知只取消防抖拉取，不能中断恢复。
+    private var startupTask: Task<Void, Never>?
     private var choiceTask: Task<Void, Never>?
     private var sessionGeneration = 0
     private var operationGeneration = 0
@@ -156,7 +158,7 @@ final class SyncManager: ObservableObject {
             self.startWatching()
             _ = await self.pull()
         }
-        pullTask = restore
+        startupTask = restore
         return restore
     }
 
@@ -429,6 +431,8 @@ final class SyncManager: ObservableObject {
         pushTask = nil
         pullTask?.cancel()
         pullTask = nil
+        startupTask?.cancel()
+        startupTask = nil
         choiceTask?.cancel()
         choiceTask = nil
         containerLookup?.cancel()

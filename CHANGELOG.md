@@ -6,11 +6,11 @@
 
 ### 中文
 
-- 关闭或重新开启 iCloud 同步后，丢弃旧会话的迟到结果和错误，避免旧持仓、设置或同步状态覆盖当前内容；首次开启的取消和开机容器查找也按会话处理。已开始的协调文件写入可能仍会完成。
+- 关闭或重新开启 iCloud 同步后，丢弃旧会话的迟到结果和错误，避免旧持仓、设置或同步状态覆盖当前内容；首次开启的取消和开机容器查找也按会话处理。启动后立即打开面板时继续安装文件监听。已开始的协调文件写入可能仍会完成。
 
 ### English
 
-- Discard delayed results and errors from previous iCloud sync sessions after stopping or restarting sync. Canceled initial setup and startup container discovery also keep their session boundaries. Coordinated file writes that have already started may still complete.
+- Discard delayed results and errors from previous iCloud sync sessions after stopping or restarting sync. Canceled initial setup and startup container discovery also keep their session boundaries. Opening the panel immediately after startup keeps file watching active. Coordinated file writes that have already started may still complete.
 
 ## 1.4.1（未发布）
 

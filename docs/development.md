@@ -49,6 +49,8 @@ The core's `FailoverPolicy` and `TickerVisibility` keep time and visibility deci
 
 Each sync start/enable owns a session generation. Stopping, canceling initial setup, or starting another session invalidates pending discovery, choices, debounce tasks and their results. Within a session, each file read/write also has an operation generation so older results cannot replace a newer checkpoint. Apply and error paths check ownership after awaiting IO; startup container availability can still be discovered while sync is off. `SyncFileAccess` keeps real coordinated IO as the default and lets native tests pause results after reading or committing an isolated file. Stopping does not undo a coordinated write that already began. Exit flushing and the sync document format retain their existing behavior.
 
+Startup restoration owns a separate task from debounced pulls, so an immediate panel check cannot cancel watcher setup. Native tests use real isolated files and directory notifications to check the saved checkpoint, final sync state and subsequent external changes. App Store smoke checks wait up to the same 30 seconds for a complete default watchlist in `sync.json`; a missing write log alone does not show that the file was not committed.
+
 ### Trade fees and compatibility
 
 `Trade.fee` is an optional nonnegative amount in the trading currency. Missing fees mean zero. Initial and additional purchases capitalize fees in cost; dividend cost uses net cash, and sell/dividend records store realized profit after fees. Daily P&L subtracts the fees for the quote's local trading date exactly once, including sold-out positions; dividend cash itself keeps the existing ex-dividend calculation.

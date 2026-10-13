@@ -52,6 +52,29 @@ log_has() {
   grep -qF -- "$1" "$LOG" 2>/dev/null
 }
 
+# 自写通知可触发新的拉取；写日志不是文件是否落盘的证据。
+appstore_sync_file_ready() {
+  python3 - "$1" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1]) as source:
+        document = json.load(source)
+    content = document["content"]
+    watchlist = content["watchlist"]
+    symbols = {item["symbol"] for item in watchlist}
+    expected = [
+        {"us.INX", "us.IXIC", "us.DJI", "usAAPL", "usMSFT", "usNVDA", "hf_XAU", "whEURUSD"},
+        {"sh000001", "sz399001", "sz399006", "hkHSI", "us.IXIC", "sh600519", "hk00700", "usAAPL"},
+    ]
+    ready = document["format"] == 1 and len(watchlist) == 8 and symbols in expected and isinstance(content["settings"], dict)
+except (OSError, ValueError, KeyError, TypeError):
+    ready = False
+sys.exit(0 if ready else 1)
+PY
+}
+
 # 直接写本机保存的自选列表（JSON），模拟用户在界面里改过。第二个参数是别的设置域（比如沙盒容器里的）。
 write_watchlist() {
   defaults write "${2:-$DOMAIN}" watchlist.v1 -data "$(printf '%s' "$1" | xxd -p | tr -d '\n')"
@@ -842,7 +865,7 @@ appstore_test() {
   : > "$LOG"
   STOX_SYNC_DIR="$cloud" "$APP/Contents/MacOS/Stox" --show-panel > shots/appstore-sync.log 2>&1 &
   local pid=$!
-  wait_for 30 log_has "已写入本机的自选和设置（8 只）" || fail "App Store 版在沙盒里没有写出同步文件"
+  wait_for 30 appstore_sync_file_ready "$cloud/sync.json" || fail "App Store 版在沙盒里没有写出完整默认自选的同步文件"
   grep -q '"usAAPL"' "$cloud/sync.json" || fail "同步文件里没有默认自选"
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
