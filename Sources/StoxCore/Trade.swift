@@ -170,14 +170,14 @@ extension Portfolio {
 }
 
 extension Portfolio {
-    /// 全部买卖记录，制表符分隔，按日期从早到晚，粘贴到 Numbers、Excel 就是一张表。金额保留两位小数，方便再计算。
+    /// 全部买卖记录，制表符分隔；可重新导入的数值保留原始精度，展示金额保留两位小数。
     public static func tradesText(items: [WatchItem]) -> String {
         var rows: [(day: String, order: Int, line: String)] = []
         for item in items {
             for trade in item.trades {
                 var kind = trade.side.title
-                if let bonus = trade.bonus, bonus > 0 {
-                    kind += L("（每股送转 %@）", QuoteFormatter.plain(bonus))
+                if let bonus = trade.bonus {
+                    kind += L("（每股送转 %@）", String(bonus))
                 }
                 let line = [
                     trade.day,
@@ -185,11 +185,11 @@ extension Portfolio {
                     item.symbol.rawValue,
                     item.symbol.market.region.currency,
                     kind,
-                    QuoteFormatter.plain(trade.shares),
-                    QuoteFormatter.plain(trade.price),
+                    String(trade.shares),
+                    String(trade.price),
                     QuoteFormatter.fixed(trade.shares * trade.price, decimals: 2),
-                    trade.fee.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "",
-                    trade.profit.map { QuoteFormatter.fixed($0, decimals: 2) } ?? "",
+                    trade.fee.map { String($0) } ?? "",
+                    trade.profit.map { String($0) } ?? "",
                 ].joined(separator: "\t")
                 rows.append((trade.day, rows.count, line))
             }

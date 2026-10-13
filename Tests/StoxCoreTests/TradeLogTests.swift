@@ -168,9 +168,9 @@ final class TradeLogTests: XCTestCase {
         ]
         XCTAssertEqual(Portfolio.tradesText(items: items), [
             "日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t费用\t已实现盈亏",
-            "2026-01-05\t贵州茅台\tsh600519\tCNY\t买入\t100\t1200\t120000.00\t\t",
-            "2026-02-10\t平安银行\tsz000001\tCNY\t分红（每股送转 0.4）\t1000\t0.5\t500.00\t\t500.00",
-            "2026-03-02\t贵州茅台\tsh600519\tCNY\t卖出\t50\t1300\t65000.00\t5.00\t4995.00",
+            "2026-01-05\t贵州茅台\tsh600519\tCNY\t买入\t100.0\t1200.0\t120000.00\t\t",
+            "2026-02-10\t平安银行\tsz000001\tCNY\t分红（每股送转 0.4）\t1000.0\t0.5\t500.00\t\t500.0",
+            "2026-03-02\t贵州茅台\tsh600519\tCNY\t卖出\t50.0\t1300.0\t65000.00\t5.0\t4995.0",
         ].joined(separator: "\n"), "按日期排，几只的记录混在一起")
         XCTAssertEqual(Portfolio.tradesText(items: [items[2]]), "", "没有记录时是空的")
     }
