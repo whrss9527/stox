@@ -1,5 +1,7 @@
 # Developing Stox
 
+Version comparison uses FritCore from the exact Frit 0.4.1 dependency, with the public tag revision recorded in `Package.resolved`. `UpdateCheck.isNewer` remains a compatibility entry point without its own parser. Numeric prerelease identifiers are compared numerically, build metadata is ignored, and an unparseable candidate or current version returns false. The download, installation and relaunch implementation stays in Stox for the separate updater migration.
+
 [← Back to the README](../README.md) · [简体中文](development.zh-CN.md)
 
 ## Development
