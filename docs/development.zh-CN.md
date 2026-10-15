@@ -138,3 +138,7 @@ App Store 版不自动发布：GitHub 版发布以后，写好英文的“此版
 设计取舍见 [docs/DESIGN.md](DESIGN.md)。
 
 繁体表沿用简体源文键，界面用语核对为“代號、設定、選單列、貼上、匯入”等。`AppLanguage.securityName` 仅在显示边界使用 Foundation 简繁转换，模型和同步保留源名称及代码。Info.plist 注册 zh-Hant，InterfaceLanguage 识别繁体及台湾、香港、澳门语言选择。Linux 测试覆盖转换、资源和持久化；Apple Bundle 的系统语言匹配由 macOS 原生测试及 zh-TW/zh-HK 启动用例验证，Linux Foundation 不支持相同的匹配算法。 分支精简集也运行 zh-TW/zh-HK 面板启动和已保存的繁体语言设置，共十一例界面启动检查。
+
+### 共用发行验收
+
+自动发行等待Core、完整App启动/同步/更新及App Store沙盒检查全部成功。两个发行入口及`frit-ref`辅助脚本共同固定Frit0.4.1的`2291523e16c91afae06868d7c4e188efc36cd70b`，继续要求公证。手动发行的`dry_run`构建并验收当前源码，不创建标签或发行；最终ZIP重新解压核对全架构签名、各根架构票据摘要与启用的Gatekeeper策略。公开附件保持不变，草稿按已有标签恢复；不完整公开发行要求新的补丁版本。纯workflow改动保留App版本。
