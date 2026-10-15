@@ -1,4 +1,5 @@
 import XCTest
+import Combine
 import StoxCore
 @testable import Stox
 
@@ -127,10 +128,10 @@ private final class SyncSessionFixture {
                            defaults: context.defaults, clock: clock)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     }
-    func manager(requiresContainer: Bool = false) async -> SyncManager {
+    func manager(requiresContainer: Bool = false, watchesChanges: Bool = false) async -> SyncManager {
         let access = await io.access(requiresContainer: requiresContainer)
         return SyncManager(store: store, settings: context.settings, defaults: context.defaults,
-                           clock: clock, location: .override(folder), watchesChanges: false, files: access)
+                           clock: clock, location: .override(folder), watchesChanges: watchesChanges, files: access)
     }
     func writeRemote(note: String, interval: Double = 10) throws -> SyncDocument {
         var settings = context.settings.syncedSettings
@@ -154,6 +155,74 @@ private final class SyncSessionFixture {
 }
 
 final class SyncSessionTests: XCTestCase {
+    @MainActor
+    func testStartupSelfWriteNotificationKeepsFileCheckpointAndWatcher() async throws {
+        let fixture = try SyncSessionFixture()
+        let sync = await fixture.manager(watchesChanges: true)
+        defer { fixture.cleanup(sync) }
+        fixture.context.settings.syncEnabled = true
+        await fixture.io.holdWrite()
+        let startup = sync.start()
+        let id = try await fixture.io.waitForWrite()
+        // Held merge 已完成真实协调写入，目录通知可在该返回仍暂停时触发新 pull。
+        XCTAssertEqual(try CloudFile.read(at: fixture.file)?.content.watchlist, fixture.store.items)
+        let checkpoint = expectation(description: "startup reaches a synced checkpoint after its own write notification")
+        var checked = false
+        let status = sync.$status.sink { value in
+            if case .synced = value, !checked { checked = true; checkpoint.fulfill() }
+        }
+        let result = await XCTWaiter.fulfillment(of: [checkpoint], timeout: 5)
+        await fixture.io.releaseWrite(id)
+        await startup.value
+        status.cancel()
+        XCTAssertEqual(result, .completed)
+        XCTAssertEqual(try fixture.savedBaseline()?.watchlist, fixture.store.items)
+        guard case .synced = sync.status else { return XCTFail("startup must leave a synced checkpoint") }
+
+        let changed = expectation(description: "external write is still observed after startup self-write")
+        var observed = false
+        let items = fixture.store.$items.sink { value in
+            if value.first?.note == "after self-write", !observed { observed = true; changed.fulfill() }
+        }
+        _ = try fixture.writeRemote(note: "after self-write")
+        let watchResult = await XCTWaiter.fulfillment(of: [changed], timeout: 5)
+        items.cancel()
+        XCTAssertEqual(watchResult, .completed, "own write notification must not remove the external watcher")
+        XCTAssertEqual(fixture.store.items.first?.note, "after self-write")
+    }
+
+    @MainActor
+    func testOpeningPanelDuringStartupKeepsExternalFileWatcher() async throws {
+        let fixture = try SyncSessionFixture()
+        let sync = await fixture.manager(watchesChanges: true)
+        defer { fixture.cleanup(sync) }
+        fixture.context.settings.syncEnabled = true
+        let checkpoint = expectation(description: "startup plus immediate panel check creates a synced file")
+        var checked = false
+        let status = sync.$status.sink { value in
+            if case .synced = value, !checked { checked = true; checkpoint.fulfill() }
+        }
+        let startup = sync.start()
+        sync.panelWillOpen()
+        let result = await XCTWaiter.fulfillment(of: [checkpoint], timeout: 5)
+        await startup.value
+        status.cancel()
+        XCTAssertEqual(result, .completed)
+        XCTAssertEqual(try CloudFile.read(at: fixture.file)?.content.watchlist, fixture.store.items)
+        XCTAssertEqual(try fixture.savedBaseline()?.watchlist, fixture.store.items)
+
+        let changed = expectation(description: "external write after immediate startup panel open is observed")
+        var observed = false
+        let items = fixture.store.$items.sink { value in
+            if value.first?.note == "after startup panel", !observed { observed = true; changed.fulfill() }
+        }
+        _ = try fixture.writeRemote(note: "after startup panel")
+        let watchResult = await XCTWaiter.fulfillment(of: [changed], timeout: 5)
+        items.cancel()
+        XCTAssertEqual(watchResult, .completed, "opening the panel must not cancel required watcher setup")
+        XCTAssertEqual(fixture.store.items.first?.note, "after startup panel")
+    }
+
     @MainActor
     func testLateReadAndErrorAfterDisableCannotApplyOrStartWrite() async throws {
         for fail in [false, true] {
