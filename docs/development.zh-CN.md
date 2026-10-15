@@ -35,7 +35,7 @@ macOS App 使用 XcodeGen 2.44.1 生成工程；`make project` 下载固定版�
 
 ### CI 验证分级
 
-所有分支都运行 Linux 核心单元测试、翻译和离线商店资料检查，以及 macOS 应用单元测试。分支的 macOS 任务只编译 runner 本机架构，运行 `ci-e2e.sh quick`（中英文面板、详情、搜索和设置共八例）以及完整的假 iCloud 同步测试，执行上限 20 分钟。SwiftPM 编译产物按编译器版本、runner 架构和清单缓存。main 保留通用版、全量启动、一键更新、实时接口巡检、App Store 沙盒和商店截图。分支保存诊断日志；提交信息加 `[screenshots]` 可选截图。`run_case` 最多等 20 秒，直到晚到的面板诊断或设置诊断全部打印后的 `STOX_DIAG late ready=true`；超时或进程提前退出会失败。同步面板也使用同一个就绪检查。`scripts/test_ci_readiness.py` 离线验证这个约定，macOS 实际运行时长需要在 Actions 查看。
+所有分支都运行 Linux 核心单元测试、翻译和离线商店资料检查，以及 macOS 应用单元测试。分支的 macOS 任务只编译 runner 本机架构，运行 `ci-e2e.sh quick`（中英文面板、详情、搜索和设置共九例）以及完整的假 iCloud 同步测试，执行上限 20 分钟。SwiftPM 编译产物按编译器版本、runner 架构和清单缓存。main 保留通用版、全量启动、一键更新、实时接口巡检、App Store 沙盒和商店截图。分支保存诊断日志；提交信息加 `[screenshots]` 可选截图。`run_case` 最多等 20 秒，直到晚到的面板诊断或设置诊断全部打印后的 `STOX_DIAG late ready=true`；超时或进程提前退出会失败。同步面板也使用同一个就绪检查。`scripts/test_ci_readiness.py` 离线验证这个约定，macOS 实际运行时长需要在 Actions 查看。
 
 ### 盈亏日历补齐
 
@@ -140,3 +140,5 @@ App Store 版不自动发布：GitHub 版发布以后，写好英文的“此版
 设计取舍见 [docs/DESIGN.md](DESIGN.md)。
 
 繁体表沿用简体源文键，界面用语核对为“代號、設定、選單列、貼上、匯入”等。`AppLanguage.securityName` 仅在显示边界使用 Foundation 简繁转换，模型和同步保留源名称及代码。Info.plist 注册 zh-Hant，InterfaceLanguage 识别繁体及台湾、香港、澳门语言选择。Linux 测试覆盖转换、资源和持久化；Apple Bundle 的系统语言匹配由 macOS 原生测试及 zh-TW/zh-HK 启动用例验证，Linux Foundation 不支持相同的匹配算法。 分支精简集也运行 zh-TW/zh-HK 面板启动和已保存的繁体语言设置，共十一例界面启动检查。
+
+启动就绪保持20秒门槛；批量输入不再等待不会生成的单条搜索结果，分支quick增加相同批量场景，共九例。失败后终止前保存3秒主线程采样，仍按失败处理；前期/late诊断记录单调时钟耗时。
