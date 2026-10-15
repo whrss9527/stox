@@ -91,6 +91,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      - name: Candidate version
+        run: |
+          candidate_version=$(python3 scripts/candidate-version.py)
+          echo "VERSION=$candidate_version" >> "$GITHUB_ENV"
       - name: Toolchain
         id: toolchain
         # 用 runner 上最新的正式版 Xcode：用 Xcode 26 编译时，面板在 macOS 26 上会换成系统的 Liquid Glass。
@@ -132,6 +136,7 @@ jobs:
         run: ./scripts/build-app.sh
       - name: Inspect bundle
         run: |
+          python3 scripts/candidate-version.py --bundle dist/Stox.app
           plutil -p dist/Stox.app/Contents/Info.plist
           ls -la dist/Stox.app/Contents/MacOS dist/Stox.app/Contents/Resources
           plutil -lint dist/Stox.app/Contents/Resources/*.lproj/*.strings
@@ -242,6 +247,10 @@ jobs:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      - name: Candidate version
+        run: |
+          candidate_version=$(python3 scripts/candidate-version.py)
+          echo "VERSION=$candidate_version" >> "$GITHUB_ENV"
       - name: Toolchain
         run: |
           latest=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -iv -e beta -e release_candidate -e '_rc' | sort -V | tail -1 || true)
@@ -253,6 +262,7 @@ jobs:
         run: ADHOC=1 scripts/build-app-store.sh
       - name: Inspect bundle
         run: |
+          python3 scripts/candidate-version.py --bundle dist/appstore/Stox.app
           plutil -p dist/appstore/Stox.app/Contents/Info.plist
           codesign -d --entitlements - dist/appstore/Stox.app
           lipo -info dist/appstore/Stox.app/Contents/MacOS/Stox
