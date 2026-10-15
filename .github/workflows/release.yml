@@ -3,7 +3,7 @@ name: release
 # 手动发版。平时不用它：推到 main 且 build 通过后，build.yml 最后的 release 会自动发布 CHANGELOG.md 最上面的新版本。
 # 用 Frit 的发布流程：打包通用版 Stox.zip，必须配置 Developer ID 证书和公证凭据，缺少时发布失败（见 Frit 的 docs/release.md），
 # 生成 SHA256SUMS.txt，打标签，发布说明是 CHANGELOG.md 里这个版本的一节加上安装步骤（scripts/release-notes.sh）。
-# 不填标签就发 CHANGELOG.md 最上面的版本；勾选 overwrite 可以用原标签的代码重新打包、替换附件。
+# 不填标签就发 CHANGELOG.md 最上面的版本；草稿可以按原标签恢复；公开发行不会覆盖。
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +12,12 @@ on:
         required: false
         default: ""
       overwrite:
-        description: "标签已存在时重新打包并替换附件"
+        description: "仅恢复原标签草稿，不覆盖公开发行"
+        type: boolean
+        default: false
+
+      dry_run:
+        description: "构建、签名与公证验收；只保存artifact，不创建标签或发行"
         type: boolean
         default: false
 
@@ -22,15 +27,16 @@ permissions:
 jobs:
   release:
     # Frit 固定在一个提交上；升级时 uses 的 @ 后面和 frit-ref 一起改。
-    uses: whrss9527/frit/.github/workflows/release-app.yml@6f27e71aab8831a9b007e6ee5b022cf19cadb0a8
+    uses: whrss9527/frit/.github/workflows/release-app.yml@2291523e16c91afae06868d7c4e188efc36cd70b
     with:
       app-name: Stox
       ref: ${{ github.sha }}
       tag: ${{ inputs.tag }}
       overwrite: ${{ inputs.overwrite }}
+      dry-run: ${{ inputs.dry_run }}
       build-command: UNIVERSAL=1 ZIP=1 scripts/build-app.sh
       archives: dist/Stox.zip
       notes-command: scripts/release-notes.sh
       require-notarization: true
-      frit-ref: 6f27e71aab8831a9b007e6ee5b022cf19cadb0a8
+      frit-ref: 2291523e16c91afae06868d7c4e188efc36cd70b
     secrets: inherit
