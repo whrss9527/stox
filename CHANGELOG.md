@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.4.3（未发布）
+
+### 中文
+
+- 关闭、切换图表或删除自选后丢弃旧请求的迟到结果；替换自选时清理已删除证券的图表缓存，保留当前自选的缓存和刷新节奏。
+
+### English
+
+- Discard delayed chart results after closing, switching charts or removing a symbol. Replacing the watchlist clears removed symbols’ chart caches while preserving current members and refresh intervals.
+
 ## 1.4.2（未发布）
 
 ### 中文
