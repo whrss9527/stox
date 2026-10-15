@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.5.0（未发布）
+
+### 中文
+
+- 支持stox://链接打开面板、添加证券和复制报价。新命令、退出或等待期间检测到剪贴板变化时，不提交旧报价。
+
+### English
+
+- Add stox:// links to open the panel, add a symbol and copy a quote. New commands, shutdown or detected clipboard changes discard pending quote results.
+
 ## 1.4.4（未发布）
 
 ### 中文

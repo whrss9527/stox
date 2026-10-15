@@ -30,6 +30,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let updater = Updater.shared
     #endif
     private lazy var sync = SyncManager(store: store, settings: settings)
+    private var linkHandler: StoxLinkHandler?
+    private let linkInbox = StoxLinkInbox()
     private var statusController: StatusItemController?
     private var hotKey: HotKey?
     private var cancellables = Set<AnyCancellable>()
@@ -100,6 +102,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settings.recordLaunch(version: AppInfo.version)
         Log.info("Stox 已启动，版本 \(AppInfo.version)（\(Bundle.main.bundleURL.path)）")
         handleLaunchArguments()
+        linkHandler = StoxLinkHandler(show: { [weak self] in self?.statusController?.openPanel() },
+                                      add: { [weak self] symbol in
+            self?.store.add(symbol)
+            self?.statusController?.reveal(symbol)
+        }, fetch: { [weak self] symbol in
+            guard let self else { return nil }
+            return try await self.store.previewQuotes(for: [symbol])[symbol]
+        })
+        linkInbox.start { [weak self] in self?.linkHandler?.handle($0) }
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        linkInbox.receive(urls)
     }
 
     /// 再次打开程序（在访达里双击）时打开设置。
@@ -109,6 +124,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        linkInbox.stop()
+        linkHandler?.cancel()
         pathMonitor.cancel()
         store.stop()
         sync.flushBeforeQuit()

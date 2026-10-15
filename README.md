@@ -130,3 +130,7 @@ Contributions are subject to the contributor agreement in [CONTRIBUTING.md](CONT
   <a href="https://github.com/whrss9527/meno"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/meno.svg" width="30%" alt="Meno: a calm menu bar, made with glass"></a>
   <a href="https://github.com/whrss9527/proxi"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/proxi.svg" width="30%" alt="Proxi: one switch for all your proxies"></a>
 </div>
+
+## Links
+
+Open `stox://show` to show the panel, `stox://add?code=600519` to add a symbol, or `stox://quote?code=usAAPL` to copy its current name, code and price. Codes use the same formats as search. For example: `open 'stox://quote?code=0700.HK'`. Links received at launch wait for initialization. Invalid links do nothing; a failed quote keeps the clipboard unchanged, and detected clipboard changes or a newer command discard an older request.
