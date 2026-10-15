@@ -608,7 +608,7 @@ struct TipsCards: View {
                     closeButton { settings.whatsNewVersion = nil }
                 }
                 if let whatsNewNotes {
-                    Text(ReleaseNotes.attributed(whatsNewNotes))
+                    Text(StoxReleaseNotes.attributed(whatsNewNotes))
                         .font(.system(size: 11))
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

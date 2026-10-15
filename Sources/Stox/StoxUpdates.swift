@@ -35,4 +35,24 @@ struct UpdateBanner: View {
     var openDetails: () -> Void
     var body: some View { FritUpdate.UpdateBanner(updater: updater, openDetails: openDetails) }
 }
+/// 已更新卡片仍使用原来的行距、项目符号与行内 Markdown。
+/// Frit 的更新详情排版属于 SDK 内部，App 不依赖其私有视图实现。
+enum StoxReleaseNotes {
+    static func attributed(_ text: String) -> AttributedString {
+        let cleaned = text.replacingOccurrences(of: "\r\n", with: "\n")
+            .split(separator: "\n", omittingEmptySubsequences: false)
+            .map { line -> String in
+                let trimmed = line.drop { $0 == " " }
+                if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
+                    return "• " + trimmed.dropFirst(2)
+                }
+                if trimmed.hasPrefix("#") {
+                    return String(trimmed.drop { $0 == "#" || $0 == " " })
+                }
+                return String(line)
+            }.joined(separator: "\n")
+        return (try? AttributedString(markdown: cleaned,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(cleaned)
+    }
+}
 #endif

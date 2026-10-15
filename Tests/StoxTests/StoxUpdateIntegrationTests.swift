@@ -21,6 +21,12 @@ private final class ReleaseProtocol: URLProtocol {
 }
 
 final class StoxUpdateIntegrationTests: XCTestCase {
+    func testUpdatedCardPreservesListLinesAndInlineMarkdown() {
+        let rendered = StoxReleaseNotes.attributed("## **1.6.1**\r\n- **更新器**：保留设置\r\n\r\n* Continue")
+        XCTAssertEqual(String(rendered.characters), "1.6.1\n• 更新器：保留设置\n\n• Continue")
+        XCTAssertTrue(rendered.runs.contains { $0.inlinePresentationIntent?.contains(.stronglyEmphasized) == true })
+    }
+
     @MainActor
     func testSharedUpdaterKeepsLegacySkipAndNotificationPreferences() async throws {
         let name = "stox-update-integration-" + UUID().uuidString
