@@ -141,7 +141,7 @@ jobs:
         continue-on-error: true
         run: scripts/measure-footprint.sh "$PWD/dist/Stox.app"
       - name: Launch smoke test
-        # 分支跑八个中英文面板、详情、搜索、设置用例；main 跑包含更多功能和截图的全量。
+        # 分支跑九个中英文面板、详情、搜索、批量输入与设置用例；main 跑包含更多功能和截图的全量。
         run: scripts/ci-e2e.sh ${{ github.ref == 'refs/heads/main' && 'smoke' || 'quick' }}
       - name: iCloud sync test
         # 用一个假的 iCloud 云盘文件夹走一遍同步：启动时拉取、运行中收到改动、文件被删后写回。
@@ -316,12 +316,12 @@ jobs:
 
   release:
     name: Release
-    needs: [core, app]
+    needs: [core, app, appstore]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     # 和 release.yml 用同一个 Frit 提交；升级时 uses 的 @ 后面和 frit-ref 一起改。
-    uses: whrss9527/frit/.github/workflows/release-app.yml@6f27e71aab8831a9b007e6ee5b022cf19cadb0a8
+    uses: whrss9527/frit/.github/workflows/release-app.yml@2291523e16c91afae06868d7c4e188efc36cd70b
     with:
       app-name: Stox
       ref: ${{ github.sha }}
@@ -331,5 +331,5 @@ jobs:
       archives: dist/Stox.zip
       notes-command: scripts/release-notes.sh
       require-notarization: true
-      frit-ref: 6f27e71aab8831a9b007e6ee5b022cf19cadb0a8
+      frit-ref: 2291523e16c91afae06868d7c4e188efc36cd70b
     secrets: inherit
