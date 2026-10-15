@@ -49,7 +49,7 @@ final class AppTestContext {
     }
     func cleanup() { defaults.removePersistentDomain(forName: suite) }
     var clock: QuoteStoreClock {
-        QuoteStoreClock(now: { [unowned self] in self.date }, sleep: { [weak self] interval in
+        QuoteStoreClock(now: { [self] in self.date }, sleep: { [weak self] interval in
             self?.delays.append(interval)
             // Hold until the test cancels this panel/polling task; no wall-clock wait.
             try await Task.sleep(nanoseconds: 3_600_000_000_000)

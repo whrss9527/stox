@@ -74,6 +74,21 @@ final class QuoteStore: ObservableObject {
     /// 每次刷新递增；较早发出、较晚返回的请求结果会被丢弃。
     private var generation = 0
     private var cancellables = Set<AnyCancellable>()
+    private enum ChartKind: Hashable {
+        case intraday, fiveDay, fundFlow, sparkline
+        case kline(KlinePeriod)
+    }
+    private struct ChartKey: Hashable {
+        var symbol: Symbol
+        var kind: ChartKind
+    }
+    private struct ChartRequest {
+        var key: ChartKey
+        var generation: Int
+    }
+    // 删除再添加同一只时也不重复 token；旧任务结束不能清掉新的归属。
+    private var chartGeneration = 0
+    private var chartRequests: [ChartKey: Int] = [:]
 
     init(
         settings: SettingsStore,
@@ -287,16 +302,23 @@ final class QuoteStore: ObservableObject {
 
     /// 展开某只证券时调用：先取一次分时，之后交易时段内每分钟刷新，休市时十分钟一次，直到收起（任务被取消）。
     func trackIntraday(_ symbol: Symbol) async {
-        while !Task.isCancelled {
+        guard contains(symbol), !Task.isCancelled else { return }
+        let request = beginChartRequest(symbol, kind: .intraday)
+        defer { endChartRequest(request) }
+        while isCurrentChartRequest(request) {
             do {
-                if let series = try await provider.fetchIntraday(for: symbol) {
+                let series = try await provider.fetchIntraday(for: symbol)
+                guard isCurrentChartRequest(request) else { return }
+                if let series {
                     intraday[symbol] = series
                     // 列表里的迷你分时也顺便更新，不用再取一次。
                     updateSparkline(symbol, from: series)
                 }
             } catch {
+                guard isCurrentChartRequest(request) else { return }
                 // 分时只是锦上添花，失败时保留上一次的，下一轮再试。
             }
+            guard isCurrentChartRequest(request) else { return }
             let live = phase(for: symbol.market.region).isLive
             try? await clock.sleep(live ? 60 : 600)
         }
@@ -305,19 +327,25 @@ final class QuoteStore: ObservableObject {
     /// 切到 K 线时调用：先取一次，之后交易时段内每分钟刷新，休市时半小时一次，直到收起或换周期（任务被取消）。
     /// 两次请求之间最后一根 K 线由实时行情更新（见 KlineSeries.merging）。
     func trackKline(_ symbol: Symbol, period: KlinePeriod) async {
+        guard contains(symbol), !Task.isCancelled else { return }
         let key = KlineKey(symbol: symbol, period: period)
-        while !Task.isCancelled {
+        let request = beginChartRequest(symbol, kind: .kline(period))
+        defer { endChartRequest(request) }
+        while isCurrentChartRequest(request) {
             do {
                 // 比图上显示的多要一些，均线从图的最左边就有。
                 let series = try await provider.fetchKline(
                     for: symbol, period: period, count: KlineChartData.fetchCount, exchangeCode: quotes[symbol]?.exchangeCode
                 )
-                if let series, !Task.isCancelled {
+                guard isCurrentChartRequest(request) else { return }
+                if let series {
                     klines[key] = series
                 }
             } catch {
+                guard isCurrentChartRequest(request) else { return }
                 // 和分时一样，失败时保留上一次的，下一轮再试。
             }
+            guard isCurrentChartRequest(request) else { return }
             let live = phase(for: symbol.market.region).isLive
             try? await clock.sleep(live ? 60 : 1800)
         }
@@ -326,16 +354,26 @@ final class QuoteStore: ObservableObject {
     /// 面板打开、列表显示着的时候调用：给列表里的这些证券取当天的分时，抽成迷你分时。一次取一只，隔一会儿再取下一只，
     /// 不一下子发一堆请求；交易时段内两分钟一轮，休市时十分钟一轮。场外基金、外汇没有分时，不取。面板关上、列表换了就停（任务被取消）。
     func trackSparklines(_ symbols: [Symbol]) async {
+        guard !Task.isCancelled else { return }
+        let requests = symbols.filter { $0.hasIntraday && contains($0) }
+            .map { beginChartRequest($0, kind: .sparkline) }
+        defer { requests.forEach(endChartRequest) }
         while !Task.isCancelled {
-            for symbol in symbols where symbol.hasIntraday {
+            guard requests.contains(where: isCurrentChartRequest) else { return }
+            for request in requests {
                 guard !Task.isCancelled else { return }
+                guard isCurrentChartRequest(request) else { continue }
+                let symbol = request.key.symbol
                 let maxAge: TimeInterval = phase(for: symbol.market.region).isLive ? 110 : 600
                 if let fetched = sparklineFetched[symbol], clock.now().timeIntervalSince(fetched) < maxAge { continue }
                 do {
-                    if let series = try await provider.fetchIntraday(for: symbol), !Task.isCancelled {
+                    let series = try await provider.fetchIntraday(for: symbol)
+                    guard isCurrentChartRequest(request) else { continue }
+                    if let series {
                         updateSparkline(symbol, from: series)
                     }
                 } catch {
+                    guard isCurrentChartRequest(request) else { continue }
                     // 取不到就先不画，下一轮再试。
                 }
                 sparklineFetched[symbol] = clock.now()
@@ -354,18 +392,22 @@ final class QuoteStore: ObservableObject {
 
     /// 切到“资金”时调用：先取一次，之后交易时段内每分钟刷新，休市时十分钟一次，直到收起或换页（任务被取消）。
     func trackFundFlow(_ symbol: Symbol) async {
-        while !Task.isCancelled {
+        guard contains(symbol), !Task.isCancelled else { return }
+        let request = beginChartRequest(symbol, kind: .fundFlow)
+        defer { endChartRequest(request) }
+        while isCurrentChartRequest(request) {
             do {
                 let flow = try await provider.fetchFundFlow(for: symbol)
-                if !Task.isCancelled {
-                    // 取不到（开盘前、这只没有）时清掉旧的，免得把昨天的当成今天的。
-                    fundFlows[symbol] = flow
-                    fundFlowLoaded.insert(symbol)
-                }
+                guard isCurrentChartRequest(request) else { return }
+                // 取不到（开盘前、这只没有）时清掉旧的，免得把昨天的当成今天的。
+                fundFlows[symbol] = flow
+                fundFlowLoaded.insert(symbol)
             } catch {
+                guard isCurrentChartRequest(request) else { return }
                 // 和分时一样，失败时保留上一次的，下一轮再试。
                 fundFlowLoaded.insert(symbol)
             }
+            guard isCurrentChartRequest(request) else { return }
             let live = phase(for: symbol.market.region).isLive
             try? await clock.sleep(live ? 60 : 600)
         }
@@ -393,18 +435,50 @@ final class QuoteStore: ObservableObject {
 
     /// 切到五日时调用：和分时一样，交易时段内每分钟刷新，休市时半小时一次。
     func trackFiveDay(_ symbol: Symbol) async {
-        while !Task.isCancelled {
+        guard contains(symbol), !Task.isCancelled else { return }
+        let request = beginChartRequest(symbol, kind: .fiveDay)
+        defer { endChartRequest(request) }
+        while isCurrentChartRequest(request) {
             do {
-                if let series = try await provider.fetchFiveDay(for: symbol, exchangeCode: quotes[symbol]?.exchangeCode),
-                   !Task.isCancelled {
+                let series = try await provider.fetchFiveDay(for: symbol, exchangeCode: quotes[symbol]?.exchangeCode)
+                guard isCurrentChartRequest(request) else { return }
+                if let series {
                     fiveDay[symbol] = series
                 }
             } catch {
+                guard isCurrentChartRequest(request) else { return }
                 // 失败时保留上一次的，下一轮再试。
             }
+            guard isCurrentChartRequest(request) else { return }
             let live = phase(for: symbol.market.region).isLive
             try? await clock.sleep(live ? 60 : 1800)
         }
+    }
+
+    private func beginChartRequest(_ symbol: Symbol, kind: ChartKind) -> ChartRequest {
+        chartGeneration &+= 1
+        let request = ChartRequest(key: ChartKey(symbol: symbol, kind: kind), generation: chartGeneration)
+        chartRequests[request.key] = request.generation
+        return request
+    }
+
+    private func isCurrentChartRequest(_ request: ChartRequest) -> Bool {
+        !Task.isCancelled && contains(request.key.symbol) && chartRequests[request.key] == request.generation
+    }
+
+    private func endChartRequest(_ request: ChartRequest) {
+        if chartRequests[request.key] == request.generation { chartRequests[request.key] = nil }
+    }
+
+    private func pruneChartCaches(keeping symbols: Set<Symbol>) {
+        chartRequests = chartRequests.filter { symbols.contains($0.key.symbol) }
+        intraday = intraday.filter { symbols.contains($0.key) }
+        klines = klines.filter { symbols.contains($0.key.symbol) }
+        fiveDay = fiveDay.filter { symbols.contains($0.key) }
+        fundFlows = fundFlows.filter { symbols.contains($0.key) }
+        fundFlowLoaded = fundFlowLoaded.intersection(symbols)
+        sparklines = sparklines.filter { symbols.contains($0.key) }
+        sparklineFetched = sparklineFetched.filter { symbols.contains($0.key) }
     }
 
     // MARK: - 市场状态
@@ -527,13 +601,7 @@ final class QuoteStore: ObservableObject {
     func remove(_ symbol: Symbol) {
         items.removeAll { $0.symbol == symbol }
         quotes[symbol] = nil
-        intraday[symbol] = nil
-        klines = klines.filter { $0.key.symbol != symbol }
-        fiveDay[symbol] = nil
-        fundFlows[symbol] = nil
-        fundFlowLoaded.remove(symbol)
-        sparklines[symbol] = nil
-        sparklineFetched[symbol] = nil
+        pruneChartCaches(keeping: Set(items.map(\.symbol)))
         extendedHours[symbol] = nil
         rapidMoves.forget(symbol)
         alertLog.forget(symbol)
@@ -587,6 +655,7 @@ final class QuoteStore: ObservableObject {
         items = newItems
         quotes = quotes.filter { symbols.contains($0.key) }
         extendedHours = extendedHours.filter { symbols.contains($0.key) }
+        if Set(oldItems.keys) != symbols { pruneChartCaches(keeping: symbols) }
         for item in newItems {
             let old = oldItems[item.symbol]
             if old?.alert != item.alert || (old?.holding != item.holding && (item.alert.profitAbove != nil || item.alert.lossBelow != nil)) {

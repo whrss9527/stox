@@ -39,6 +39,10 @@ Every branch runs all Linux core tests, localization and offline listing checks,
 
 `ProfitHistory.backfill` consumes daily, forward-adjusted candlesticks and fills only absent market/day records. It uses the preceding trading close and share counts reversed from retained trades, skips all trade/dividend days and incomplete market totals, and limits the result to 60 completed trading days. Truncated or unknown trade logs are treated conservatively. Estimates carry `estimated`, enter normal totals, and omit historical value and cost-based P&L. Old records decode with `estimated = false`; actual closing snapshots replace estimates. `QuoteStore.backfillProfitHistory` runs once per calendar opening, requests 62 bars (including the reference close and a possible live bar), cancels writes when the panel closes, and discards results if holdings changed while awaiting data. It does not run during quote polling. Prices are forward-adjusted, so these results are estimates rather than reconstructed brokerage statements.
 
+### Chart request lifecycle
+
+Chart tracking uses an owner per symbol and role (including the K-line period). After each provider return, both success and error paths check cancellation, watchlist membership and current ownership. Removing a symbol invalidates its owners and clears its chart and loading caches; generations remain monotonic across remove/re-add. Reordering and filtering keep caches for current members. Native held-provider tests cover late returns, replacement, period isolation and cache admission. Providers may finish in-flight work; this does not add request deduplication, cache TTLs or a new refresh policy.
+
 ### Application unit tests
 
 `make test` runs `StoxCoreTests` on every platform and `StoxTests` on macOS. The app tests use fake quote providers, `QuoteStoreClock`, dedicated UserDefaults suites and temporary sync folders; they never use live quote endpoints or the user's iCloud files. `SyncManager` accepts a test location and can disable file watching while exercising the same apply/push paths. Stop panel/polling tasks and disable sync before removing fixtures.
