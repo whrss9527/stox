@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.6.0（未发布）
+
+### 中文
+
+- 快捷指令新增查询证券价格和打开行情面板。价格以数值返回，可接到后续操作；查询不会添加自选或改动剪贴板。
+
+### English
+
+- Add Shortcuts actions to get a stock price as a number and open the quotes panel. Price queries leave the watchlist and clipboard unchanged.
+
 ## 1.5.0（未发布）
 
 ### 中文

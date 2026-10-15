@@ -75,7 +75,8 @@ def scan():
                     continue
                 where = f"{path.relative_to(ROOT)}:{number}"
                 for start, text in literals(line):
-                    wrapped = re.search(r"(?<![A-Za-z0-9_])L\(\s*$", line[:start]) is not None
+                    # AppIntents元数据需要编译期LocalizedStringResource，不能先经过运行时L()。
+                    wrapped = re.search(r"(?<![A-Za-z0-9_])(?:L|LocalizedStringResource)\(\s*$", line[:start]) is not None
                     if wrapped:
                         if "\\(" in text:
                             unwrapped.append(f"{where}: L() 的键里不能有插值，用 %@ 占位：\"{text}\"")

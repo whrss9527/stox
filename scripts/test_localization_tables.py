@@ -14,6 +14,16 @@ spec.loader.exec_module(checker)
 
 
 class LocalizationTableTests(unittest.TestCase):
+    def testCompileTimeIntentResourcesAreCheckedWithoutAllowingRawChinese(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "Intents.swift").write_text('let title = LocalizedStringResource("证券代码")\nlet old = L("原有")\nlet raw = "未翻译"\n')
+            with patch.object(checker, "ROOT", root), patch.object(checker, "SOURCES", [root]):
+                keys, unwrapped = checker.scan()
+            self.assertEqual(set(keys), {"证券代码", "原有"})
+            self.assertEqual(len(unwrapped), 1)
+            self.assertIn("未翻译", unwrapped[0])
+
     def check(self, languages):
         with tempfile.TemporaryDirectory() as temporary:
             resources = Path(temporary)
