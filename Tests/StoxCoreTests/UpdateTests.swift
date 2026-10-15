@@ -47,15 +47,16 @@ final class UpdateTests: XCTestCase {
         XCTAssertNil(UpdateCheck.parse(Data("not json".utf8)))
     }
 
-    func testVersionComparison() {
-        XCTAssertTrue(UpdateCheck.isNewer("0.2.0", than: "0.1.0"))
-        XCTAssertTrue(UpdateCheck.isNewer("v0.10.0", than: "0.9.9"))
-        XCTAssertTrue(UpdateCheck.isNewer("1.0", than: "0.9.9"))
-        XCTAssertTrue(UpdateCheck.isNewer("1.0.1", than: "1.0"))
-        XCTAssertTrue(UpdateCheck.isNewer("1.0.0", than: "1.0.0-beta"))
-        XCTAssertFalse(UpdateCheck.isNewer("1.0.0-beta", than: "1.0.0"))
-        XCTAssertFalse(UpdateCheck.isNewer("0.1.0", than: "0.1.0"))
-        XCTAssertFalse(UpdateCheck.isNewer("0.1.0", than: "0.2.0"))
+    func testReleaseRangeUsesSharedVersionRules() {
+        let versions = ["1.0.0-beta.2", "1.0.0-beta.10", "1.0.0", "1.0.1+build.3", "1.1.0", "2.invalid.0"]
+        let releases = versions.map {
+            ReleaseInfo(version: $0, tag: "v" + $0, pageURL: URL(string: "https://example.com")!)
+        }
+        XCTAssertEqual(UpdateCheck.releases(releases, after: "1.0.0-beta.2", upTo: "1.0.1").map(\.version),
+                       ["1.0.1+build.3", "1.0.0", "1.0.0-beta.10"])
+        XCTAssertTrue(UpdateCheck.releases(releases, after: "invalid", upTo: "1.0.1").isEmpty)
+        XCTAssertFalse(UpdateCheck.isNewer("invalid", than: "0.0.0"))
+        XCTAssertFalse(UpdateCheck.isNewer("1.0.1", than: "invalid"))
     }
 
     func testChecksums() {
