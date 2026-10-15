@@ -134,3 +134,7 @@ Contributions are subject to the contributor agreement in [CONTRIBUTING.md](CONT
 ## Links
 
 Open `stox://show` to show the panel, `stox://add?code=600519` to add a symbol, or `stox://quote?code=usAAPL` to copy its current name, code and price. Codes use the same formats as search. For example: `open 'stox://quote?code=0700.HK'`. Links received at launch wait for initialization. Invalid links do nothing; a failed quote keeps the clipboard unchanged, and detected clipboard changes or a newer command discard an older request.
+
+## Shortcuts
+
+In the macOS Shortcuts app, add Stox’s “Get Stock Price” action, enter a code such as `600519`, `0700.HK` or `usAAPL`, and connect its numeric price to the next action. Queries use the existing Tencent/Sina fallback without adding to the watchlist or writing the clipboard. Invalid codes, missing quotes and cancellation report an error. “Open Quotes Panel” opens the watchlist panel after initialization, including a cold launch. Spotlight discovery depends on the OS and indexing state; the app includes both AppShortcuts metadata entries.

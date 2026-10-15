@@ -31,7 +31,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #endif
     private lazy var sync = SyncManager(store: store, settings: settings)
     private var linkHandler: StoxLinkHandler?
-    private let linkInbox = StoxLinkInbox()
+    private let linkInbox = StoxIntentSupport.links
     private var statusController: StatusItemController?
     private var hotKey: HotKey?
     private var cancellables = Set<AnyCancellable>()

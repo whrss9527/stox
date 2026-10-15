@@ -65,6 +65,7 @@ plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP/Contents/Info.plis
 for lproj in Resources/*.lproj; do
   cp -R "$lproj" "$APP/Contents/Resources/"
 done
+python3 scripts/check-app-intents.py "$APP"
 if [[ "$FLAVOR" == "appstore" ]]; then
   # 只用 HTTPS（系统自带的加密），出口合规可以豁免；声明了以后每次上传不用再在 App Store Connect 里回答。
   plutil -replace ITSAppUsesNonExemptEncryption -bool NO "$APP/Contents/Info.plist"
