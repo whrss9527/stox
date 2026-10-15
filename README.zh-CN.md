@@ -129,3 +129,7 @@ Stox 是自由软件，以 [GNU 通用公共许可证第 3 版（GPL-3.0）](LIC
   <a href="https://github.com/whrss9527/meno"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/meno.svg" width="30%" alt="Meno：安静的菜单栏，由玻璃打造"></a>
   <a href="https://github.com/whrss9527/proxi"><img src="https://raw.githubusercontent.com/whrss9527/whrss9527/master/assets/cards/proxi.svg" width="30%" alt="Proxi：一个开关，管好所有代理"></a>
 </div>
+
+## 链接
+
+`stox://show`打开面板，`stox://add?code=600519`添加证券，`stox://quote?code=usAAPL`查询并复制当前名称、代码和价格。证券代码格式与搜索相同，例如终端运行`open 'stox://quote?code=0700.HK'`。启动时收到的链接等待初始化完成再执行；无效链接不执行，报价失败保留剪贴板原内容，检测到用户已复制新内容或收到新命令时丢弃旧查询。
