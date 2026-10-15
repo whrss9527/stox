@@ -9,7 +9,7 @@ var products: [Product] = [
 ]
 
 var targets: [Target] = [
-    .target(name: "StoxCore", resources: [.copy("DatasourceSnapshots")]),
+    .target(name: "StoxCore", dependencies: [.product(name: "FritCore", package: "Frit")], resources: [.copy("DatasourceSnapshots")]),
     .executableTarget(name: "StoxCLI", dependencies: ["StoxCore"]),
     .testTarget(name: "StoxCoreTests", dependencies: ["StoxCore"], resources: [.copy("Fixtures")]),
 ]
@@ -24,5 +24,6 @@ let package = Package(
     name: "Stox",
     platforms: [.macOS(.v13)],
     products: products,
+    dependencies: [.package(url: "https://github.com/whrss9527/Frit", exact: "0.4.1")],
     targets: targets
 )

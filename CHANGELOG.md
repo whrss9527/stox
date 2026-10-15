@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.4.4（未发布）
+
+### 中文
+
+- 统一更新版本的比较规则：正确比较数字测试版后缀，忽略构建信息；版本号无法解析时不提示更新。
+
+### English
+
+- Use shared update version comparison: compare numeric prerelease identifiers correctly, ignore build metadata, and reject unparseable versions when checking for updates.
+
 ## 1.4.3（未发布）
 
 ### 中文
