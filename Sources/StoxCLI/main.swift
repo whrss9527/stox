@@ -1,4 +1,5 @@
 import Foundation
+import FritCore
 import StoxCore
 
 // 命令行小工具：检查数据源、调试解析结果。
@@ -195,14 +196,15 @@ do {
 
     case "latest-release":
         let current = arguments.dropFirst().first ?? "0.0.0"
-        let release = try await UpdateCheck.latest(currentVersion: current)
+        let candidate = try await StoxReleaseFeed.latest(currentVersion: current)
+        let release = candidate.release
         let published = release.publishedAt.map { ISO8601DateFormatter().string(from: $0) } ?? "--"
-        print("最新版本 \(release.tag)，发布于 \(published)")
-        print("附件 \(release.archiveName ?? "无")，\(release.archiveSize ?? 0) 字节")
-        let verification = release.checksumsURL != nil ? UpdateCheck.checksumsName : (release.archiveSHA256 != nil ? "附件摘要" : "无")
+        print("最新版本 \(release.tagName)，发布于 \(published)")
+        print("附件 \(candidate.archive?.name ?? "无")，\(candidate.archive?.size ?? 0) 字节")
+        let verification = candidate.checksums != nil ? StoxReleaseFeed.checksumsName : (candidate.archive?.sha256 != nil ? "附件摘要" : "无")
         print("校验方式 \(verification)")
-        print(UpdateCheck.isNewer(release.version, than: current) ? "比 \(current) 新，可以更新" : "不比 \(current) 新")
-        exit(release.canInstall ? 0 : 1)
+        print(AppVersion.isNewer(release.version?.description ?? release.tagName, than: current) ? "比 \(current) 新，可以更新" : "不比 \(current) 新")
+        exit(candidate.canInstall ? 0 : 1)
 
     default:
         printUsage()

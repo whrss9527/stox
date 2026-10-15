@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import FritCore
 import StoxCore
 
 struct PanelActions {
@@ -598,7 +599,7 @@ struct TipsCards: View {
                     }
                     Spacer(minLength: 4)
                     Button(L("看看更新了什么")) {
-                        if let url = URL(string: "https://github.com/\(UpdateCheck.repository)/releases/tag/v\(version)") {
+                        if let url = URL(string: "https://github.com/\(StoxReleaseFeed.repository)/releases/tag/v\(version)") {
                             NSWorkspace.shared.open(url)
                         }
                         settings.whatsNewVersion = nil
@@ -650,19 +651,21 @@ struct TipsCards: View {
     private static func loadNotes(_ version: String, since: String?) async -> String? {
         let lines: [String]
         do {
-            let all = try await UpdateCheck.releases(count: 30, currentVersion: AppInfo.version)
-            let range = UpdateCheck.releases(all, after: since ?? version, upTo: version)
+            let all = try await StoxReleaseFeed.releases(count: 30, currentVersion: AppInfo.version)
+            let range = AppVersion(since ?? version).flatMap { lower in
+                AppVersion(version).map { ReleaseFeed.releases(all, after: lower, upTo: $0) }
+            } ?? []
             if range.count > 1 {
-                lines = ReleaseNotesText.firstLines(range, limit: 5)
+                lines = ReleaseNotes.firstLines(range, limit: 5, style: StoxReleaseFeed.notesStyle)
             } else {
                 // 只差一个版本，或者不知道是从哪个版本更新的：这个版本自己的前几条。
-                let release: ReleaseInfo
-                if let found = all.first(where: { $0.version == version }) {
+                let release: GitHubRelease
+                if let found = all.first(where: { $0.version?.description == version }) {
                     release = found
                 } else {
-                    release = try await UpdateCheck.release(version: version, currentVersion: AppInfo.version)
+                    release = try await StoxReleaseFeed.release(version: version, currentVersion: AppInfo.version)
                 }
-                lines = Array(release.highlights
+                lines = Array(ReleaseNotes.highlights(release.body ?? "", style: StoxReleaseFeed.notesStyle)
                     .split(separator: "\n")
                     .map(String.init)
                     .filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }

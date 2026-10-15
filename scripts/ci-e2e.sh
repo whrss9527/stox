@@ -771,6 +771,40 @@ PY
   defaults write "$DOMAIN" update.autoCheck -bool false
   defaults write "$DOMAIN" tips.dismissed -bool true
 
+  # 拒绝不可安装附件和错误摘要；旧副本继续运行且程序文件不变。
+  cp "$feed/latest.json" "$feed/valid.json"
+  local rejection expected rejected pid before after
+  for rejection in no-archive bad-checksum; do
+    python3 - "$feed/valid.json" "$feed/latest.json" "$rejection" <<'PYREJECT'
+import json, sys
+source, destination, kind = sys.argv[1:]
+with open(source) as file:
+    release = json.load(file)
+if kind == 'no-archive':
+    release['assets'] = []
+else:
+    next(item for item in release['assets'] if item['name'] == 'Stox.zip')['digest'] = 'sha256:' + '0' * 64
+with open(destination, 'w') as file:
+    json.dump(release, file)
+PYREJECT
+    expected=noArchive
+    [[ "$rejection" != bad-checksum ]] || expected=checksumMismatch
+    rejected="$WORK/reject-$rejection"
+    mkdir -p "$rejected"
+    ditto "$APP" "$rejected/Stox.app"
+    before=$(shasum -a 256 "$rejected/Stox.app/Contents/MacOS/Stox" | cut -d ' ' -f1)
+    "$rejected/Stox.app/Contents/MacOS/Stox" --install-update > "shots/update-$rejection.log" 2>&1 &
+    pid=$!
+    wait_for 45 grep -q "STOX_UPDATE_RESULT failure=$expected" "shots/update-$rejection.log" || fail "没有拒绝 $rejection"
+    after=$(shasum -a 256 "$rejected/Stox.app/Contents/MacOS/Stox" | cut -d ' ' -f1)
+    [[ "$before" == "$after" ]] || fail "$rejection 改动了旧程序"
+    [[ "$(version_of "$rejected/Stox.app")" == "$(version_of "$APP")" ]] || fail "$rejection 替换了旧版本"
+    kill -0 "$pid" || fail "$rejection 后旧程序没有保留运行"
+    kill "$pid"
+    wait "$pid" || true
+  done
+  cp "$feed/valid.json" "$feed/latest.json"
+
   # 发现新版本：面板底部的更新条和“关于与更新”页。
   : > "$LOG"
   run_case update-banner --check-update --show-panel
@@ -828,8 +862,9 @@ appstore_test() {
   nm "$binary" > "$WORK/symbols.txt"
   grep -q '4Stox11SyncManagerC' "$WORK/symbols.txt" || fail "nm 看不到 Stox 模块的符号，没法检查"
   local found
-  found=$(grep -E '4Stox(7Updater|15UpdateInstaller|12UpdateBanner|13UpdateSection|13Translocation|11AppLocation|5Shell)[A-Z]' "$WORK/symbols.txt" | head -5 || true)
+  found=$(grep -E '4Stox(7Updater|15UpdateInstaller|12UpdateBanner|13UpdateSection|13Translocation|11AppLocation|5Shell)[A-Z]|10FritUpdate' "$WORK/symbols.txt" | head -5 || true)
   [[ -z "$found" ]] || fail "App Store 版里还有一键更新的代码：$found"
+  [[ ! -d "$APP/Contents/Resources/Frit_FritUpdate.bundle" ]] || fail "App Store 版带上了自主更新资源"
   # 界面文字直接在程序文件里找（strings 只列 ASCII）：“自动检查更新”开关下面的说明、更新条的提示。
   # 不超过 15 字节的短字符串会编进指令里找不到，所以找长一点的、只有更新界面才用的。
   if LC_ALL=C grep -aFq -e '6 小时检查一次 GitHub' -e '查看更新内容' "$binary"; then

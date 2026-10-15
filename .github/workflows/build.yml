@@ -9,6 +9,11 @@ on:
   push:
     branches: ["**"]
   workflow_dispatch:
+    inputs:
+      full_validation:
+        description: "Run full universal/update/Store verification without publishing from a branch"
+        type: boolean
+        default: false
 
 # 同一分支上新的推送会取消还在跑的旧构建；main 上不取消，免得发版做到一半被打断。
 concurrency:
@@ -54,7 +59,7 @@ jobs:
               print(f"::error title=Unit test failure::{message}")
           PY
       - name: Live data smoke test
-        if: github.ref == 'refs/heads/main'
+        if: (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation))
         id: live-data-0
         # 真实请求腾讯行情接口和 GitHub 的发布接口；偶尔抖动时不阻塞构建。
         continue-on-error: true
@@ -84,9 +89,9 @@ jobs:
   app:
     name: macOS app
     runs-on: macos-15
-    timeout-minutes: ${{ github.ref == 'refs/heads/main' && 45 || 20 }}
+    timeout-minutes: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && 45 || 20 }}
     env:
-      STOX_E2E_SCREENSHOTS: ${{ (github.ref == 'refs/heads/main' || contains(github.event.head_commit.message, '[screenshots')) && '1' || '0' }}
+      STOX_E2E_SCREENSHOTS: ${{ ((github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) || contains(github.event.head_commit.message, '[screenshots')) && '1' || '0' }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -132,7 +137,7 @@ jobs:
           PY
       - name: Build Stox.app
         env:
-          UNIVERSAL: ${{ github.ref == 'refs/heads/main' && '1' || '0' }}
+          UNIVERSAL: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && '1' || '0' }}
         run: ./scripts/build-app.sh
       - name: Inspect bundle
         run: |
@@ -147,12 +152,12 @@ jobs:
         run: scripts/measure-footprint.sh "$PWD/dist/Stox.app"
       - name: Launch smoke test
         # 分支跑九个中英文面板、详情、搜索、批量输入与设置用例；main 跑包含更多功能和截图的全量。
-        run: scripts/ci-e2e.sh ${{ github.ref == 'refs/heads/main' && 'smoke' || 'quick' }}
+        run: scripts/ci-e2e.sh ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && 'smoke' || 'quick' }}
       - name: iCloud sync test
         # 用一个假的 iCloud 云盘文件夹走一遍同步：启动时拉取、运行中收到改动、文件被删后写回。
         run: scripts/ci-e2e.sh sync
       - name: One-click update test
-        if: github.ref == 'refs/heads/main'
+        if: (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation))
         # 本地假发布 9.9.9：发现新版本、下载校验替换并重新启动，以及从临时位置运行时装进“应用程序”。
         run: scripts/ci-e2e.sh update
       - name: Crop screenshots
@@ -214,7 +219,7 @@ jobs:
         continue-on-error: true
         run: scripts/ci-annotate-image.sh 4
       - name: Live data smoke test
-        if: github.ref == 'refs/heads/main'
+        if: (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation))
         id: live-data-1
         continue-on-error: true
         run: swift run -c release stox-cli quote sh600519 hk00700 usAAPL us.IXIC
@@ -238,7 +243,7 @@ jobs:
 
   appstore:
     name: App Store edition (sandbox)
-    if: github.ref == 'refs/heads/main'
+    if: (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation))
     # App Store 版：ad-hoc 签名、带沙盒 entitlement（不需要证书），在沙盒里启动一遍，确认取得到行情、面板打得开、
     # 同步文件写得进去、没有一键更新的代码，顺便做 App Store 尺寸的截图。和上面的 macOS app 并行，不拖慢它。
     runs-on: macos-15

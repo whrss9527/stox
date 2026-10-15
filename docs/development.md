@@ -1,6 +1,8 @@
 # Developing Stox
 
-Version comparison uses FritCore from the exact Frit 0.4.1 dependency, with the public tag revision recorded in `Package.resolved`. `UpdateCheck.isNewer` remains a compatibility entry point without its own parser. Numeric prerelease identifiers are compared numerically, build metadata is ignored, and an unparseable candidate or current version returns false. The download, installation and relaunch implementation stays in Stox for the separate updater migration.
+The GitHub app uses FritUpdate from the exact public Frit 0.4.2 tag (`Package.resolved`). App-specific configuration keeps `Stox.zip`, the `STOX_` environment prefix, `update.` preference keys, six-hour checks, notifications and relaunch callbacks. The library owns checking, download/verification, replacement and the update views. `StoxReleaseFeed` retains only the read-only HTTP adapter needed by the Linux CLI and “What's New”; release parsing/version ordering/notes use FritCore. The old Stox updater/installer/shell and duplicate algorithms were removed; their library regressions remain in Frit, including all seven staged-replacement cases. An app integration test exercises the actual shared updater against isolated legacy skip/notification preferences.
+
+Xcode and SwiftPM both pin the same SDK. Only the ordinary Xcode target links FritUpdate; the App Store target links FritCore only, guarded imports remain excluded and sandbox CI rejects FritUpdate symbols/resources. Packaging verifies the actual shared resource bundle contains English/Simplified/Traditional strings. The app sets Frit's language hook to its current language. Release-workflow pins remain independent at the already verified 0.4.1/2291523 commit until a separate workflow change is needed. Full update/relocation tests and the first public-version upgrade remain required; a user's real-device acceptance is not replaced by CI.
 
 [← Back to the README](../README.md) · [简体中文](development.zh-CN.md)
 

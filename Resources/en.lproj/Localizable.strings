@@ -499,8 +499,6 @@
 "打开日志" = "Open Log";
 
 /* Stox/Shell.swift */
-"%@ 执行超时" = "%@ timed out";
-"无法运行 %@：%@" = "Couldn’t run %@: %@";
 
 /* Stox/StackedTickerImage.swift */
 "，" = ", ";
@@ -579,56 +577,12 @@
 "写入 iCloud 失败：%@" = "Couldn’t write to iCloud: %@";
 
 /* Stox/UpdateInstaller.swift */
-"“应用程序”" = "“Applications”";
-"个人的“应用程序”（~/Applications）" = "your personal “Applications” (~/Applications)";
-"读不到 Info.plist" = "can’t read Info.plist";
-"bundle identifier 是 %@" = "bundle identifier is %@";
-"版本是 %@，不是 %@" = "version is %@, not %@";
-"签名校验失败：%@" = "signature check failed: %@";
-"没有开发者签名" = "no developer signature";
 
 /* Stox/UpdateViews.swift */
-"查看更新内容" = "See What’s New";
-"更新" = "Update";
-"取消更新" = "Cancel Update";
-"重试" = "Retry";
-"正在下载 %@" = "Downloading %@";
-"正在校验 %@" = "Verifying %@";
-"正在安装 %@" = "Installing %@";
-"已更新到 %@，正在重新启动" = "Updated to %@, relaunching";
-"更新到 %@ 失败" = "Update to %@ failed";
-"有新版本 %@" = "Version %@ available";
-"马上就好，请不要退出" = "Almost done, please don’t quit";
-"程序会自动重新打开" = "Stox will reopen automatically";
-"下载 %@ 后自动安装并重新启动" = "Downloads %@, installs and relaunches";
-"点“更新”自动下载安装并重新启动" = "Click “Update” to download, install and relaunch";
-"已经是最新版本" = "Stox is up to date";
-"正在检查更新…" = "Checking for updates…";
-"已跳过 %@" = "Skipped %@";
-"仍然查看" = "Show Anyway";
-"正在下载 %@…" = "Downloading %@…";
-"正在校验 %@…" = "Verifying %@…";
-"正在安装 %@…" = "Installing %@…";
-"已更新到 %@，正在重新启动…" = "Updated to %@, relaunching…";
-"检查更新" = "Check for Updates";
-"还没有检查过更新" = "Never checked for updates";
-"上次检查：%@" = "Last checked: %@";
-"发布于 %@" = "Released %@";
-"到发布页下载" = "Download from Release Page";
-"跳过这个版本" = "Skip This Version";
-"立即更新" = "Update Now";
-"在浏览器里查看发布页" = "View Release Page in Browser";
-"点一下就行：下载" = "Just one click: downloads";
-"，校验后替换程序并自动重新启动，自选和设置都会保留。" = ", verifies, replaces the app and relaunches. Your watchlist and settings are kept.";
-"打开“App 管理”设置" = "Open “App Management” Settings";
 
 /* Stox/Updater.swift */
-"不是从 Stox.app 运行的，没法在程序里更新" = "Stox isn’t running from Stox.app, so it can’t update itself";
-"现在是从下载文件夹这类临时位置运行的，这次会装进%@" = "Stox is running from a temporary location such as Downloads; this update installs it into %@";
-"，旧的那份移到废纸篓" = " and moves the old copy to the Trash";
 "Stox 有新版本 %@" = "Stox %@ is available";
 "打开行情面板点“更新”，自动下载安装并重新启动" = "Open the panel and click “Update” to download, install and relaunch";
-"检查更新失败：%@" = "Couldn’t check for updates: %@";
 
 /* StoxCore/ChartLevel.swift */
 "成本 " = "Cost ";
@@ -731,22 +685,6 @@
 "日期\t名称\t代码\t币种\t类型\t股数\t价格\t金额\t费用\t已实现盈亏" = "Date\tName\tSymbol\tCurrency\tType\tShares\tPrice\tAmount\tFees\tRealized P&L";
 
 /* StoxCore/Update.swift */
-"还没有发布过版本" = "No versions have been released yet";
-"服务器返回了 %@" = "The server returned %@";
-"读不懂服务器返回的内容" = "Couldn’t understand the server’s response";
-"这个版本没有可以直接安装的附件，请到发布页手动下载" = "This version has no installable download. Please download it from the release page";
-"校验文件里没有这个附件的校验和" = "The checksum file has no checksum for this download";
-"下载的文件校验和不对，可能没下载完整或被篡改" = "The download’s checksum doesn’t match; it may be incomplete or tampered with";
-"解压失败：%@" = "Couldn’t unzip: %@";
-"压缩包里没有 Stox.app" = "The archive doesn’t contain Stox.app";
-"下载的程序不对：%@" = "The downloaded app is wrong: %@";
-"替换程序失败：%@" = "Couldn’t replace the app: %@";
-"已取消授权，程序没有改动" = "Authorization canceled; the app wasn’t changed";
-"macOS 不允许 Stox 替换自己。到“系统设置 → 隐私与安全性 → App 管理”里允许 Stox，再点重试" = "macOS doesn’t allow Stox to replace itself. Allow Stox in “System Settings → Privacy & Security → App Management”, then click Retry";
-"新版本不是同一个开发者签名的（应该是 %@），为了安全没有安装。可以到发布页确认后手动下载" = "The new version isn’t signed by the same developer (expected %@), so it wasn’t installed. You can verify and download it from the release page";
-"这个版本没有写更新内容" = "No release notes for this version";
-"还有 %@ 个更早的版本，见发布页" = "And %@ more on the release page";
-"- 还有 %@ 个更早的版本" = "- And %@ more";
 
 /* StoxCore/Watchlist.swift */
 "一行" = "One Line";

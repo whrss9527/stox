@@ -1,6 +1,8 @@
 # Stox 开发指南
 
-版本比较使用精确依赖 Frit 0.4.1 的 FritCore，公开标签提交记录在 `Package.resolved`。`UpdateCheck.isNewer` 保留为兼容入口，不再自行解析。预发布数字后缀按数值比较，忽略构建信息，候选或当前版本无法解析时返回 false。下载、安装与重启实现仍由 Stox 承担，完整更新器迁移另行进行。
+普通版采用精确公开的 Frit0.4.2/FritUpdate，锁文件记录实际标签提交。App配置保留Stox.zip、STOX环境前缀、update.偏好键、六小时检查、原通知和退出回调；检查/下载/校验/替换/界面由共用库承担。StoxReleaseFeed只保留Linux CLI与已更新说明需要的只读HTTP适配，解析、版本排序和说明使用FritCore。删除重复实现后，回归留在Frit（含全部七项暂存替换场景），App补实际SDK与旧跳过/通知偏好的集成检查。
+
+Xcode/SwiftPM固定相同SDK，仅普通版链接FritUpdate；AppStore仅链接FritCore，条件编译排除更新导入，沙盒检查拒绝FritUpdate符号与资源。打包检查真正共用bundle的三语资源，并把App当前语言传入共用钩子。发行工作流仍独立固定已验证的0.4.1/2291523，本次不混改。完整更新/搬家和公开旧版升级仍须逐项验收，不以CI代替用户实机确认。
 
 [← 回到 README](../README.zh-CN.md) · [English](development.md)
 

@@ -20,9 +20,17 @@ on:
         description: "构建、签名与公证验收；只保存artifact，不创建标签或发行"
         type: boolean
         default: false
+      verify_upgrade:
+        description: "验证旧正式版到签名候选（dry-run）或已公开目标版本的真实升级"
+        type: boolean
+        default: false
+      from_tag:
+        description: "升级验证的旧正式版"
+        default: v1.6.0
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   release:
@@ -40,3 +48,59 @@ jobs:
       require-notarization: true
       frit-ref: 2291523e16c91afae06868d7c4e188efc36cd70b
     secrets: inherit
+  previous-upgrade:
+    needs: release
+    if: inputs.verify_upgrade
+    runs-on: macos-26
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - name: Download and verify original signed archives
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OLD_TAG: ${{ inputs.from_tag }}
+          TARGET_TAG: ${{ inputs.tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -e
+          if [[ "$DRY_RUN" == true ]]; then
+            gh run download "$GITHUB_RUN_ID" --repo "$GITHUB_REPOSITORY" --name release-dry-run --dir candidate
+          else
+            if [[ -z "$TARGET_TAG" ]]; then TARGET_TAG="v$(python3 scripts/candidate-version.py)"; fi
+            gh release download "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" --pattern Stox.zip --pattern SHA256SUMS.txt --dir candidate
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TARGET_TAG" > candidate/release.json
+          fi
+          gh release download "$OLD_TAG" --repo "$GITHUB_REPOSITORY" --pattern Stox.zip --pattern SHA256SUMS.txt --dir old
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$OLD_TAG" > old/release.json
+          python3 - <<'PY'
+          import hashlib, json, pathlib
+          old = pathlib.Path('old/Stox.zip')
+          asset = next(a for a in json.loads(pathlib.Path('old/release.json').read_text())['assets'] if a['name'] == 'Stox.zip')
+          digest = hashlib.sha256(old.read_bytes()).hexdigest()
+          assert asset['digest'] == 'sha256:' + digest
+          assert pathlib.Path('old/SHA256SUMS.txt').read_text().split()[0] == digest
+          archives = list(pathlib.Path('candidate').rglob('Stox.zip'))
+          assert len(archives) == 1
+          archive = archives[0]
+          digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+          assert (archive.parent / 'SHA256SUMS.txt').read_text().split()[0] == digest
+          if pathlib.Path('candidate/release.json').exists():
+              asset = next(a for a in json.loads(pathlib.Path('candidate/release.json').read_text())['assets'] if a['name'] == 'Stox.zip')
+              assert asset['digest'] == 'sha256:' + digest
+          pathlib.Path('candidate-path.txt').write_text(str(archive.resolve()))
+          PY
+      - name: Exercise the signed previous-version upgrade
+        run: |
+          env -u GH_TOKEN -u GITHUB_TOKEN scripts/check-previous-upgrade.sh "$PWD/old/Stox.zip" "$(cat candidate-path.txt)" "$PWD/upgrade-evidence"
+      - name: Preserve upgrade evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: previous-version-upgrade
+          path: upgrade-evidence/
+          if-no-files-found: warn
