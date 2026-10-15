@@ -33,7 +33,12 @@ extension FritUpdate.Updater {
 struct UpdateBanner: View {
     @EnvironmentObject private var updater: Updater
     var openDetails: () -> Void
-    var body: some View { FritUpdate.UpdateBanner(updater: updater, openDetails: openDetails) }
+    var body: some View {
+        if updater.candidate != nil {
+            FritUpdate.UpdateBanner(updater: updater, openDetails: openDetails)
+                .glassCard()
+        }
+    }
 }
 /// 已更新卡片仍使用原来的行距、项目符号与行内 Markdown。
 /// Frit 的更新详情排版属于 SDK 内部，App 不依赖其私有视图实现。
