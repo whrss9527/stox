@@ -88,6 +88,10 @@ run_case() {
   "$APP/Contents/MacOS/Stox" "$@" > "shots/$name.log" 2>&1 &
   local pid=$!
   if ! wait_for_stox_ready "$pid" "shots/$name.log"; then
+    # 20秒门槛已失败。先保留仍在运行的主线程栈，再终止；采样不改变失败结果。
+    if kill -0 "$pid" 2>/dev/null; then
+      sample "$pid" 3 -file "shots/$name-timeout-sample.txt" > "shots/$name-timeout-sample.log" 2>&1 || true
+    fi
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
     cat "shots/$name.log"
@@ -139,6 +143,9 @@ quick() {
   grep -q 'settings_page=display' shots/settings-display.log || fail "设置窗口没有打开"
 
   defaults delete "$DOMAIN" watchlist.v1 2>/dev/null || true
+  # 复现完整main曾超时的批量输入；仅展示，确认前不能改动默认八只自选。
+  run_case batch --show-panel --search "601318 09988 TSLA 茅台"
+  grep -q "items=8 " shots/batch.log || fail "批量添加在确认前不应该改动自选"
   run_case en-panel --show-panel -AppleLanguages '(en)'
   check_fits en-panel
   grep -q 'english=true sample="Settings…"' shots/en-panel.log || fail "英文界面没有启用"

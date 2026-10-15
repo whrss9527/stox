@@ -114,11 +114,12 @@ final class StatusItemController: NSObject {
         panel.makeKey()
         statusItem.button?.highlight(true)
         if printDiagnostics || !keys.isEmpty {
+            let diagnosticsStarted = ProcessInfo.processInfo.systemUptime
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 1_500_000_000)
                 // 预填了搜索词时，等搜索结果回来再按键。
                 for _ in 0..<50 where search != nil {
-                    guard let router = self?.router, router.searchResults.isEmpty || router.isSearching else { break }
+                    guard let router = self?.router, router.waitsForSearchDiagnostics else { break }
                     try? await Task.sleep(nanoseconds: 100_000_000)
                 }
                 // 打开涨跌榜时，等榜单取回来再报。
@@ -133,10 +134,14 @@ final class StatusItemController: NSObject {
                     try? await Task.sleep(nanoseconds: 1_500_000_000)
                 }
                 if printDiagnostics {
+                    print("STOX_DIAG stage=early elapsed=\(ProcessInfo.processInfo.systemUptime - diagnosticsStarted)")
+                    fflush(stdout)
                     self?.printDiagnostics()
                     // 盘前盘后价在行情之后才取，过几秒再报一次；面板尺寸也再报一次，那时更新内容这些慢的都到了，布局也调整完了。
                     try? await Task.sleep(nanoseconds: 6_000_000_000)
                     if let self {
+                        print("STOX_DIAG stage=late elapsed=\(ProcessInfo.processInfo.systemUptime - diagnosticsStarted)")
+                        fflush(stdout)
                         print("STOX_DIAG late \(self.extendedHoursDiagnostics)")
                         self.panelDiagnostics().forEach { print("STOX_DIAG late " + $0) }
                         print("STOX_DIAG late flow=\(self.fundFlowDiagnostics) sparklines=\(self.store.sparklines.count)")
@@ -695,6 +700,11 @@ final class PanelRouter: ObservableObject {
     /// 粘贴了多个代码时的批量添加内容；普通搜索时为 nil。
     var batch: (symbols: [Symbol], rejected: [String])? {
         SymbolInput.parseList(trimmedQuery)
+    }
+
+    /// 批量输入由批量视图处理，不会产生单条搜索结果，诊断不应等待它。
+    var waitsForSearchDiagnostics: Bool {
+        !trimmedQuery.isEmpty && batch == nil && (searchResults.isEmpty || isSearching)
     }
 
     /// 返回 true 表示 Esc 已被面板内部消化，不需要关闭面板。
