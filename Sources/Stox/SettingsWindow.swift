@@ -698,6 +698,10 @@ struct AboutPage: View {
     @ObservedObject var store: QuoteStore
     @ObservedObject var sync: SyncManager
     @State private var copiedDiagnostics = false
+    @State private var showsDonation = false
+
+    private static let donationImage = Bundle.main.url(forResource: "donate-wechat", withExtension: "png")
+        .flatMap { NSImage(contentsOf: $0) }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -731,6 +735,25 @@ struct AboutPage: View {
             HStack(spacing: 10) {
                 Button("GitHub") { NSWorkspace.shared.open(AppInfo.repositoryURL) }
                 Button(L("反馈问题")) { NSWorkspace.shared.open(Diagnostics.feedbackURL(version: AppInfo.version, osVersion: ProcessInfo.processInfo.operatingSystemVersionString)) }
+                #if !APP_STORE
+                if let image = Self.donationImage {
+                    Button(L("请我喝杯咖啡")) { showsDonation = true }
+                        .popover(isPresented: $showsDonation) {
+                            VStack(spacing: 10) {
+                                Image(nsImage: image)
+                                    .resizable()
+                                    .interpolation(.high)
+                                    .scaledToFit()
+                                    .frame(width: 270)
+                                    .accessibilityLabel(L("微信赞赏码"))
+                                Text(L("使用微信扫一扫"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(12)
+                        }
+                }
+                #endif
             }
             #if !APP_STORE
             Divider()

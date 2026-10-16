@@ -110,6 +110,8 @@ How to open older ad-hoc signed versions, how to build from source and how the G
 
 Stox is free and open source. If you like it, a ⭐ star means a lot, or you can buy me a coffee with WeChat.
 
+In the GitHub build, the same code is available in Settings → About & Updates → Buy Me a Coffee.
+
 <p align="center"><img src="docs/donate-wechat.png" width="240" alt="WeChat tip code: buy me a coffee"></p>
 
 ## License
