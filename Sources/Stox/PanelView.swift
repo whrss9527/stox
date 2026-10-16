@@ -106,7 +106,6 @@ struct WatchlistPanel: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            PanelHeader()
             SearchBar()
             if router.trimmedQuery.isEmpty {
                 if let maxHeight = router.cardsMaxHeight {
@@ -151,11 +150,11 @@ struct WatchlistPanel: View {
 }
 
 @MainActor
-struct PanelHeader: View {
+struct MarketStatusLine: View {
     @EnvironmentObject private var store: QuoteStore
     @EnvironmentObject private var settings: SettingsStore
 
-    /// 标题下面每个市场的状态：“A股交易中”，英文是“CN Open”。
+    /// 底栏每个市场的状态：“A股交易中”，英文是“CN Open”。
     static func status(_ region: MarketRegion, _ phase: MarketPhase) -> String {
         switch region {
         case .cn: return L("A股%@", phase.displayName)
@@ -166,56 +165,32 @@ struct PanelHeader: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(nsImage: NSApp.applicationIconImage)
-                .resizable()
-                .frame(width: 30, height: 30)
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Stox")
-                    .font(.system(size: 14, weight: .semibold))
-                HStack(spacing: 8) {
-                    // 环球的品种工作日全天都在交易，不占这里的地方。
-                    ForEach(store.activeRegions.filter { $0 != .global }, id: \.self) { region in
-                        let phase = store.phase(for: region)
-                        HStack(spacing: 3) {
-                            Circle()
-                                .fill(Theme.phaseColor(phase, convention: settings.colorConvention))
-                                .frame(width: 6, height: 6)
-                            Text(Self.status(region, phase))
-                                .font(.system(size: 10.5))
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        .help(region == .hk ? L("港股行情延时约 15 分钟") : "")
-                    }
-                }
-            }
-            Spacer(minLength: 4)
-            if let error = store.lastError {
-                Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.orange)
-                    .help(L("刷新失败：%@", error))
-            }
-            Button {
-                settings.panelPinned.toggle()
-            } label: {
-                Image(systemName: settings.panelPinned ? "pin.fill" : "pin")
-            }
-            .buttonStyle(IconButtonStyle())
-            .help(settings.panelPinned ? L("取消钉住：点别处时自动关闭") : L("钉住：点别处时不关闭，可以拖到任何位置"))
-            Button {
-                store.restart()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .rotationEffect(.degrees(store.isRefreshing ? 180 : 0))
-                    .animation(.easeInOut(duration: 0.3), value: store.isRefreshing)
-            }
-            .buttonStyle(IconButtonStyle())
-            .keyboardShortcut("r", modifiers: .command)
-            .help(L("立即刷新（⌘R）"))
+        ViewThatFits(in: .horizontal) {
+            states(compact: false)
+            states(compact: true)
         }
-        .padding(10)
-        .glassCard(prominent: true)
+    }
+
+    private func states(compact: Bool) -> some View {
+        HStack(spacing: 7) {
+            // 环球品种没有统一的开收盘时刻，不占这里的地方。
+            ForEach(store.activeRegions.filter { $0 != .global }, id: \.self) { region in
+                let phase = store.phase(for: region)
+                let status = Self.status(region, phase)
+                HStack(spacing: 3) {
+                    Circle()
+                        .fill(Theme.phaseColor(phase, convention: settings.colorConvention))
+                        .frame(width: 5, height: 5)
+                    Text(compact ? region.displayName : status)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(status)
+                .help(region == .hk ? status + "\n" + L("港股行情延时约 15 分钟") : status)
+            }
+        }
+        .fixedSize()
     }
 }
 
@@ -637,7 +612,7 @@ struct TipsCards: View {
                 tip(L("点右边的色块，在涨跌幅、涨跌额和总市值之间切换"))
                 tip(L("一次粘贴多个代码，回车全部添加"))
                 tip(L("↑ ↓ 选择，回车添加或展开；展开后 ← → 切换分时和 K 线"))
-                tip(L("点右上角的图钉，面板就一直显示，可以拖到任何位置"))
+                tip(L("在底部选项菜单选择“本次保持打开”，可临时置顶并拖动面板"))
             }
             .padding(10)
             .glassCard()
@@ -1075,15 +1050,49 @@ struct PanelFooter: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(statusText(at: context.date))
-            }
+            VStack(alignment: .leading, spacing: 3) {
+                MarketStatusLine()
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    HStack(spacing: 3) {
+                        if settings.panelPinned {
+                            Image(systemName: "pin.fill")
+                                .help(L("本次保持打开"))
+                        }
+                        Text(statusText(at: context.date))
+                    }
+                    .help(statusText(at: context.date, detailed: true)
+                          + (store.usingBackup ? "\n" + L("腾讯的行情接口暂时取不到，正在用新浪的行情；分时和 K 线要等腾讯恢复") : ""))
+                    .accessibilityLabel(statusText(at: context.date, detailed: true))
+                }
                 .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(store.lastError != nil && copiedMessage == nil ? Color.orange : Color.secondary)
                 .lineLimit(1)
-                .help(store.usingBackup ? L("腾讯的行情接口暂时取不到，正在用新浪的行情；分时和 K 线要等腾讯恢复") : "")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 4)
+            Button {
+                store.restart()
+            } label: {
+                Image(systemName: "arrow.clockwise")
+                    .rotationEffect(.degrees(store.isRefreshing ? 180 : 0))
+                    .animation(.easeInOut(duration: 0.3), value: store.isRefreshing)
+                    .overlay(alignment: .topTrailing) {
+                        if store.lastError != nil {
+                            Circle().fill(Color.orange).frame(width: 5, height: 5)
+                        }
+                    }
+            }
+            .buttonStyle(IconButtonStyle())
+            .keyboardShortcut("r", modifiers: .command)
+            .help(store.lastError.map { L("刷新失败：%@", $0) + "\n" + L("立即刷新（⌘R）") } ?? L("立即刷新（⌘R）"))
+            .accessibilityLabel(L("立即刷新（⌘R）"))
+            .accessibilityValue(store.lastError.map { L("刷新失败：%@", $0) } ?? "")
             Menu {
+                Toggle(isOn: $settings.panelPinned) {
+                    Label(L("本次保持打开"), systemImage: "pin")
+                }
+                .help(settings.panelPinned ? L("取消钉住：点别处时自动关闭") : L("钉住：点别处时不关闭，可以拖到任何位置"))
+                Divider()
                 Text(L("排序"))
                 Picker(L("排序"), selection: $settings.sortMode) {
                     ForEach(WatchlistSort.allCases, id: \.self) { mode in
@@ -1130,7 +1139,8 @@ struct PanelFooter: View {
             .buttonStyle(IconButtonStyle())
             .frame(width: 30, height: 30)
             .background(Circle().fill(Color.primary.opacity(0.05)))
-            .help(L("排序：%@；色块显示%@", settings.sortMode.title, settings.changeDisplay.title))
+            .accessibilityLabel(L("排序、复制与面板选项"))
+            .help(L("排序、复制与面板选项") + "\n" + L("排序：%@；色块显示%@", settings.sortMode.title, settings.changeDisplay.title))
             Button {
                 actions.openSettings(nil)
             } label: {
@@ -1187,7 +1197,7 @@ struct PanelFooter: View {
         }
     }
 
-    private func statusText(at date: Date) -> String {
+    private func statusText(at date: Date, detailed: Bool = false) -> String {
         if let copiedMessage {
             return copiedMessage
         }
@@ -1196,6 +1206,9 @@ struct PanelFooter: View {
             return L("连不上行情，%@ 秒后重试", max(1, Int(ceil(retryAt.timeIntervalSince(date)))))
         }
         guard let updated = store.lastUpdated else { return L("正在获取行情…") }
+        if !detailed {
+            return L("%@ 更新", QuoteFormatter.time(updated)) + (store.usingBackup ? " · " + L("新浪行情") : "")
+        }
         let cadence = store.effectiveInterval > settings.refreshInterval
             ? L("休市中每分钟刷新")
             : L("每 %@ 秒刷新", Int(settings.refreshInterval))

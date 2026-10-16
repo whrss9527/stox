@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.7.0（未发布）
+
+### 中文
+
+- 精简行情面板顶部标题卡片，市场状态、更新时间和刷新整合到底栏；置顶移至菜单且仅本次打开有效，每次重新打开默认失焦关闭。
+
+### English
+
+- Simplify the quotes panel with market status, update time and refresh in the bottom bar. Keep-open is a menu option for the current opening; reopening restores automatic closing on focus loss.
+
 ## 1.6.2（未发布）
 
 ### 中文

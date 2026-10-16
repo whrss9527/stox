@@ -137,7 +137,7 @@
 "点右边的色块，在涨跌幅、涨跌额和总市值之间切换" = "Click the colored pill to switch between % change, change and market cap";
 "一次粘贴多个代码，回车全部添加" = "Paste several symbols at once and press Return to add them all";
 "↑ ↓ 选择，回车添加或展开；展开后 ← → 切换分时和 K 线" = "↑ ↓ to select, Return to add or expand; ← → switch charts when expanded";
-"点右上角的图钉，面板就一直显示，可以拖到任何位置" = "Click the pin at the top right to keep the panel open and drag it anywhere";
+"在底部选项菜单选择“本次保持打开”，可临时置顶并拖动面板" = "Use Keep Open for This Session in the bottom options menu to pin and move this panel";
 "不再显示" = "Don’t Show Again";
 "今日盈亏" = "Today’s P&L";
 "持仓盈亏" = "Total P&L";
@@ -745,3 +745,6 @@
 "证券代码" = "Symbol Code";
 "打开行情面板" = "Open Quotes Panel";
 "打开 Stox 的自选行情面板。" = "Open the Stox watchlist panel.";
+"本次保持打开" = "Keep Open for This Session";
+"排序、复制与面板选项" = "Sort, Copy and Panel Options";
+"新浪行情" = "Sina quotes";
