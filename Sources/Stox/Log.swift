@@ -1,4 +1,5 @@
 import Foundation
+import StoxCore
 import os
 
 /// 日志写到系统的统一日志（“控制台”App 里按 subsystem 过滤），同时追加到 ~/Library/Application Support/Stox/stox.log，
@@ -36,12 +37,11 @@ enum Log {
     }
 
     /// 最近的日志可跨越一次轮转；读取前先写完队列，不取配置或持仓文件。
-    static func recentLines(limit: Int = 200, at url: URL = fileURL) -> [String] {
+    static func recentLines(limit: Int = 200, at url: URL = fileURL, maxBytesPerFile: Int = 1 << 20) -> [String] {
         queue.sync {
             let previous = url.appendingPathExtension("1")
-            let lines = [previous, url].flatMap { file -> [String] in
-                guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [] }
-                return text.components(separatedBy: .newlines).filter { !$0.isEmpty }
+            let lines = [previous, url].flatMap { file in
+                DiagnosticLogTail.lines(at: file, limit: limit, maxBytes: maxBytesPerFile)
             }
             return Array(lines.suffix(max(0, limit)))
         }
