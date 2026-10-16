@@ -745,3 +745,6 @@
 "证券代码" = "Symbol Code";
 "打开行情面板" = "Open Quotes Panel";
 "打开 Stox 的自选行情面板。" = "Open the Stox watchlist panel.";
+"本次保持打开" = "Keep Open for This Session";
+"排序、复制与面板选项" = "Sort, Copy and Panel Options";
+"新浪行情" = "Sina quotes";

@@ -130,8 +130,12 @@ quick() {
   use_chinese
   defaults write "$DOMAIN" update.autoCheck -bool false
   defaults write "$DOMAIN" tips.dismissed -bool true
+  # 升级后旧的置顶偏好也不能让面板保持打开。
+  defaults write "$DOMAIN" panel.pinned -bool true
   run_case panel --show-panel
   check_fits panel
+  grep -q 'pinned=false' shots/panel.log || fail "每次打开面板应该默认失焦关闭"
+  defaults delete "$DOMAIN" panel.pinned
   grep -q 'english=false sample="设置…"' shots/panel.log || fail "界面应该是中文"
   grep -q 'image=false color=redUp' shots/panel.log || fail "默认菜单栏显示或涨跌颜色不对"
   run_case detail --show-panel --expand sh600519
@@ -495,7 +499,7 @@ smoke() {
     echo "::warning::没有取到汇率"
   fi
 
-  # 钉住的面板放回上次拖到的位置（左上角 x=100，离屏幕底边 600）。
+  # 旧版持久置顶和位置不能改变新面板默认失焦关闭的行为。
   defaults write "$DOMAIN" panel.pinned -bool true
   defaults write "$DOMAIN" panel.pinnedX -float 100
   defaults write "$DOMAIN" panel.pinnedY -float 600
@@ -503,8 +507,7 @@ smoke() {
   defaults delete "$DOMAIN" panel.pinned
   defaults delete "$DOMAIN" panel.pinnedX
   defaults delete "$DOMAIN" panel.pinnedY
-  grep -q "pinned=true" shots/pinned.log || fail "没有读到钉住的设置"
-  grep -q "panel_frame=100 " shots/pinned.log || fail "钉住的面板没有放回上次的位置"
+  grep -q "pinned=false" shots/pinned.log || fail "旧版置顶设置不应恢复为常驻面板"
 
   # 外观选深色：面板和设置窗口用深色，菜单栏不受影响。
   defaults write "$DOMAIN" appearance -string dark

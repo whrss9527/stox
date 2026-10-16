@@ -14,7 +14,7 @@ final class StatusItemController: NSObject {
     private let sync: SyncManager
     private let router = PanelRouter()
     private let statusItem: NSStatusItem
-    private var panel: PanelWindow?
+    private(set) var panel: PanelWindow?
     private var hostingView: NSHostingView<AnyView>?
     /// SwiftUI 最近一次量出的面板内容尺寸。
     private var contentSize = CGSize.zero
@@ -56,7 +56,7 @@ final class StatusItemController: NSObject {
         settings.$panelPinned
             .removeDuplicates()
             .dropFirst()
-            .receive(on: RunLoop.main)
+            // SettingsStore 在 MainActor 上更新，置顶状态要在下一次失焦前立即应用。
             .sink { [weak self] pinned in self?.pinnedChanged(pinned) }
             .store(in: &cancellables)
 
@@ -94,6 +94,9 @@ final class StatusItemController: NSObject {
         route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil, keys: [PanelKey] = [],
         printDiagnostics: Bool = false
     ) {
+        if panel?.isVisible != true {
+            settings.panelPinned = false
+        }
         if panel == nil {
             makePanel()
         }
@@ -170,6 +173,7 @@ final class StatusItemController: NSObject {
         panel.orderOut(nil)
         statusItem.button?.highlight(false)
         router.panelDidClose()
+        settings.panelPinned = false
     }
 
     func openSettings(_ page: SettingsPage?) {
@@ -394,7 +398,8 @@ final class StatusItemController: NSObject {
 
     /// 放在菜单栏图标正下方，不超出屏幕。
     private func position(_ panel: PanelWindow) {
-        if settings.panelPinned, let topLeft = settings.pinnedTopLeft {
+        // @Published 在 willSet 发出值，此时窗口已同步新模式，设置属性还可能是旧值。
+        if panel.pinned, let topLeft = settings.pinnedTopLeft {
             // 钉住时放回上次拖到的位置；那块屏幕不在了就放到主屏幕里。
             let size = panel.frame.size
             let screen = NSScreen.screens.first { $0.visibleFrame.insetBy(dx: -1, dy: -1).contains(topLeft) } ?? NSScreen.main

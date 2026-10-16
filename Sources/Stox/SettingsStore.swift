@@ -317,11 +317,9 @@ final class SettingsStore: ObservableObject {
     @Published var profitCalendarByYear: Bool {
         didSet { defaults.set(profitCalendarByYear, forKey: Keys.profitCalendarByYear) }
     }
-    /// 面板钉住：点别处时不关闭，可以拖到任何位置。
-    @Published var panelPinned: Bool {
-        didSet { defaults.set(panelPinned, forKey: Keys.panelPinned) }
-    }
-    /// 钉住时面板左上角的位置（屏幕坐标），下次打开放回这里。
+    /// 仅本次打开钉住：点别处时不关闭；关闭后恢复，不读取旧版持久置顶偏好。
+    @Published var panelPinned = false
+    /// 本次钉住时面板左上角的位置（屏幕坐标），用于尺寸变化时保持拖动后的位置。
     var pinnedTopLeft: CGPoint? {
         get {
             guard defaults.object(forKey: Keys.pinnedX) != nil, defaults.object(forKey: Keys.pinnedY) != nil else { return nil }
@@ -397,7 +395,6 @@ final class SettingsStore: ObservableObject {
         showDayProfit = defaults.object(forKey: Keys.showDayProfit) as? Bool ?? false
         menuBarProfit = defaults.string(forKey: Keys.menuBarProfit).flatMap(MenuBarProfit.init(rawValue:)) ?? .day
         profitCalendarByYear = defaults.object(forKey: Keys.profitCalendarByYear) as? Bool ?? false
-        panelPinned = defaults.object(forKey: Keys.panelPinned) as? Bool ?? false
         chartPeriod = defaults.string(forKey: Keys.chartPeriod).flatMap(ChartPeriod.init(rawValue:)) ?? .intraday
         tipsDismissed = defaults.object(forKey: Keys.tipsDismissed) as? Bool ?? false
         whatsNewVersion = defaults.string(forKey: Keys.whatsNewVersion)
@@ -491,7 +488,6 @@ final class SettingsStore: ObservableObject {
         static let showDayProfit = "ticker.dayProfit"
         static let menuBarProfit = "ticker.profitKind"
         static let profitCalendarByYear = "calendar.byYear"
-        static let panelPinned = "panel.pinned"
         static let pinnedX = "panel.pinnedX"
         static let pinnedY = "panel.pinnedY"
         static let chartPeriod = "chart.period"
