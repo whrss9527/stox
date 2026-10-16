@@ -36,7 +36,6 @@ defaults write "$domain" ticker.rotate -bool false
 defaults write "$domain" ticker.hidden -bool false
 defaults write "$domain" ticker.hideWhenClosed -bool false
 defaults write "$domain" ticker.dayProfit -bool false
-defaults write "$domain" panel.pinned -bool true
 defaults write "$domain" refreshInterval -float 5
 defaults write "$domain" slowWhenIdle -bool false
 defaults write "$domain" update.autoCheck -bool false
@@ -44,7 +43,7 @@ defaults write "$domain" sync.enabled -bool false
 defaults write "$domain" alertsEnabled -bool false
 defaults write "$domain" tips.dismissed -bool true
 log=shots/footprint-app.log
-STOX_SYNC_DIR="$work/sync" STOX_TEST_NOTIFICATIONS=denied "$app/Contents/MacOS/Stox" --show-panel > "$log" 2>&1 &
+STOX_SYNC_DIR="$work/sync" STOX_TEST_NOTIFICATIONS=denied "$app/Contents/MacOS/Stox" --show-panel --pin-panel > "$log" 2>&1 &
 app_pid=$!
 # 必须真实显示两行菜单栏、拿到行情和迷你走势线，不能拿空面板的数值当作该场景的基线。
 ready() {

@@ -179,6 +179,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///        [--group 科技]                                      直接打开这个分组的编辑页
     ///        [--alerts]                                         直接打开最近的提醒
     ///        [--rank]                                           直接打开 A 股涨跌榜
+    ///        [--pin-panel]                                      显式保持本次面板打开，供测量使用
     ///        [--export-backup 路径] [--import-backup 路径]       启动时导出备份，或者用备份替换自选（不问）
     ///   Stox --show-settings [general|display|sync|about]      打开设置窗口并打印窗口位置
     ///   Stox --check-update                                    先检查一次更新再打开上面两者（只有 GitHub 版）
@@ -266,6 +267,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         ?? (alerts ? .alerts : (rank ? .rank : (calendar ? .calendar : .list))),
                     expand: expand, search: search, keys: keys, printDiagnostics: true
                 )
+                if arguments.contains("--pin-panel") {
+                    self.settings.panelPinned = true
+                }
             }
         }
     }
