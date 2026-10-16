@@ -15,6 +15,11 @@ final class StatusItemController: NSObject {
     private let router = PanelRouter()
     private let statusItem: NSStatusItem
     private(set) var panel: PanelWindow?
+    /// 菜单栏按钮当前的屏幕坐标；系统重新排列菜单栏时会变化。
+    var statusButtonFrame: NSRect? {
+        guard let button = statusItem.button, let window = button.window else { return nil }
+        return window.convertToScreen(button.convert(button.bounds, to: nil))
+    }
     private var hostingView: NSHostingView<AnyView>?
     /// SwiftUI 最近一次量出的面板内容尺寸。
     private var contentSize = CGSize.zero
@@ -411,8 +416,7 @@ final class StatusItemController: NSObject {
             panel.setFrameOrigin(origin)
             return
         }
-        guard let button = statusItem.button, let buttonWindow = button.window else { return }
-        let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        guard let buttonRect = statusButtonFrame, let buttonWindow = statusItem.button?.window else { return }
         let size = panel.frame.size
         var origin = NSPoint(x: buttonRect.midX - size.width / 2, y: buttonRect.minY - size.height - 2)
         if let screen = buttonWindow.screen ?? NSScreen.main {

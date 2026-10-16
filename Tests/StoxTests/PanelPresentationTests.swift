@@ -65,9 +65,11 @@ final class PanelPresentationTests: XCTestCase {
         context.settings.pinnedTopLeft = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
         context.settings.panelPinned = false
         XCTAssertFalse(panel.pinned)
-        // The status item can move while macOS arranges the menu bar; its old x is not an anchor.
         XCTAssertNotEqual(panel.frame.origin, floatingOrigin)
-        XCTAssertGreaterThan(panel.frame.maxY, screen.midY + panel.frame.height / 2)
+        // Test hosts may not have a menu bar layout yet. Use the live anchor and screen bounds.
+        let anchor = try XCTUnwrap(controller.statusButtonFrame)
+        let expectedTop = max(anchor.minY - 2, screen.minY + 6 + panel.frame.height)
+        XCTAssertEqual(panel.frame.maxY, expectedTop, accuracy: 1)
         context.settings.panelPinned = true
         controller.closePanel()
         XCTAssertFalse(context.settings.panelPinned)
