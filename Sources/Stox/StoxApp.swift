@@ -65,12 +65,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Notifier.shared.postSummary(note)
         }
         #if !APP_STORE
-        updater.notify = { title, body in
-            Notifier.shared.postUpdate(title: title, body: body)
+        updater.notify = { candidate in
+            Notifier.shared.postUpdate(title: L("Stox 有新版本 %@", candidate.release.version?.description ?? candidate.release.tagName),
+                                      body: L("打开行情面板点“更新”，自动下载安装并重新启动"))
         }
-        updater.onRelaunch = {
-            NSApp.terminate(nil)
-        }
+        // Frit 默认重启入口先创建交接 helper 再退出 App。
+        // onRelaunch 在交接前调用，不能在该通知里提前 terminate。
         #endif
 
         store.start()
@@ -240,6 +240,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             #if !APP_STORE
             if installUpdate {
                 await self.updater.checkAndInstall()
+                if case .failed(_, let failure) = self.updater.phase {
+                    let code: String
+                    switch failure {
+                    case .noArchive: code = "noArchive"
+                    case .checksumMismatch: code = "checksumMismatch"
+                    default: code = "other"
+                    }
+                    print("STOX_UPDATE_RESULT failure=\(code)")
+                    fflush(stdout)
+                }
                 return
             }
             if checkUpdate {

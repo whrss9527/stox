@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/whrss9527/Frit",
       "state" : {
-        "revision" : "2291523e16c91afae06868d7c4e188efc36cd70b",
-        "version" : "0.4.1"
+        "revision" : "7e27bc717429f3490775c295808892ed8af8e729",
+        "version" : "0.4.2"
       }
     }
   ],

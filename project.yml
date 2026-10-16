@@ -7,6 +7,9 @@ options:
 packages:
   StoxPackage:
     path: .
+  FritPackage:
+    url: https://github.com/whrss9527/Frit
+    exactVersion: 0.4.2
 settings:
   base:
     SWIFT_VERSION: '5.0'
@@ -24,9 +27,6 @@ targetTemplates:
       - path: Resources
         excludes: [Info.plist, '*.entitlements']
         buildPhase: resources
-    dependencies:
-      - package: StoxPackage
-        product: StoxCore
     settings:
       base:
         PRODUCT_NAME: Stox
@@ -37,8 +37,20 @@ targetTemplates:
 targets:
   Stox:
     templates: [StoxApplication]
+    dependencies:
+      - package: StoxPackage
+        product: StoxCore
+      - package: FritPackage
+        product: FritCore
+      - package: FritPackage
+        product: FritUpdate
   StoxAppStore:
     templates: [StoxApplication]
+    dependencies:
+      - package: StoxPackage
+        product: StoxCore
+      - package: FritPackage
+        product: FritCore
     settings:
       base:
         SWIFT_ACTIVE_COMPILATION_CONDITIONS: '$(inherited) APP_STORE'
@@ -53,6 +65,8 @@ targets:
     sources: [Tests/StoxTests]
     dependencies:
       - target: Stox
+      - package: FritPackage
+        product: FritUpdate
       - package: StoxPackage
         product: StoxCore
     settings:

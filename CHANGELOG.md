@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.6.1（未发布）
+
+### 中文
+
+- 更新检查、下载安装和更新界面统一采用 Frit；保留已有跳过版本和通知偏好，支持原地更新及从临时位置搬入应用程序，继续校验附件和开发者签名。
+
+### English
+
+- Use Frit for update checks, installation and update views while preserving skipped versions and notification preferences. In-place updates, relocation from temporary locations and archive/developer verification remain available.
+
 ## 1.6.0（未发布）
 
 ### 中文

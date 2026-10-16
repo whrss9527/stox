@@ -65,6 +65,22 @@ plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$APP/Contents/Info.plis
 for lproj in Resources/*.lproj; do
   cp -R "$lproj" "$APP/Contents/Resources/"
 done
+if [[ "$FLAVOR" == "github" ]]; then
+  # 共用更新视图的 Bundle.module 必须能在实际安装后的 App 中读取。
+  SDK_RESOURCES="$APP/Contents/Resources/Frit_FritUpdate.bundle"
+  if [[ ! -d "$SDK_RESOURCES" ]]; then
+    ditto "$DERIVED_DATA/Build/Products/Release/Frit_FritUpdate.bundle" "$SDK_RESOURCES"
+  fi
+  python3 - "$SDK_RESOURCES" <<'PYUPDATE'
+from pathlib import Path
+import sys
+bundle = Path(sys.argv[1])
+languages = {path.parent.name.lower() for path in bundle.rglob('Localizable.strings')}
+missing = {'en.lproj', 'zh-hans.lproj', 'zh-hant.lproj'} - languages
+if missing:
+    sys.exit('共用更新器缺少语言资源：' + ', '.join(sorted(missing)))
+PYUPDATE
+fi
 python3 scripts/check-app-intents.py "$APP"
 if [[ "$FLAVOR" == "appstore" ]]; then
   # 只用 HTTPS（系统自带的加密），出口合规可以豁免；声明了以后每次上传不用再在 App Store Connect 里回答。

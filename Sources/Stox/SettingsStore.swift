@@ -1,4 +1,5 @@
 import AppKit
+import FritCore
 import StoxCore
 
 enum ColorConvention: String, CaseIterable, Identifiable {
@@ -405,7 +406,7 @@ final class SettingsStore: ObservableObject {
 
     /// 启动时记下这次运行的版本；比上次运行的新，就在面板里提示一次“已更新”。
     func recordLaunch(version: String) {
-        if let last = defaults.string(forKey: Keys.lastRunVersion), UpdateCheck.isNewer(version, than: last) {
+        if let last = defaults.string(forKey: Keys.lastRunVersion), AppVersion.isNewer(version, than: last) {
             // 上一次的提示还没关就又更新了：从更早的那个版本算起。
             if whatsNewVersion == nil || whatsNewSince == nil {
                 whatsNewSince = last
