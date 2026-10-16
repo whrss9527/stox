@@ -109,6 +109,8 @@ brew install --cask whrss9527/tap/stox
 
 Stox 免费开源。觉得好用的话，点个 ⭐ Star 就是很大的鼓励；也可以微信扫一扫请我喝杯咖啡。
 
+GitHub 版也可以在「设置 → 关于与更新 → 请我喝杯咖啡」里打开同一张赞赏码。
+
 <p align="center"><img src="docs/donate-wechat.png" width="240" alt="微信赞赏码：请我喝杯咖啡"></p>
 
 ## 许可证
