@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.6.2（未发布）
+
+### 中文
+
+- 解决 iCloud 冲突时，在同一次文件协调中重读并合并最新内容；保留其他编辑器尚未保存的修改，写回成功后才清理已处理的冲突版本。
+
+### English
+
+- Re-read and merge the latest contents within one coordinated write when resolving iCloud conflicts. Preserve unsaved edits from other file presenters and clear captured conflicts only after the write succeeds.
+
 ## 1.6.1（未发布）
 
 ### 中文
