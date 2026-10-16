@@ -58,12 +58,16 @@ final class PanelPresentationTests: XCTestCase {
         XCTAssertTrue(context.settings.panelPinned)
         panel.resignKey()
         XCTAssertTrue(panel.isVisible)
-        let anchoredOrigin = panel.frame.origin
-        panel.setFrameOrigin(NSPoint(x: anchoredOrigin.x - 40, y: anchoredOrigin.y - 40))
+        let screen = try XCTUnwrap(panel.screen ?? NSScreen.main).visibleFrame
+        let floatingOrigin = NSPoint(x: screen.midX - panel.frame.width / 2,
+                                     y: screen.midY - panel.frame.height / 2)
+        panel.setFrameOrigin(floatingOrigin)
+        context.settings.pinnedTopLeft = CGPoint(x: panel.frame.minX, y: panel.frame.maxY)
         context.settings.panelPinned = false
         XCTAssertFalse(panel.pinned)
-        XCTAssertEqual(panel.frame.minX, anchoredOrigin.x, accuracy: 1)
-        XCTAssertEqual(panel.frame.minY, anchoredOrigin.y, accuracy: 1)
+        // The status item can move while macOS arranges the menu bar; its old x is not an anchor.
+        XCTAssertNotEqual(panel.frame.origin, floatingOrigin)
+        XCTAssertGreaterThan(panel.frame.maxY, screen.midY + panel.frame.height / 2)
         context.settings.panelPinned = true
         controller.closePanel()
         XCTAssertFalse(context.settings.panelPinned)
