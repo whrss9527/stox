@@ -90,21 +90,40 @@ enum CloudFile {
 
     /// 在同一个协调写操作里读、合并、写，避免拉取之后、写回之前到来的云端改动被覆盖。
     static func merge(_ document: SyncDocument, base: SyncContent?, at url: URL) throws -> SyncDocument {
+        try coordinatedMerge(at: url) { current in
+            guard let current else { return document }
+            return SyncMerge.threeWay(base: base, local: document, remote: current)
+        }
+    }
+
+    /// 所有冲突文档共用同一基线；当前目的文档只在最终写协调区内读取。
+    static func mergeConflictDocuments(_ documents: [SyncDocument], base: SyncContent?, at url: URL) throws -> SyncDocument? {
+        guard !documents.isEmpty else { return nil }
+        return try coordinatedMerge(at: url) { current in
+            let candidates = documents + (current.map { [$0] } ?? [])
+            guard let merged = SyncMerge.resolving(base: base, documents: candidates) else {
+                throw CocoaError(.fileWriteUnknown)
+            }
+            return merged
+        }
+    }
+
+    private static func coordinatedMerge(at url: URL, merging: (SyncDocument?) throws -> SyncDocument) throws -> SyncDocument {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         var coordinationError: NSError?
-        var result: Result<SyncDocument, Error> = .success(document)
-        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &coordinationError) { writeURL in
+        var result: Result<SyncDocument, Error>?
+        // 更新同一文档时先让呈现者保存；forReplacing 表示删除/替换另一个项目。
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forMerging, error: &coordinationError) { writeURL in
             result = Result {
-                var merged = document
-                if FileManager.default.fileExists(atPath: writeURL.path) {
-                    let remote = try SyncDocument.decode(Data(contentsOf: writeURL))
-                    merged = SyncMerge.threeWay(base: base, local: document, remote: remote)
-                }
+                let current = FileManager.default.fileExists(atPath: writeURL.path)
+                    ? try SyncDocument.decode(Data(contentsOf: writeURL)) : nil
+                let merged = try merging(current)
                 try merged.encoded().write(to: writeURL, options: .atomic)
                 return merged
             }
         }
         if let coordinationError { throw coordinationError }
+        guard let result else { throw CocoaError(.fileWriteUnknown) }
         return try result.get()
     }
 
@@ -113,12 +132,10 @@ enum CloudFile {
         let conflicts = NSFileVersion.unresolvedConflictVersionsOfItem(at: url) ?? []
         guard !conflicts.isEmpty else { return nil }
         var candidates: [SyncDocument] = []
-        if let current = try read(at: url) { candidates.append(current) }
         for version in conflicts {
             candidates.append(try SyncDocument.decode(Data(contentsOf: version.url)))
         }
-        guard let merged = SyncMerge.resolving(base: base, documents: candidates) else { return nil }
-        try write(merged, to: url)
+        guard let merged = try mergeConflictDocuments(candidates, base: base, at: url) else { return nil }
         for version in conflicts {
             version.isResolved = true
             try version.remove()
