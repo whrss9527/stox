@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.6.2（未发布）
+
+### 中文
+
+- 复制诊断信息时仅读取有限的最近日志，避免超大旧文件占用过多内存；保留当前及上一份日志的顺序，不改写文件。
+
+### English
+
+- Bound recent log reads when copying diagnostics, preserving current/previous log order without rewriting oversized old files.
+
 ## 1.6.1（未发布）
 
 ### 中文
