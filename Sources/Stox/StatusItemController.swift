@@ -14,7 +14,12 @@ final class StatusItemController: NSObject {
     private let sync: SyncManager
     private let router = PanelRouter()
     private let statusItem: NSStatusItem
-    private var panel: PanelWindow?
+    private(set) var panel: PanelWindow?
+    /// 菜单栏按钮当前的屏幕坐标；系统重新排列菜单栏时会变化。
+    var statusButtonFrame: NSRect? {
+        guard let button = statusItem.button, let window = button.window else { return nil }
+        return window.convertToScreen(button.convert(button.bounds, to: nil))
+    }
     private var hostingView: NSHostingView<AnyView>?
     /// SwiftUI 最近一次量出的面板内容尺寸。
     private var contentSize = CGSize.zero
@@ -56,7 +61,7 @@ final class StatusItemController: NSObject {
         settings.$panelPinned
             .removeDuplicates()
             .dropFirst()
-            .receive(on: RunLoop.main)
+            // SettingsStore 在 MainActor 上更新，置顶状态要在下一次失焦前立即应用。
             .sink { [weak self] pinned in self?.pinnedChanged(pinned) }
             .store(in: &cancellables)
 
@@ -94,6 +99,9 @@ final class StatusItemController: NSObject {
         route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil, keys: [PanelKey] = [],
         printDiagnostics: Bool = false
     ) {
+        if panel?.isVisible != true {
+            settings.panelPinned = false
+        }
         if panel == nil {
             makePanel()
         }
@@ -170,6 +178,7 @@ final class StatusItemController: NSObject {
         panel.orderOut(nil)
         statusItem.button?.highlight(false)
         router.panelDidClose()
+        settings.panelPinned = false
     }
 
     func openSettings(_ page: SettingsPage?) {
@@ -394,7 +403,8 @@ final class StatusItemController: NSObject {
 
     /// 放在菜单栏图标正下方，不超出屏幕。
     private func position(_ panel: PanelWindow) {
-        if settings.panelPinned, let topLeft = settings.pinnedTopLeft {
+        // @Published 在 willSet 发出值，此时窗口已同步新模式，设置属性还可能是旧值。
+        if panel.pinned, let topLeft = settings.pinnedTopLeft {
             // 钉住时放回上次拖到的位置；那块屏幕不在了就放到主屏幕里。
             let size = panel.frame.size
             let screen = NSScreen.screens.first { $0.visibleFrame.insetBy(dx: -1, dy: -1).contains(topLeft) } ?? NSScreen.main
@@ -406,8 +416,7 @@ final class StatusItemController: NSObject {
             panel.setFrameOrigin(origin)
             return
         }
-        guard let button = statusItem.button, let buttonWindow = button.window else { return }
-        let buttonRect = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        guard let buttonRect = statusButtonFrame, let buttonWindow = statusItem.button?.window else { return }
         let size = panel.frame.size
         var origin = NSPoint(x: buttonRect.midX - size.width / 2, y: buttonRect.minY - size.height - 2)
         if let screen = buttonWindow.screen ?? NSScreen.main {

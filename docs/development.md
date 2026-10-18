@@ -150,3 +150,5 @@ Automatic releases wait for Core, the complete app launch/sync/update checks, an
 Launch readiness keeps its 20-second deadline. Batch input does not wait for single-search results that it never produces, and the nine-case branch quick suite includes the same batch query as the full suite. A failed launch saves a three-second main-thread sample before terminating and remains a failure; early/late diagnostic stages include monotonic elapsed time.
 
 CI reads the first release heading in `CHANGELOG.md` with `scripts/candidate-version.py`, exports that marketing version to both the regular and Store builds, and checks each built Info.plist before launch tests. A malformed first heading or a mismatched bundle fails the job; the parser does not fall back to an older release heading or Git tag. This keeps version-dependent runtime checks on the candidate version.
+
+`--show-panel --pin-panel` explicitly keeps only that diagnostic opening visible, as used by `measure-footprint.sh`. Ordinary openings ignore legacy persisted pin preferences and close on focus loss; the bottom menu can opt the current opening into keep-open.
