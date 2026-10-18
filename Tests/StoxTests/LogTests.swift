@@ -2,6 +2,23 @@ import XCTest
 @testable import Stox
 
 final class LogTests: XCTestCase {
+    func testBoundedRecentLinesStillSpanPreviousAndCurrentFiles() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let file = folder.appendingPathComponent("stox.log")
+        let old = file.appendingPathExtension("1")
+        let prefix = String(repeating: "旧记录🙂", count: 5000)
+        let previous = prefix + "\nprevious error\n"
+        let current = prefix + "\ncurrent error\n"
+        try previous.write(to: old, atomically: true, encoding: .utf8)
+        try current.write(to: file, atomically: true, encoding: .utf8)
+        XCTAssertEqual(Log.recentLines(limit: 2, at: file, maxBytesPerFile: 64), ["previous error", "current error"])
+        XCTAssertEqual(Log.recentLines(limit: 1, at: file, maxBytesPerFile: 64), ["current error"])
+        XCTAssertEqual(try String(contentsOf: old), previous)
+        XCTAssertEqual(try String(contentsOf: file), current)
+    }
+
     func testRotationKeepsOnePreviousFileAndRecentLinesSpanBothFiles() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }
