@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.7.2（2026-10-19）
+
+### 中文
+
+- 修正面板自动关闭：鼠标移出后无需点击即可关闭，快速移回、操作菜单及拖动时不误关；“本次保持打开”仍可临时置顶。
+
+### English
+
+- Close the panel when the mouse pointer leaves, without requiring a click. Quick re-entry, menus and dragging avoid premature closing; Keep Open for This Session still pins the current opening.
+
 ## 1.7.1（2026-10-18）
 
 ### 中文
