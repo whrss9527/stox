@@ -5,7 +5,7 @@ import StoxCore
 
 /// 菜单栏图标 + 玻璃面板。
 ///
-/// - 左键单击：打开 / 关闭行情面板（再点一次、点到别处、按 Esc 都会关闭）
+/// - 左键单击：打开 / 关闭行情面板（鼠标移出、点到别处、按 Esc 都会关闭）
 /// - 右键或 Control+单击：在“菜单栏显示行情”和“只显示图标”之间切换
 @MainActor
 final class StatusItemController: NSObject {
@@ -15,6 +15,7 @@ final class StatusItemController: NSObject {
     private let router = PanelRouter()
     private let statusItem: NSStatusItem
     private(set) var panel: PanelWindow?
+    private var mouseDismissal: PanelMouseDismissal?
     /// 菜单栏按钮当前的屏幕坐标；系统重新排列菜单栏时会变化。
     var statusButtonFrame: NSRect? {
         guard let button = statusItem.button, let window = button.window else { return nil }
@@ -25,7 +26,7 @@ final class StatusItemController: NSObject {
     private var contentSize = CGSize.zero
     private var resizeObserver: NSObjectProtocol?
     private var moveObserver: NSObjectProtocol?
-    /// 面板因为点到别处而关闭的时间：点菜单栏图标关闭面板时，不要紧接着又把它打开。
+    /// 面板自动关闭的时间：点菜单栏图标关闭面板时，不要紧接着又把它打开。
     private var lastAutoClose = Date.distantPast
     private var rotationTimer: Timer?
     private var rotationIndex = 0
@@ -120,6 +121,7 @@ final class StatusItemController: NSObject {
         position(panel)
         panel.orderFrontRegardless()
         panel.makeKey()
+        mouseDismissal?.start()
         statusItem.button?.highlight(true)
         if printDiagnostics || !keys.isEmpty {
             let diagnosticsStarted = ProcessInfo.processInfo.systemUptime
@@ -174,6 +176,7 @@ final class StatusItemController: NSObject {
     }
 
     func closePanel() {
+        mouseDismissal?.stop()
         guard let panel, panel.isVisible else { return }
         panel.orderOut(nil)
         statusItem.button?.highlight(false)
@@ -211,10 +214,13 @@ final class StatusItemController: NSObject {
         moveObserver = NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.panelMoved() }
         }
-        panel.onResignKey = { [weak self] in self?.panelLostFocus() }
+        panel.onResignKey = { [weak self] in self?.closeUnpinnedPanel() }
         panel.onClose = { [weak self] in self?.closePanel() }
         panel.onEscape = { [weak self] in self?.router.handleEscape() ?? false }
         panel.onNavigate = { [weak self] key in self?.handleNavigation(key) ?? false }
+        mouseDismissal = PanelMouseDismissal(panel: panel, statusButtonFrame: { [weak self] in self?.statusButtonFrame }) { [weak self] in
+            self?.closeUnpinnedPanel()
+        }
         self.panel = panel
     }
 
@@ -272,7 +278,7 @@ final class StatusItemController: NSObject {
         }
     }
 
-    private func panelLostFocus() {
+    private func closeUnpinnedPanel() {
         guard let panel, panel.isVisible, !settings.panelPinned else { return }
         lastAutoClose = Date()
         closePanel()

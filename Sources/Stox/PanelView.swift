@@ -1091,7 +1091,7 @@ struct PanelFooter: View {
                 Toggle(isOn: $settings.panelPinned) {
                     Label(L("本次保持打开"), systemImage: "pin")
                 }
-                .help(settings.panelPinned ? L("取消钉住：点别处时自动关闭") : L("钉住：点别处时不关闭，可以拖到任何位置"))
+                .help(settings.panelPinned ? L("取消保持打开：鼠标移出面板时自动关闭") : L("本次保持打开：鼠标移出面板时不关闭，可以拖动"))
                 Divider()
                 Text(L("排序"))
                 Picker(L("排序"), selection: $settings.sortMode) {

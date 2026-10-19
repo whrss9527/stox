@@ -105,8 +105,8 @@
 "环球%@" = "Global %@";
 "港股行情延时约 15 分钟" = "Hong Kong quotes are delayed by about 15 minutes";
 "刷新失败：%@" = "Refresh failed: %@";
-"取消钉住：点别处时自动关闭" = "Unpin: close when clicking elsewhere";
-"钉住：点别处时不关闭，可以拖到任何位置" = "Pin: stay open when clicking elsewhere and drag anywhere";
+"取消保持打开：鼠标移出面板时自动关闭" = "Stop keeping open: close when the pointer leaves the panel";
+"本次保持打开：鼠标移出面板时不关闭，可以拖动" = "Keep open for this session: stay visible when the pointer leaves and allow dragging";
 "立即刷新（⌘R）" = "Refresh Now (⌘R)";
 "搜索代码、名称或拼音，回车添加" = "Search symbol, name or pinyin; Return to add";
 "还没有自选，在上面的搜索框里添加" = "Your watchlist is empty. Add symbols with the search field above";
