@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.8.0（未发布）
+
+### 中文
+
+- 在“关于与更新”中增加微信赞赏入口，可直接打开 README 中的赞赏码。
+
+### English
+
+- Add a WeChat support button in About & Updates to open the same code shown in the README.
+
 ## 1.7.2（2026-10-19）
 
 ### 中文
