@@ -43,7 +43,7 @@ enum PanelKey: String {
     }
 }
 
-/// 无边框、不激活程序的浮动面板：像菜单一样出现在菜单栏图标下面，点到别处或按 Esc 时关闭。
+/// 无边框、不激活程序的浮动面板：出现在菜单栏图标下面，鼠标移出、点到别处或按 Esc 时关闭。
 /// 不激活程序，所以打开面板不会抢走正在使用的 App 的焦点。
 final class PanelWindow: NSPanel {
     /// 失去焦点（点到别处）时调用。钉住时由调用方决定不关闭。
@@ -79,6 +79,7 @@ final class PanelWindow: NSPanel {
         hasShadow = true
         isMovable = false
         hidesOnDeactivate = false
+        acceptsMouseMovedEvents = true
         animationBehavior = .utilityWindow
         self.contentView = contentView
     }

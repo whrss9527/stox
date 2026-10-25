@@ -43,6 +43,8 @@ jobs:
       overwrite: ${{ inputs.overwrite }}
       dry-run: ${{ inputs.dry_run }}
       build-command: UNIVERSAL=1 ZIP=1 scripts/build-app.sh
+      # App 窗口测试需要 Xcode 宿主，不能使用 Frit 默认的无宿主 swift test。
+      test-command: make test
       archives: dist/Stox.zip
       notes-command: scripts/release-notes.sh
       require-notarization: true

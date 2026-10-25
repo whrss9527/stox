@@ -2,7 +2,7 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
-## 1.7.1（未发布）
+## 1.8.0（未发布）
 
 ### 中文
 
@@ -11,6 +11,26 @@
 ### English
 
 - Add a WeChat support button in About & Updates to open the same code shown in the README.
+
+## 1.7.2（2026-10-19）
+
+### 中文
+
+- 修正面板自动关闭：鼠标移出后无需点击即可关闭，快速移回、操作菜单及拖动时不误关；“本次保持打开”仍可临时置顶。
+
+### English
+
+- Close the panel when the mouse pointer leaves, without requiring a click. Quick re-entry, menus and dragging avoid premature closing; Keep Open for This Session still pins the current opening.
+
+## 1.7.1（2026-10-18）
+
+### 中文
+
+- 复制诊断信息时仅读取有限的最近日志，避免超大旧文件占用过多内存；保留当前及上一份日志的顺序，不改写文件。
+
+### English
+
+- Bound recent log reads when copying diagnostics, preserving current/previous log order without rewriting oversized old files.
 
 ## 1.7.0（未发布）
 
