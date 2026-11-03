@@ -8,8 +8,8 @@
 
 ### 方式一：下载构建好的 App
 
-1. 在仓库的 [Releases](https://github.com/whrss9527/stox/releases) 页面下载最新版本的 `Stox.zip`。想试用未发布的最新代码，可以在 [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) 页面最近一次成功的构建里下载 `Stox-app`。
-2. 解压后把 `Stox.app` 拖进“应用程序”文件夹。
+1. 在仓库的 [Releases](https://github.com/whrss9527/stox/releases) 页面下载最新版本的 `Stox.dmg`。想试用未发布的最新代码，可以在 [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) 页面最近一次成功的构建里下载 `Stox-app`。
+2. 打开 DMG 后把 `Stox.app` 拖到右侧“应用程序”文件夹。
 3. 发布说明里写着“已用 Developer ID 签名并通过苹果公证”的版本，双击就能打开。更早的版本使用临时签名，第一次打开会被系统拦截，任选一种方式放行：
    - 在终端执行 `xattr -dr com.apple.quarantine /Applications/Stox.app`，然后正常打开；
    - 或者先双击一次，再到“系统设置 → 隐私与安全性”里点“仍要打开”。
