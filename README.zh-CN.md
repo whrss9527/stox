@@ -81,7 +81,7 @@ brew install --cask whrss9527/tap/stox
 
 或者手动安装：
 
-1. 在 [Releases](https://github.com/whrss9527/stox/releases) 下载最新的 `Stox.zip`，解压后把 `Stox.app` 拖进“应用程序”。
+1. 在 [Releases](https://github.com/whrss9527/stox/releases) 下载最新的 `Stox.dmg`，打开后把 `Stox.app` 拖到右侧“应用程序”。
 2. 双击打开。
 3. 以后有新版本，点面板底部的“更新”就行。
 

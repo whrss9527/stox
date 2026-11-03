@@ -8,8 +8,8 @@ Requires macOS 13 Ventura or later, on Apple silicon or Intel.
 
 ### Option 1: download the app
 
-1. Download the latest `Stox.zip` from [Releases](https://github.com/whrss9527/stox/releases). To try the latest unreleased code, download `Stox-app` from the most recent successful build on the [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) page.
-2. Unzip it and drag `Stox.app` into Applications.
+1. Download the latest `Stox.dmg` from [Releases](https://github.com/whrss9527/stox/releases). To try the latest unreleased code, download `Stox-app` from the most recent successful build on the [Actions](https://github.com/whrss9527/stox/actions/workflows/build.yml) page.
+2. Open the DMG and drag `Stox.app` to Applications on the right.
 3. Versions whose release notes say they are signed with a Developer ID and notarized by Apple open with a double-click. Earlier versions are ad-hoc signed and blocked on first launch; allow them either way:
    - run `xattr -dr com.apple.quarantine /Applications/Stox.app` in Terminal, then open it normally;
    - or double-click it once, then click "Open Anyway" in System Settings → Privacy & Security.

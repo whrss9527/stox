@@ -82,7 +82,7 @@ brew install --cask whrss9527/tap/stox
 
 Or by hand:
 
-1. Download the latest `Stox.zip` from [Releases](https://github.com/whrss9527/stox/releases), unzip it and drag `Stox.app` into Applications.
+1. Download the latest `Stox.dmg` from [Releases](https://github.com/whrss9527/stox/releases), open it and drag `Stox.app` to Applications on the right.
 2. Double-click to open it.
 3. When there's a new version, click Update at the bottom of the panel.
 

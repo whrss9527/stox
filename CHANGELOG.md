@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.8.0（2026-11-03）
+
+### 中文
+
+- 提供 DMG 拖拽安装包，打开后把 Stox 拖到「应用程序」即可安装；应用内更新继续自动完成。
+
+### English
+
+- Install from a DMG by dragging Stox to Applications. In-app updates continue to install automatically.
+
 ## 1.7.2（2026-10-19）
 
 ### 中文
