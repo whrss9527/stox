@@ -42,6 +42,8 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var rankUpdated: [RankKind: Date] = [:]
     /// 最近一次取榜单失败的原因；取到了就清掉。
     @Published private(set) var rankError: String?
+    /// 榜单页面只由最近一次请求更新；切换榜单后旧请求不再发布结果或错误。
+    private var rankGeneration = 0
     /// 上一次取盘前盘后价的时间和当时取的是哪几只。
     private var extendedHoursFetched: (date: Date, symbols: Set<Symbol>) = (.distantPast, [])
 
@@ -415,20 +417,30 @@ final class QuoteStore: ObservableObject {
 
     /// 取一次涨跌榜的前 count 只（行业榜是前 count 个行业）。
     func loadRank(_ kind: RankKind, count: Int) async {
+        guard !Task.isCancelled else { return }
+        rankGeneration &+= 1
+        let current = rankGeneration
+        if rankError != nil { rankError = nil }
         do {
             if kind == .industries {
-                if let entries = try await provider.fetchIndustries(count: count) {
+                let entries = try await provider.fetchIndustries(count: count)
+                guard current == rankGeneration, !Task.isCancelled else { return }
+                if let entries {
                     industries = entries
                     rankUpdated[kind] = clock.now()
                     rankError = nil
                 }
-            } else if let entries = try await provider.fetchRank(kind, count: count) {
-                rank[kind] = entries
-                rankUpdated[kind] = clock.now()
-                rankError = nil
+            } else {
+                let entries = try await provider.fetchRank(kind, count: count)
+                guard current == rankGeneration, !Task.isCancelled else { return }
+                if let entries {
+                    rank[kind] = entries
+                    rankUpdated[kind] = clock.now()
+                    rankError = nil
+                }
             }
         } catch {
-            guard !Task.isCancelled else { return }
+            guard current == rankGeneration, !Task.isCancelled else { return }
             rankError = error.localizedDescription
         }
     }

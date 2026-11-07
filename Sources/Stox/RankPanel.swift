@@ -43,8 +43,9 @@ struct RankPanel: View {
             .padding(.horizontal, 2)
         }
         .task(id: settings.rankKind) {
+            let kind = settings.rankKind
             while !Task.isCancelled {
-                await store.loadRank(settings.rankKind, count: Self.fetched)
+                await store.loadRank(kind, count: Self.fetched)
                 try? await Task.sleep(nanoseconds: Self.refreshInterval * 1_000_000_000)
             }
         }

@@ -2,6 +2,16 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.8.1（2026-11-07）
+
+### 中文
+
+- 榜单切换：忽略旧请求较晚返回的结果与错误，加载新榜单时清除上次的错误提示；离开页面后不再接纳已取消请求的结果。
+
+### English
+
+- Keep ranking results and errors tied to the current request when switching lists, clear stale errors when loading a new list, and discard results from canceled requests after leaving the page.
+
 ## 1.8.0（2026-11-03）
 
 ### 中文
