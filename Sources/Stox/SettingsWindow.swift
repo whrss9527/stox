@@ -80,6 +80,17 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         NSApp.setActivationPolicy(.accessory)
     }
 
+    #if STOX_UI_FIXTURE
+    func resetFixturePresentation() {
+        window?.close()
+        window = nil
+    }
+    func showFixtureMinimum() {
+        show(page: .display)
+        window?.setContentSize(NSSize(width: 680, height: 460))
+    }
+    #endif
+
     private func makeWindow() -> NSWindow? {
         guard let settings, let store, let sync else { return nil }
         let root = SettingsRootView(navigation: navigation, settings: settings, store: store, sync: sync)

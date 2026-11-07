@@ -154,3 +154,11 @@ CI 通过 `scripts/candidate-version.py` 读取 `CHANGELOG.md` 首个版本章�
 `--show-panel --pin-panel` 显式保持本次诊断面板打开，供 `measure-footprint.sh` 测量使用。普通打开忽略旧版持久置顶偏好，默认失焦关闭；底部菜单可为当前打开临时选择保持打开。
 
 手动安装使用 `Stox.dmg`：`dmg-archive: dist/Stox.zip` 从公证后的 ZIP 制作 DMG，独立签名、公证，并将两种附件纳入校验和；应用内更新继续使用 `Stox.zip`。
+
+### 在个人 Mac 上使用离线 UI fixture
+
+`bash scripts/build-ui-fixture.sh` 只构建 `.build/ui-fixture/Stox UI Fixture.app`，不会启动它。独立 bundle 使用真实生产面板、榜单、搜索、详情和设置视图，只把行情 provider 和偏好存储替换成编译条件内的假数据与临时文件 adapter。签名只带 App Sandbox，没有网络或 iCloud entitlement；禁用通知、全局热键、登录项注册，以及更新/同步的自动启动。不替换已安装的 Stox，不读取其偏好或持仓。
+
+手动打开 fixture 后，控制窗口可以切换英文/简体中文、浅色/深色，不修改系统设置；再点击按钮打开相应生产页面。切换语言会关闭旧页面，让下一次打开重新生成译文。搜索预填 `fixture`，同时提供已添加与未添加的模拟证券。“Fail requests”和“Refresh”用于检查行情缓存、失败和恢复；榜单故意使用不同响应延迟，以检查快速切换。控制窗口显示本次临时数据路径，每次新启动都使用新数据。跳往外部网站、系统设置的按钮，以及自动安装/重新启动，不属于这个 fixture 的验收范围。
+
+不打开窗口的 adapter 测试：`swift test --jobs 2 -Xswiftc -DSTOX_UI_FIXTURE --filter UIFixtureAdapterTests`。普通构建不包含任何 fixture 类型或控制窗口；adapter 测试通过不能代替真实窗口的视觉验收。fixture 通过 `ENABLE_DEBUG_DYLIB=NO` 直接链接可执行文件后再进行 ad-hoc 沙盒签名，保留 hardened runtime 与库验证。

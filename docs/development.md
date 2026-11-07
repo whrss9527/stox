@@ -154,3 +154,11 @@ CI reads the first release heading in `CHANGELOG.md` with `scripts/candidate-ver
 `--show-panel --pin-panel` explicitly keeps only that diagnostic opening visible, as used by `measure-footprint.sh`. Ordinary openings ignore legacy persisted pin preferences and close on focus loss; the bottom menu can opt the current opening into keep-open.
 
 Manual installation uses `Stox.dmg`: `dmg-archive: dist/Stox.zip` builds the DMG from the notarized ZIP, signs and notarizes it separately, and includes both in the checksums. In-app updates continue to use `Stox.zip`.
+
+### Offline UI fixture on a personal Mac
+
+`bash scripts/build-ui-fixture.sh` only builds `.build/ui-fixture/Stox UI Fixture.app`; it does not launch it. This separate bundle uses the production panel, rankings, search, details and Settings views, with compile-time-only fake quote providers and a temporary-file preferences adapter. Its App Sandbox signature has no network or iCloud entitlement. Notifications, global hotkeys, login-item registration and automatic update/sync startup are disabled. It does not replace the installed Stox or read its preferences or holdings.
+
+Open the fixture manually to use its control window: choose English/Simplified Chinese and light/dark appearance without changing system settings, then open a production UI scene. Switching language closes the old scene so it can be rebuilt in that language. Search uses `fixture` to offer both saved and new synthetic symbols. “Fail requests” and “Refresh” exercise cached quotes, failure and recovery; rankings intentionally have different response delays for rapid-switch checks. The session's temporary data path appears in the control window. New launches start with fresh data. External website/system-settings buttons and automatic reinstall/relaunch are outside this fixture's acceptance scope.
+
+Fixture adapter tests do not open windows: `swift test --jobs 2 -Xswiftc -DSTOX_UI_FIXTURE --filter UIFixtureAdapterTests`. Ordinary builds omit all fixture types and controls. Visual acceptance still requires inspecting the real opened windows; passing these adapter tests does not establish layout correctness. The fixture links directly into its executable (`ENABLE_DEBUG_DYLIB=NO`) before ad-hoc sandbox signing; it keeps hardened runtime and library validation enabled.
