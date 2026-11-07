@@ -185,6 +185,12 @@ actor UIFixtureProvider: QuoteProvider {
         return KlineSeries(symbol: symbol, period: period, candles: candles)
     }
     func fetchExchangeRates() async throws -> ExchangeRates? { try await delay(); return ExchangeRates(hkdCNY: 0.92, usdCNY: 7.18) }
+    func fetchExtendedHours(for symbol: Symbol, exchangeCode: String?) async throws -> ExtendedHoursQuote? {
+        try await delay(0.8)
+        guard symbol.market.region == .us, !symbol.isIndex else { return nil }
+        // A synthetic, timestamp-free response exercises the production missing-time semantics.
+        return ExtendedHoursQuote(session: .afterHours, price: quote(symbol).price * 1.008)
+    }
     func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]? {
         try await delay(kind == .gainers ? 1.2 : 0.15)
         return Self.items.filter { $0.symbol.market.region == .cn }.enumerated().map { index, item in

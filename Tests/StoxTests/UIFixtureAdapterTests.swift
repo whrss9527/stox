@@ -69,6 +69,21 @@ final class UIFixtureAdapterTests: XCTestCase {
         XCTAssertTrue(results.contains { !saved.contains($0.symbol) })
     }
 
+    func testExtendedHoursFixturePreservesItsPriceAndFailureControls() async throws {
+        let provider = UIFixtureProvider()
+        let symbol = Symbol("usAAPL")!
+        let quote = try await provider.fetchQuotes(for: [symbol])[symbol]
+        let extended = try await provider.fetchExtendedHours(for: symbol, exchangeCode: nil)
+        XCTAssertEqual(extended?.session, .afterHours)
+        XCTAssertEqual(try XCTUnwrap(extended).price, try XCTUnwrap(quote).price * 1.008)
+        XCTAssertNil(extended?.time)
+        await provider.setFailure(true)
+        do {
+            _ = try await provider.fetchExtendedHours(for: symbol, exchangeCode: nil)
+            XCTFail("extended-hours fixtures must honor the failure control")
+        } catch { XCTAssertEqual((error as? URLError)?.code, .notConnectedToInternet) }
+    }
+
     func testFakeRequestsHonorCancellation() async throws {
         let task = Task { try await UIFixtureProvider().fetchRank(.gainers, count: 40) }
         task.cancel()
