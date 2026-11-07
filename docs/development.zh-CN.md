@@ -163,4 +163,4 @@ CI 通过 `scripts/candidate-version.py` 读取 `CHANGELOG.md` 首个版本章�
 
 不打开窗口的 adapter 测试：`swift test --jobs 2 -Xswiftc -DSTOX_UI_FIXTURE --filter UIFixtureAdapterTests`。普通构建不包含任何 fixture 类型或控制窗口；adapter 测试通过不能代替真实窗口的视觉验收。fixture 通过 `ENABLE_DEBUG_DYLIB=NO` 直接链接可执行文件后再进行 ad-hoc 沙盒签名，保留 hardened runtime 与库验证。
 
-打开场景还会把 fixture 自身的 `NSAccessibility` 树（包括原生表格的子节点）导出到本次临时 session 的 `accessibility.txt`。这个只读诊断不访问其他应用，不产生 OS 输入，用来区分真实辅助功能结构与自动化工具格式化后的输出。
+只有显式带 `--export-own-ax` 启动时，打开场景才会把 fixture 自身的现代 `NSAccessibility` 协议树导出到本次临时 session 的 `accessibility.txt`。只读诊断不访问其他应用、不产生 OS 输入；没有声明该协议的节点（包括部分 SwiftUI 和原生表格代理）只记类型、不继续遍历，不能据此证明控件缺失。正常打开 fixture 不自动运行辅助功能诊断。

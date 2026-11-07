@@ -263,9 +263,11 @@ private struct UIFixtureControlView: View {
     private func show(route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil) {
         controller.openPanel(route: route, expand: expand, search: search, printDiagnostics: true)
         settings.panelPinned = true
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
-            if let view = controller.panel?.contentView { UIFixture.exportAccessibility(of: view) }
+        if ProcessInfo.processInfo.arguments.contains("--export-own-ax") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                if let view = controller.panel?.contentView { UIFixture.exportAccessibility(of: view) }
+            }
         }
     }
 }
