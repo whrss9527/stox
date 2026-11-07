@@ -7,10 +7,12 @@
 ### 中文
 
 - 榜单切换：忽略旧请求较晚返回的结果与错误，加载新榜单时清除上次的错误提示；离开页面后不再接纳已取消请求的结果。
+- 修正行情数据的异常数字处理，避免无效价格、成交量或单位换算溢出影响行情与持仓显示。
 
 ### English
 
 - Keep ranking results and errors tied to the current request when switching lists, clear stale errors when loading a new list, and discard results from canceled requests after leaving the page.
+- Reject invalid quote prices and omit non-finite optional fields or overflowing unit conversions before they reach quote and portfolio views.
 
 ## 1.8.0（2026-11-03）
 
