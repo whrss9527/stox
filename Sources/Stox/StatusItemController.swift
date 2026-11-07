@@ -189,6 +189,19 @@ final class StatusItemController: NSObject {
         SettingsWindowController.shared.show(page: page)
     }
 
+    #if STOX_UI_FIXTURE
+    func resetFixturePresentation() {
+        closePanel()
+        if let resizeObserver { NotificationCenter.default.removeObserver(resizeObserver) }
+        if let moveObserver { NotificationCenter.default.removeObserver(moveObserver) }
+        resizeObserver = nil
+        moveObserver = nil
+        panel = nil
+        hostingView = nil
+        contentSize = .zero
+    }
+    #endif
+
     private func makePanel() {
         let actions = PanelActions(
             openSettings: { [weak self] page in self?.openSettings(page) },

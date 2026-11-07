@@ -330,6 +330,7 @@
 "正在加载…" = "Loading…";
 "榜上暂时没有" = "Nothing on the list yet";
 "领涨 %@ %@" = "Leader %@ %@";
+"第 %@ 名，%@，涨跌幅 %@" = "Rank %@, %@, change %@";
 "%@已在自选里，点一下回到列表并展开" = "%@ is in your watchlist. Click to go back to the list and expand it";
 "把领涨的%@加到自选" = "Add leader %@ to the watchlist";
 "已在自选里，点一下回到列表并展开" = "In your watchlist. Click to go back to the list and expand it";

@@ -42,8 +42,26 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var rankUpdated: [RankKind: Date] = [:]
     /// 最近一次取榜单失败的原因；取到了就清掉。
     @Published private(set) var rankError: String?
+    /// 榜单页面只由最近一次请求更新；切换榜单后旧请求不再发布结果或错误。
+    private var rankGeneration = 0
     /// 上一次取盘前盘后价的时间和当时取的是哪几只。
     private var extendedHoursFetched: (date: Date, symbols: Set<Symbol>) = (.distantPast, [])
+    /// A small window avoids one child task per watch item. The limiter also covers superseded sessions.
+    private static let extendedHoursConcurrency = 4
+    private let extendedHoursLimiter = ExtendedHoursRequestLimiter(capacity: extendedHoursConcurrency)
+    private var extendedHoursOwner = 0
+    private var extendedHoursMembershipSerial = 0
+    private var extendedHoursMembership: [Symbol: Int] = [:]
+    private struct ExtendedHoursRequest: Sendable {
+        let symbol: Symbol
+        let exchangeCode: String?
+        let membership: Int
+    }
+    private struct ExtendedHoursResult: Sendable {
+        let request: ExtendedHoursRequest
+        let value: ExtendedHoursQuote?
+        let succeeded: Bool
+    }
 
     /// 港币、美元兑人民币的汇率。持仓有两种以上货币时才去取，用来折合成人民币。
     @Published private(set) var rates: ExchangeRates?
@@ -129,6 +147,17 @@ final class QuoteStore: ObservableObject {
         .receive(on: RunLoop.main)
         .sink { [weak self] _ in self?.restart() }
         .store(in: &cancellables)
+
+        settings.$showExtendedHours.removeDuplicates().dropFirst()
+            .sink { [weak self] enabled in
+                guard let self else { return }
+                self.extendedHoursFetched = (.distantPast, [])
+                if !enabled {
+                    self.extendedHoursMembership.removeAll()
+                    if !self.extendedHours.isEmpty { self.extendedHours = [:] }
+                }
+            }
+            .store(in: &cancellables)
     }
 
     // MARK: - 轮询
@@ -236,9 +265,14 @@ final class QuoteStore: ObservableObject {
     /// 面板打开时独立轮询盘前盘后价；SwiftUI 任务在关闭面板或关闭设置时取消。
     /// 每次打开立即取一轮，不沿用上次面板关闭前的刷新计时。
     func trackExtendedHours() async {
+        guard !Task.isCancelled else { return }
+        extendedHoursOwner &+= 1
+        let owner = extendedHoursOwner
+        defer { if owner == extendedHoursOwner { extendedHoursOwner &+= 1 } }
         extendedHoursFetched = (.distantPast, [])
-        while !Task.isCancelled {
-            await refreshExtendedHoursIfNeeded()
+        while !Task.isCancelled, owner == extendedHoursOwner {
+            await refreshExtendedHoursIfNeeded(owner: owner)
+            guard !Task.isCancelled, owner == extendedHoursOwner else { return }
             // 仍按行情轮询节奏检查时段变化，实际网络请求由下面的缓存间隔控制。
             try? await clock.sleep(min(effectiveInterval, 60))
         }
@@ -247,9 +281,10 @@ final class QuoteStore: ObservableObject {
     /// 美股不在常规交易时取自选里美股个股的盘前盘后价，每只一个请求：盘前盘后至少隔 15 秒取一次，
     /// 美股多时按每只 2 秒放慢；休市时价格不会再变，半小时一次；自选里多了美股个股时马上取。
     /// 常规交易时段里、设置里关掉时清空，也不去取。
-    private func refreshExtendedHoursIfNeeded() async {
-        guard !Task.isCancelled else { return }
-        let symbols = items.map(\.symbol).filter { $0.market.region == .us && !$0.isIndex }
+    private func refreshExtendedHoursIfNeeded(owner: Int) async {
+        guard !Task.isCancelled, owner == extendedHoursOwner else { return }
+        var seen = Set<Symbol>()
+        let symbols = items.map(\.symbol).filter { $0.market.region == .us && !$0.isIndex && seen.insert($0).inserted }
         let usPhase = self.phase(for: .us)
         guard settings.showExtendedHours, !symbols.isEmpty, usPhase != .trading, usPhase != .lunchBreak else {
             if !extendedHours.isEmpty { extendedHours = [:] }
@@ -262,35 +297,72 @@ final class QuoteStore: ObservableObject {
             || clock.now().timeIntervalSince(extendedHoursFetched.date) >= interval
         else { return }
         extendedHoursFetched = (clock.now(), wanted)
-        let provider = self.provider
-        let requests = symbols.map { ($0, quotes[$0]?.exchangeCode) }
-        // 每只的结果：取到了（可能是没有盘前盘后成交）或者请求失败。
-        let results = await withTaskGroup(of: (Symbol, ExtendedHoursQuote?, Bool).self) { group in
-            for (symbol, code) in requests {
-                group.addTask {
-                    do {
-                        try Task.checkCancellation()
-                        let value = try await provider.fetchExtendedHours(for: symbol, exchangeCode: code)
-                        return (symbol, value, true)
-                    } catch {
-                        return (symbol, nil, false)
-                    }
-                }
+        extendedHoursMembership = extendedHoursMembership.filter { wanted.contains($0.key) }
+        let requests = symbols.map { symbol in
+            if extendedHoursMembership[symbol] == nil {
+                extendedHoursMembershipSerial &+= 1
+                extendedHoursMembership[symbol] = extendedHoursMembershipSerial
             }
-            var all: [(Symbol, ExtendedHoursQuote?, Bool)] = []
-            for await result in group { all.append(result) }
+            return ExtendedHoursRequest(symbol: symbol, exchangeCode: quotes[symbol]?.exchangeCode,
+                                        membership: extendedHoursMembership[symbol]!)
+        }
+        // 每只的结果：取到了（可能是没有盘前盘后成交）或者请求失败。
+        let results = await withTaskGroup(of: ExtendedHoursResult.self) { group in
+            var next = 0
+            var running = 0
+            var all: [ExtendedHoursResult] = []
+            while true {
+                while running < Self.extendedHoursConcurrency, next < requests.count,
+                      !Task.isCancelled, owner == extendedHoursOwner {
+                    let request = requests[next]
+                    next += 1
+                    guard isCurrentExtendedHoursRequest(request, owner: owner) else { continue }
+                    group.addTask { await self.fetchExtendedHours(request, owner: owner) }
+                    running += 1
+                }
+                guard running > 0, let result = await group.next() else { break }
+                running -= 1
+                all.append(result)
+                if Task.isCancelled || owner != extendedHoursOwner { group.cancelAll() }
+            }
             return all
         }
         // 取的时候进了常规交易或者关掉了，就不要这次的结果了。
         let phaseNow = self.phase(for: .us)
-        guard !Task.isCancelled, settings.showExtendedHours, phaseNow != .trading, phaseNow != .lunchBreak else { return }
+        guard !Task.isCancelled, owner == extendedHoursOwner, settings.showExtendedHours,
+              phaseNow != .trading, phaseNow != .lunchBreak else { return }
         let current = Set(items.map(\.symbol))
         var updated = extendedHours.filter { current.contains($0.key) }
-        for (symbol, value, ok) in results where ok && current.contains(symbol) {
+        for result in results where result.succeeded && isCurrentExtendedHoursRequest(result.request, owner: owner) {
             // 请求失败时保留上一次的，下一轮再试。
-            updated[symbol] = value
+            updated[result.request.symbol] = result.value
         }
         if updated != extendedHours { extendedHours = updated }
+    }
+
+    private func isCurrentExtendedHoursRequest(_ request: ExtendedHoursRequest, owner: Int) -> Bool {
+        owner == extendedHoursOwner && settings.showExtendedHours && contains(request.symbol)
+            && extendedHoursMembership[request.symbol] == request.membership
+    }
+
+    private func fetchExtendedHours(_ request: ExtendedHoursRequest, owner: Int) async -> ExtendedHoursResult {
+        let failed = ExtendedHoursResult(request: request, value: nil, succeeded: false)
+        guard !Task.isCancelled, isCurrentExtendedHoursRequest(request, owner: owner),
+              await extendedHoursLimiter.acquire(request.symbol) else { return failed }
+        guard !Task.isCancelled, isCurrentExtendedHoursRequest(request, owner: owner) else {
+            await extendedHoursLimiter.release(request.symbol)
+            return failed
+        }
+        let result: ExtendedHoursResult
+        do {
+            try Task.checkCancellation()
+            let value = try await provider.fetchExtendedHours(for: request.symbol, exchangeCode: request.exchangeCode)
+            result = ExtendedHoursResult(request: request, value: value, succeeded: true)
+        } catch {
+            result = failed
+        }
+        await extendedHoursLimiter.release(request.symbol)
+        return result
     }
 
     /// 当前实际的刷新间隔：所有关注的市场都休市时会放宽到每分钟一次。
@@ -415,20 +487,30 @@ final class QuoteStore: ObservableObject {
 
     /// 取一次涨跌榜的前 count 只（行业榜是前 count 个行业）。
     func loadRank(_ kind: RankKind, count: Int) async {
+        guard !Task.isCancelled else { return }
+        rankGeneration &+= 1
+        let current = rankGeneration
+        if rankError != nil { rankError = nil }
         do {
             if kind == .industries {
-                if let entries = try await provider.fetchIndustries(count: count) {
+                let entries = try await provider.fetchIndustries(count: count)
+                guard current == rankGeneration, !Task.isCancelled else { return }
+                if let entries {
                     industries = entries
                     rankUpdated[kind] = clock.now()
                     rankError = nil
                 }
-            } else if let entries = try await provider.fetchRank(kind, count: count) {
-                rank[kind] = entries
-                rankUpdated[kind] = clock.now()
-                rankError = nil
+            } else {
+                let entries = try await provider.fetchRank(kind, count: count)
+                guard current == rankGeneration, !Task.isCancelled else { return }
+                if let entries {
+                    rank[kind] = entries
+                    rankUpdated[kind] = clock.now()
+                    rankError = nil
+                }
             }
         } catch {
-            guard !Task.isCancelled else { return }
+            guard current == rankGeneration, !Task.isCancelled else { return }
             rankError = error.localizedDescription
         }
     }
@@ -603,6 +685,8 @@ final class QuoteStore: ObservableObject {
         quotes[symbol] = nil
         pruneChartCaches(keeping: Set(items.map(\.symbol)))
         extendedHours[symbol] = nil
+        extendedHoursMembership[symbol] = nil
+        extendedHoursFetched.symbols.remove(symbol)
         rapidMoves.forget(symbol)
         alertLog.forget(symbol)
         saveAlertLog()
@@ -655,6 +739,8 @@ final class QuoteStore: ObservableObject {
         items = newItems
         quotes = quotes.filter { symbols.contains($0.key) }
         extendedHours = extendedHours.filter { symbols.contains($0.key) }
+        extendedHoursMembership = extendedHoursMembership.filter { symbols.contains($0.key) }
+        extendedHoursFetched.symbols.formIntersection(symbols)
         if Set(oldItems.keys) != symbols { pruneChartCaches(keeping: symbols) }
         for item in newItems {
             let old = oldItems[item.symbol]

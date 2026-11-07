@@ -49,6 +49,10 @@ macOS App 使用 XcodeGen 2.44.1 生成工程；`make project` 下载固定版�
 
 核心里的 `FailoverPolicy`、`TickerVisibility` 把时间与可见性判断和 AppKit 分开。主 App 之外的资源可在启动任务前设置 `AppLanguage.bundle`；测试检查独立翻译包后恢复原值。翻译和语言判断都跟随选中的资源包。
 
+### 盘前盘后请求生命周期
+
+盘前盘后轮询在同一 store 内最多同时执行四个 provider 请求，重叠面板会话共用额度，同一证券不同时重复请求。每批只创建四个滑动窗口子任务；等待额度时取消，不启动网络工作。会话归属与当前成员 token 拒绝晚结果，覆盖删除再添加、关闭再开启；删除后的 token 及时清理，只保留当前证券。刷新间隔、失败保留旧价、成功返回 nil 时清除旧价的语义不变。可控 provider 测试测的是逻辑并发，不是 RSS 或网络吞吐基准。
+
 ### 图表请求生命周期
 
 图表跟踪按证券与用途（K线包含周期）分配归属，每次等待数据源返回后，成功和错误都核对取消、自选成员及当前归属。删除证券时使其旧归属失效，并清理图表与加载缓存；删除后重加仍使用单调代次。重排与筛选保留当前成员缓存。原生可暂停数据源回归覆盖迟到结果、替换、周期隔离与缓存提交。已经发出的数据源工作可能仍会完成；本项不增加请求去重、缓存TTL或新的刷新策略。
@@ -154,3 +158,13 @@ CI 通过 `scripts/candidate-version.py` 读取 `CHANGELOG.md` 首个版本章�
 `--show-panel --pin-panel` 显式保持本次诊断面板打开，供 `measure-footprint.sh` 测量使用。普通打开忽略旧版持久置顶偏好，默认失焦关闭；底部菜单可为当前打开临时选择保持打开。
 
 手动安装使用 `Stox.dmg`：`dmg-archive: dist/Stox.zip` 从公证后的 ZIP 制作 DMG，独立签名、公证，并将两种附件纳入校验和；应用内更新继续使用 `Stox.zip`。
+
+### 在个人 Mac 上使用离线 UI fixture
+
+`bash scripts/build-ui-fixture.sh` 只构建 `.build/ui-fixture/Stox UI Fixture.app`，不会启动它。独立 bundle 使用真实生产面板、榜单、搜索、详情和设置视图，只把行情 provider 和偏好存储替换成编译条件内的假数据与临时文件 adapter。签名只带 App Sandbox，没有网络或 iCloud entitlement；禁用通知、全局热键、登录项注册，以及更新/同步的自动启动。不替换已安装的 Stox，不读取其偏好或持仓。
+
+手动打开 fixture 后，控制窗口可以切换英文/简体中文、浅色/深色，不修改系统设置；再点击按钮打开相应生产页面。切换语言会关闭旧页面，让下一次打开重新生成译文。搜索预填 `fixture`，同时提供已添加与未添加的模拟证券。“Fail requests”和“Refresh”用于检查行情缓存、失败和恢复；榜单故意使用不同响应延迟，以检查快速切换。控制窗口显示本次临时数据路径，每次新启动都使用新数据。跳往外部网站、系统设置的按钮，以及自动安装/重新启动，不属于这个 fixture 的验收范围。
+
+不打开窗口的 adapter 测试：`swift test --jobs 2 -Xswiftc -DSTOX_UI_FIXTURE --filter UIFixtureAdapterTests`。普通构建不包含任何 fixture 类型或控制窗口；adapter 测试通过不能代替真实窗口的视觉验收。fixture 通过 `ENABLE_DEBUG_DYLIB=NO` 直接链接可执行文件后再进行 ad-hoc 沙盒签名，保留 hardened runtime 与库验证。
+
+只有显式带 `--export-own-ax` 启动时，打开场景才会把 fixture 自身的现代 `NSAccessibility` 协议树导出到本次临时 session 的 `accessibility.txt`。只读诊断不访问其他应用、不产生 OS 输入；没有声明该协议的节点（包括部分 SwiftUI 和原生表格代理）只记类型、不继续遍历，不能据此证明控件缺失。正常打开 fixture 不自动运行辅助功能诊断。

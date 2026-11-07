@@ -2,6 +2,22 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.8.1（2026-11-07）
+
+### 中文
+
+- 榜单切换：忽略旧请求较晚返回的结果与错误，加载新榜单时清除上次的错误提示；离开页面后不再接纳已取消请求的结果。
+- 修正行情数据的异常数字处理，避免无效价格、成交量或单位换算溢出影响行情与持仓显示。
+- 行业榜：没有领涨股时仍清晰显示行业行情，并向屏幕阅读器提供名次、行业与涨跌幅。
+- 盘前盘后行情：分批获取美股价格，快速关闭面板、切换自选或移除证券时，不再让旧请求回填数据。
+
+### English
+
+- Keep ranking results and errors tied to the current request when switching lists, clear stale errors when loading a new list, and discard results from canceled requests after leaving the page.
+- Reject invalid quote prices and omit non-finite optional fields or overflowing unit conversions before they reach quote and portfolio views.
+- Keep industry rankings readable when no leading stock is available, with rank, industry and change announced to screen readers.
+- Fetch extended-hours quotes in small batches and discard stale results after closing the panel, changing the watchlist or removing a symbol.
+
 ## 1.8.0（2026-11-03）
 
 ### 中文

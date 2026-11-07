@@ -435,7 +435,7 @@ smoke() {
   defaults delete "$DOMAIN" calendar.byYear
   defaults delete "$DOMAIN" holdings.history.v1
   grep -q "route=calendar" shots/calendar.log || fail "没有打开盈亏日历"
-  grep -Eq "calendar=[2-9]" shots/calendar.log || fail "盈亏日历里应该有这个月记的两天"
+  grep -Eq '(^|[[:space:]])calendar=([2-9]|[1-9][0-9]+)($|[[:space:]])' shots/calendar.log || fail "盈亏日历里应该至少有这个月记的两天"
   grep -q "calendar_by_year=true" shots/calendar-year.log || fail "盈亏日历没有按年看"
   grep -Eq "calendar_months=[1-9]" shots/calendar-year.log || fail "按年看时应该有记过的月份"
   # 茅台按 1200 的成本已经赚了 1% 以上，止盈提醒应该发出来，也记在最近的提醒里。A 股开盘前（北京时间 9 点多）

@@ -7,21 +7,29 @@ import StoxCore
 enum LanguageSetting {
     /// 偏好设置里现在存的选择（只看 Stox 自己的偏好设置，不看启动参数里的 -AppleLanguages 和系统语言）。
     static var current: InterfaceLanguage {
+        #if STOX_UI_FIXTURE
+        return InterfaceLanguage(appleLanguages: UIFixture.defaults.object(forKey: InterfaceLanguage.defaultsKey))
+        #else
         guard let domain = Bundle.main.bundleIdentifier else {
             return InterfaceLanguage(appleLanguages: UserDefaults.standard.object(forKey: InterfaceLanguage.defaultsKey))
         }
         return InterfaceLanguage(appleLanguages: UserDefaults.standard.persistentDomain(forName: domain)?[InterfaceLanguage.defaultsKey])
+        #endif
     }
 
     /// 这次启动时存的选择，界面语言是按它定的；和 current 不同时要重新启动才生效。
     static let atLaunch = current
 
     static func set(_ language: InterfaceLanguage) {
+        #if STOX_UI_FIXTURE
+        UIFixture.defaults.set(language.appleLanguages, forKey: InterfaceLanguage.defaultsKey)
+        #else
         if let languages = language.appleLanguages {
             UserDefaults.standard.set(languages, forKey: InterfaceLanguage.defaultsKey)
         } else {
             UserDefaults.standard.removeObject(forKey: InterfaceLanguage.defaultsKey)
         }
+        #endif
         Log.info("界面语言改为 \(language.rawValue)，重新启动后生效")
     }
 

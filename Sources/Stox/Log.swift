@@ -14,9 +14,13 @@ enum Log {
     }()
 
     static var directory: URL {
+        #if STOX_UI_FIXTURE
+        return UIFixture.root.appendingPathComponent("logs", isDirectory: true)
+        #else
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory())
         return base.appendingPathComponent("Stox", isDirectory: true)
+        #endif
     }
 
     static var fileURL: URL { directory.appendingPathComponent("stox.log") }
