@@ -162,3 +162,5 @@ CI 通过 `scripts/candidate-version.py` 读取 `CHANGELOG.md` 首个版本章�
 手动打开 fixture 后，控制窗口可以切换英文/简体中文、浅色/深色，不修改系统设置；再点击按钮打开相应生产页面。切换语言会关闭旧页面，让下一次打开重新生成译文。搜索预填 `fixture`，同时提供已添加与未添加的模拟证券。“Fail requests”和“Refresh”用于检查行情缓存、失败和恢复；榜单故意使用不同响应延迟，以检查快速切换。控制窗口显示本次临时数据路径，每次新启动都使用新数据。跳往外部网站、系统设置的按钮，以及自动安装/重新启动，不属于这个 fixture 的验收范围。
 
 不打开窗口的 adapter 测试：`swift test --jobs 2 -Xswiftc -DSTOX_UI_FIXTURE --filter UIFixtureAdapterTests`。普通构建不包含任何 fixture 类型或控制窗口；adapter 测试通过不能代替真实窗口的视觉验收。fixture 通过 `ENABLE_DEBUG_DYLIB=NO` 直接链接可执行文件后再进行 ad-hoc 沙盒签名，保留 hardened runtime 与库验证。
+
+打开场景还会把 fixture 自身的 `NSAccessibility` 树（包括原生表格的子节点）导出到本次临时 session 的 `accessibility.txt`。这个只读诊断不访问其他应用，不产生 OS 输入，用来区分真实辅助功能结构与自动化工具格式化后的输出。

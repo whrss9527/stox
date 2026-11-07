@@ -4,16 +4,26 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 scripts/generate-project.sh
 derived="$PWD/.build/xcode/ui-fixture"
-output="$PWD/.build/ui-fixture/Stox UI Fixture.app"
+output="${STOX_UI_FIXTURE_OUTPUT:-$PWD/.build/ui-fixture/Stox UI Fixture.app}"
+bundle_id="${STOX_UI_FIXTURE_BUNDLE_ID:-io.github.whrss9527.stox.uifixture20261107}"
+case "$bundle_id" in
+  io.github.whrss9527.stox.uifixture20261107|io.github.whrss9527.stox.uifixture20261107.final) ;;
+  *) echo "error: fixture bundle identifier is not isolated" >&2; exit 1 ;;
+esac
+case "$output" in
+  "$PWD/.build/ui-fixture/Stox UI Fixture.app"|"$PWD/.build/ui-fixture-final/Stox UI Fixture Final.app") ;;
+  *) echo "error: fixture output must use its dedicated .build directory" >&2; exit 1 ;;
+esac
 version="$(python3 scripts/candidate-version.py)"
 mkdir -p "$PWD/.build/ui-fixture"
-python3 - "$PWD/Resources/Info.plist" "$PWD/.build/ui-fixture/Info.plist" "$PWD/.build/ui-fixture/fixture.entitlements" "$version" <<'PY'
+python3 - "$PWD/Resources/Info.plist" "$PWD/.build/ui-fixture/Info.plist" "$PWD/.build/ui-fixture/fixture.entitlements" "$version" "$bundle_id" <<'PY'
 import plistlib
 from pathlib import Path
 import sys
 info = plistlib.loads(Path(sys.argv[1]).read_bytes())
-info.update(CFBundleIdentifier='io.github.whrss9527.stox.uifixture20261107',
-            CFBundleDisplayName='Stox UI Fixture', CFBundleName='Stox UI Fixture',
+name = 'Stox UI Fixture Final' if sys.argv[5].endswith('.final') else 'Stox UI Fixture'
+info.update(CFBundleIdentifier=sys.argv[5],
+            CFBundleDisplayName=name, CFBundleName=name,
             StoxUIFixture=True, CFBundleShortVersionString=sys.argv[4])
 info.pop('CFBundleURLTypes', None)
 Path(sys.argv[2]).write_bytes(plistlib.dumps(info))
@@ -23,8 +33,9 @@ PY
 xcodebuild build -project Stox.xcodeproj -scheme Stox -configuration Debug \
   -derivedDataPath "$derived" -jobs 2 CODE_SIGNING_ALLOWED=NO ONLY_ACTIVE_ARCH=YES ENABLE_DEBUG_DYLIB=NO \
   "INFOPLIST_FILE=$PWD/.build/ui-fixture/Info.plist" \
-  PRODUCT_BUNDLE_IDENTIFIER=io.github.whrss9527.stox.uifixture20261107 \
+  "PRODUCT_BUNDLE_IDENTIFIER=$bundle_id" \
   'SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) STOX_UI_FIXTURE'
+mkdir -p "$(dirname "$output")"
 rm -rf "$output"
 ditto "$derived/Build/Products/Debug/Stox.app" "$output"
 if [[ -e "$output/Contents/MacOS/Stox.debug.dylib" || -e "$output/Contents/MacOS/__preview.dylib" ]]; then

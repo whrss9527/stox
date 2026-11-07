@@ -13,7 +13,7 @@ enum UIFixture {
     @MainActor static var clock: QuoteStoreClock { QuoteStoreClock(now: { date }) }
 
     @MainActor static func prepare() {
-        precondition(Bundle.main.bundleIdentifier == "io.github.whrss9527.stox.uifixture20261107"
+        precondition(["io.github.whrss9527.stox.uifixture20261107", "io.github.whrss9527.stox.uifixture20261107.final"].contains(Bundle.main.bundleIdentifier ?? "")
                      && Bundle.main.object(forInfoDictionaryKey: "StoxUIFixture") as? Bool == true,
                      "UI fixture must run inside its separate, network-disabled app bundle")
         defaults.set(false, forKey: "update.autoCheck")
@@ -58,6 +58,40 @@ enum UIFixture {
         }
         guard let bundle = Bundle(url: target) else { throw CocoaError(.fileReadCorruptFile) }
         return bundle
+    }
+
+    /// Read only this process's own production view tree, independently of a CUA formatter.
+    @MainActor static func exportAccessibility(of view: NSView) {
+        var lines = ["Stox fixture: own-process NSAccessibility tree", "AX root: " + String(describing: type(of: view))]
+        var seen = Set<ObjectIdentifier>()
+        var remaining = 400
+        func walk(_ value: Any, depth: Int) {
+            guard depth < 30, remaining > 0 else { return }
+            let object = value as AnyObject
+            guard seen.insert(ObjectIdentifier(object)).inserted else { return }
+            guard let element = value as? NSAccessibilityProtocol else {
+                lines.append(String(repeating: "  ", count: depth) + "non-NSAccessibility " + String(describing: type(of: value)))
+                return
+            }
+            remaining -= 1
+            let children = element.accessibilityChildren() ?? []
+            let role = element.accessibilityRole()?.rawValue ?? "nil"
+            let label = element.accessibilityLabel() ?? ""
+            let value = String(describing: element.accessibilityValue() ?? "").prefix(600)
+            lines.append(String(repeating: "  ", count: depth) + "\(role) children=\(children.count) label=\(label) value=\(value)")
+            for child in children { walk(child, depth: depth + 1) }
+        }
+        walk(view, depth: 0)
+        func nativeViews(_ current: NSView) {
+            if current is NSTableView {
+                lines.append("Native table: " + String(describing: type(of: current)))
+                seen.removeAll()
+                walk(current, depth: 0)
+            }
+            current.subviews.forEach(nativeViews)
+        }
+        nativeViews(view)
+        try? lines.joined(separator: "\n").write(to: root.appendingPathComponent("accessibility.txt"), atomically: true, encoding: .utf8)
     }
 }
 
@@ -229,6 +263,10 @@ private struct UIFixtureControlView: View {
     private func show(route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil) {
         controller.openPanel(route: route, expand: expand, search: search, printDiagnostics: true)
         settings.panelPinned = true
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            if let view = controller.panel?.contentView { UIFixture.exportAccessibility(of: view) }
+        }
     }
 }
 #endif
