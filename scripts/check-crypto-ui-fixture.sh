@@ -37,7 +37,7 @@ bash scripts/build-ui-fixture.sh > "$output/build.log" 2>&1
 app="$PWD/.build/ui-fixture/Stox UI Fixture.app"
 executable="$app/Contents/MacOS/Stox"
 codesign --verify --deep --strict "$app"
-codesign -d --entitlements - "$app" > "$output/entitlements.plist" 2> "$output/signature.log"
+codesign -d --entitlements - --xml "$app" > "$output/entitlements.plist" 2> "$output/signature.log"
 python3 - "$app/Contents/Info.plist" "$output/entitlements.plist" <<'PY'
 import plistlib, sys
 info = plistlib.load(open(sys.argv[1], 'rb'))
