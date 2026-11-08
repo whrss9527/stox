@@ -49,7 +49,7 @@ public struct Quote: Sendable, Equatable {
     public var low52Week: Double?
     /// 行情时间（交易所当地时间）。
     public var timestamp: Date?
-    /// 价格显示的小数位数，沿用交易所的报价精度。
+    /// 价格显示的小数位数；证券沿用报价精度，数字货币按价位给稳定展示精度（不代表交易 tickSize）。
     public var priceDecimals: Int
     /// 数据源里的交易所代码，例如 `600519`、`AAPL.OQ`、`.IXIC`。美股查 K 线时要用到后缀。
     public var exchangeCode: String?
@@ -126,7 +126,7 @@ public struct Quote: Sendable, Equatable {
 
     /// 今天是否有过成交。交易时段内仍为 false 通常意味着停牌。场外基金没有成交，有净值就算；
     /// 期货外汇的接口不给成交量，有价格就算。
-    public var hasTraded: Bool { symbol.isFund || symbol.isGlobal ? price > 0 : volume > 0 || open > 0 }
+    public var hasTraded: Bool { symbol.isFund || symbol.isGlobal || symbol.isCrypto ? price > 0 : volume > 0 || open > 0 }
 
     /// 振幅（%）。
     public var amplitude: Double? {

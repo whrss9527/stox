@@ -24,6 +24,35 @@ final class UIFixtureAdapterTests: XCTestCase {
         }
     }
 
+    func testFixtureLaunchFlagsAreAllowlistedAndStayInTemporaryDefaults() throws {
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let defaults = UIFixtureDefaults(file: folder.appendingPathComponent("preferences.plist"))
+        for language in ["en", "zh-Hans", "zh-Hant"] {
+            let options = UIFixtureLaunchOptions(arguments: ["Fixture", "--fixture-language", language,
+                "--fixture-crypto-only", "--fixture-compact", "--fixture-dark", "--sync-enabled"])
+            XCTAssertEqual(options.language, language)
+            try options.apply(to: defaults)
+            let items = try XCTUnwrap(defaults.data(forKey: "watchlist.v1").flatMap(Watchlist.decode))
+            XCTAssertEqual(items.count, 3)
+            XCTAssertTrue(items.allSatisfy { $0.symbol.isCrypto && $0.holding == nil })
+            XCTAssertTrue(defaults.bool(forKey: "list.compact"))
+            XCTAssertTrue(defaults.bool(forKey: "tips.dismissed"))
+            XCTAssertEqual(defaults.string(forKey: "appearance"), "dark")
+            XCTAssertNil(defaults.object(forKey: "sync.enabled"))
+            XCTAssertNil(defaults.object(forKey: "AppleLanguages"))
+        }
+        for arguments in [["--fixture-language", "fr"], ["--fixture-language"], ["--fixture-language=en"],
+                          ["--fixture-compact=true", "--fixture-dark=true", "--fixture-crypto-only=true"]] {
+            let options = UIFixtureLaunchOptions(arguments: arguments)
+            XCTAssertEqual(options, UIFixtureLaunchOptions(arguments: []))
+        }
+        try UIFixtureLaunchOptions(arguments: []).apply(to: defaults)
+        XCTAssertFalse(defaults.bool(forKey: "list.compact"))
+        XCTAssertEqual(defaults.string(forKey: "appearance"), "light")
+        XCTAssertEqual(defaults.data(forKey: "watchlist.v1").flatMap(Watchlist.decode), UIFixtureProvider.initialItems)
+    }
+
     func testPreferencesStayInTheTemporaryFixtureFile() throws {
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: folder) }
@@ -63,8 +92,8 @@ final class UIFixtureAdapterTests: XCTestCase {
 
     func testSearchProvidesExistingAndNewRows() async throws {
         let results = try await UIFixtureProvider().search("fixture")
-        XCTAssertEqual(results.count, 8)
-        let saved = Set(UIFixtureProvider.items.prefix(5).map(\.symbol))
+        XCTAssertEqual(results.count, UIFixtureProvider.items.count)
+        let saved = Set(UIFixtureProvider.initialItems.map(\.symbol))
         XCTAssertTrue(results.contains { saved.contains($0.symbol) })
         XCTAssertTrue(results.contains { !saved.contains($0.symbol) })
     }
@@ -82,6 +111,28 @@ final class UIFixtureAdapterTests: XCTestCase {
             _ = try await provider.fetchExtendedHours(for: symbol, exchangeCode: nil)
             XCTFail("extended-hours fixtures must honor the failure control")
         } catch { XCTAssertEqual((error as? URLError)?.code, .notConnectedToInternet) }
+    }
+
+
+    func testCryptoFixturePreservesRollingWindowUnitsPrecisionAndOldTimestamp() async throws {
+        let provider = UIFixtureProvider()
+        let btc = Symbol("ccBTCUSDT")!, doge = Symbol("ccDOGEUSDT")!, eth = Symbol("ccETHUSDT")!
+        let values = try await provider.fetchQuotes(for: [btc, doge, eth])
+        let lowPrice = try XCTUnwrap(values[doge])
+        XCTAssertEqual(lowPrice.price, 0.087654)
+        XCTAssertEqual(lowPrice.priceDecimals, 6)
+        XCTAssertEqual(lowPrice.volume, 30_000_000_000)
+        XCTAssertEqual(lowPrice.amount, lowPrice.price * lowPrice.volume)
+        XCTAssertEqual(values[btc]?.open, values[btc]?.previousClose)
+        XCTAssertEqual(values[btc]?.timestamp, UIFixture.date)
+        XCTAssertEqual(values[eth]?.timestamp, UIFixture.date.addingTimeInterval(-600))
+        XCTAssertFalse(UIFixtureProvider.initialItems.filter { $0.symbol.isCrypto }.contains { $0.holding != nil })
+        let received = try await provider.fetchIntraday(for: btc)
+        let series = try XCTUnwrap(received)
+        XCTAssertEqual(series.start, UIFixture.date.addingTimeInterval(-86400))
+        XCTAssertEqual(series.points.first?.minute, 0)
+        XCTAssertEqual(series.points.last?.minute, 1440)
+        XCTAssertTrue(series.points.allSatisfy { $0.average == nil })
     }
 
     func testFakeRequestsHonorCancellation() async throws {

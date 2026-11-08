@@ -69,6 +69,14 @@ macOS App 使用 XcodeGen 2.44.1 生成工程；`make project` 下载固定版�
 
 有费用的记录将 `side` 编码为 `buy-fee-v1`、`sell-fee-v1` 或 `dividend-fee-v1`，另存 `fee`；无费用记录保留原标签。这是在同步 format 1 内增加交易类型。已具备 #74 保留能力的客户端（0.50.2 起）会在编辑、备份和同步时原样保留这些记录，避免静默丢掉费用字段；升级前不会显示或计算不透明交易。`TradeFeeSyncTests` 用旧字段/类型结构和原有保留机制验证兼容往返。
 
+### 数字货币行情
+
+`CryptoProvider` 使用 Binance 的公开现货行情接口及同交易所的备用主机，只请求目录中的十个 USDT 交易对，不需要账号或 API Key。`ccBTCUSDT` 是稳定的同步代码，`BTC/USDT` 是显示名称。显式交易对解析为数字货币；代码操作中的裸 `BTC` 仍是美股，搜索则提供可区分的候选。
+
+App 为非数字货币保留腾讯/新浪主备切换，另注入独立的数字货币数据源。两组请求并发，成功的行情先显示；部分失败保留原报价时间并标出不可用的代码。数字货币周末仍保持刷新，数据源有独立失败退避及全局 Retry-After 限流。图表仅在可见时按需请求，同时最多三个数字货币图表请求；最近 24 小时最多 288 个五分钟点，日/周/月 K 线按 UTC 划分且数量有界。滚动 24 小时行情不覆盖日历 K 线，也不参与股票持仓和盈亏计算。
+
+数据源测试注入 URLSession/URLProtocol 和受控时钟；store 测试分别使用股票与数字货币假数据源及隔离偏好。真实接口检查与离线回归分开，必须如实记录实际网络结果。可用 `swift run stox-cli quote ccBTCUSDT ccETHUSDT` 或 `swift run stox-cli raw ccBTCUSDT` 检查真实解析路径，不向请求或样例写入个人 API 凭据。
+
 ### 行情不变量巡检
 
 `swift run stox-cli check` 按 `Sources/StoxCore/DatasourceSnapshots` 里的人工核对样本检查 A 股、港股、美股的字段数量，以及价格范围、昨收、A 股成交额/成交量、时间、52 周高点。备用源用 `--source sina`。`--save-raw response.bin` 在 HTTP 失败时也保存原始字节；`--raw response.bin --at 2026-10-07T10:00:00Z` 不联网复放响应。退出码 0 表示通过、1 表示响应存在差异、2 表示参数无效。没有人工核对格式快照的证券明确报错。

@@ -55,6 +55,8 @@ public enum MarketClock {
         case .global:
             // 工作日全天，哪天开哪天收见 globalPhase。
             return [Session(start: 0, end: 24 * 60, phase: .trading)]
+        case .crypto:
+            return [Session(start: 0, end: 24 * 60, phase: .trading)]
         }
     }
 
@@ -65,6 +67,7 @@ public enum MarketClock {
 
     /// 仅按时间表判断的交易时段。
     public static func phase(for region: MarketRegion, at date: Date) -> MarketPhase {
+        if region == .crypto { return .trading }
         if region == .global { return globalPhase(at: date) }
         let calendar = region.calendar
         let weekday = calendar.component(.weekday, from: date)
@@ -78,6 +81,8 @@ public enum MarketClock {
     ///
     /// - Parameter latestQuoteTime: 该市场所有行情里最新的时间戳。
     public static func effectivePhase(for region: MarketRegion, at date: Date, latestQuoteTime: Date?) -> MarketPhase {
+        // 停更是网络或数据问题，不能把 7×24 市场当成休市而降低轮询频率。
+        if region == .crypto { return .trading }
         let scheduled = phase(for: region, at: date)
         if region == .global {
             // 期货外汇只在圣诞、元旦这样的节日休市：该开着的时候最新的行情已经是几个小时以前的，就是休市

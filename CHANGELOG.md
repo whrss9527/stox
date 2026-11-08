@@ -2,6 +2,20 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
+## 1.9.0（2026-11-08）
+
+### 中文
+
+- 新增数字货币行情：搜索 BTC/USDT、ETH/USDT、SOL/USDT 等常用现货交易对，加入自选与菜单栏；明确标注 Binance 来源、USDT 单位和滚动 24 小时涨跌。
+- 提供最近 24 小时走势及日、周、月 K 线，按需加载；数字货币全天候刷新，周末也保持更新。
+- 数字货币与股票行情独立请求、独立恢复；接口暂不可用时保留原报价和时间并提示未更新，支持受限并发、取消和失败退避。
+
+### English
+
+- Add common crypto spot pairs such as BTC/USDT, ETH/USDT and SOL/USDT to search, the watchlist and menu bar, with Binance attribution, USDT units and rolling 24-hour changes.
+- View the past 24 hours and daily, weekly or monthly candles, loaded on demand. Crypto refreshes around the clock, including weekends.
+- Fetch and recover crypto independently from stocks. Unavailable data keeps its original price and timestamp with a warning; requests have bounded concurrency, cancellation and failure backoff.
+
 ## 1.8.1（2026-11-07）
 
 ### 中文

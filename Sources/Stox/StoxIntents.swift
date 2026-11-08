@@ -6,6 +6,7 @@ import StoxCore
 enum StoxIntentSupport {
     /// AppDelegate与快捷指令共用队列，冷启动时先收下，初始化后再打开面板。
     static let links = StoxLinkInbox()
+    private static let cryptoProvider = CryptoProvider.shared
 
     static func price(code: String) async throws -> Double {
         try await price(code: code, fetch: liveQuote)
@@ -23,6 +24,7 @@ enum StoxIntentSupport {
     }
 
     private static func liveQuote(_ symbol: Symbol) async throws -> Quote? {
+        if symbol.isCrypto { return try await cryptoProvider.fetchQuotes(for: [symbol])[symbol] }
         let result = try await QuoteFailover.fetchQuotes([symbol], primary: TencentProvider(), backup: SinaProvider())
         return result.quotes[symbol]
     }

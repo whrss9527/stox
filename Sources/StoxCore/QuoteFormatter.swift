@@ -91,6 +91,16 @@ public enum QuoteFormatter {
     /// 成交量：A 股按“手”显示，港美股按“股”显示。
     public static func volume(_ shares: Double, market: Market) -> String {
         guard shares > 0 else { return "--" }
+        if market == .crypto {
+            guard shares.isFinite else { return "--" }
+            // 币的成交量可以小于 1，不能按股票大数格式四舍五入成 0。
+            var amount = shares < 10_000 ? fixed(shares, decimals: 8) : largeNumber(shares)
+            if shares < 10_000 {
+                while amount.hasSuffix("0") { amount.removeLast() }
+                if amount.hasSuffix(".") { amount.removeLast() }
+            }
+            return L("%@币", amount)
+        }
         if market.region == .cn { return L("%@手", largeNumber(shares / 100)) }
         return L("%@股", largeNumber(shares))
     }
@@ -103,14 +113,15 @@ public enum QuoteFormatter {
     }
 
     static func signed(_ value: Double, decimals: Int) -> String {
-        let threshold = 0.5 * pow(10, -Double(decimals))
+        let precision = max(0, min(decimals, 8))
+        let threshold = 0.5 * pow(10, -Double(precision))
         if abs(value) < threshold { return fixed(0, decimals: decimals) }
         return (value > 0 ? "+" : "") + fixed(value, decimals: decimals)
     }
 
     /// 固定小数位，不带正负号。
     public static func fixed(_ value: Double, decimals: Int) -> String {
-        String(format: "%.\(max(0, min(decimals, 6)))f", value)
+        String(format: "%.\(max(0, min(decimals, 8)))f", value)
     }
 }
 

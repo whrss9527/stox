@@ -157,7 +157,7 @@ extension Portfolio {
     /// since 按各个市场当地的日期比，比如今年是 `2026-01-01`。
     public static func realizedProfit(items: [WatchItem], since day: String) -> [(region: MarketRegion, profit: Double)] {
         var totals: [MarketRegion: Double] = [:]
-        for item in items where item.trades.contains(where: { $0.profit != nil && $0.day >= day }) {
+        for item in items where !item.symbol.isCrypto && item.trades.contains(where: { $0.profit != nil && $0.day >= day }) {
             totals[item.symbol.market.region, default: 0] += item.trades.realizedProfit(since: day)
         }
         return MarketRegion.allCases.compactMap { region in totals[region].map { (region, $0) } }

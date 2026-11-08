@@ -30,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     #if STOX_UI_FIXTURE
     private let settings = SettingsStore(defaults: UIFixture.defaults)
     private lazy var store = QuoteStore(settings: settings, provider: UIFixture.provider, backup: nil,
+                                        cryptoProvider: UIFixture.provider,
                                         defaults: UIFixture.defaults, clock: UIFixture.clock)
     private lazy var sync = SyncManager(store: store, settings: settings, defaults: UIFixture.defaults,
                                        location: .override(UIFixture.root.appendingPathComponent("sync")), watchesChanges: false)

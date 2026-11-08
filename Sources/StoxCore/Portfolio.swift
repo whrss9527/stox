@@ -92,7 +92,7 @@ public struct PortfolioSummary: Equatable, Sendable {
 public enum Portfolio {
     /// 一只证券的持仓盈亏；没有现价时返回 nil。trades 是这只记下的买卖，今天的会算进今日盈亏。
     public static func position(_ holding: Holding, quote: Quote, trades: [Trade] = []) -> PositionValue? {
-        guard holding.isValid, quote.price > 0 else { return nil }
+        guard !quote.symbol.isCrypto, holding.isValid, quote.price > 0 else { return nil }
         return PositionValue(
             marketValue: holding.shares * quote.price,
             costValue: holding.costValue,
@@ -211,6 +211,7 @@ extension MarketRegion {
         case .cn: return L("人民币")
         case .hk: return L("港币")
         case .us, .global: return L("美元")
+        case .crypto: return "USDT"
         }
     }
 
@@ -220,6 +221,7 @@ extension MarketRegion {
         case .cn: return "¥"
         case .hk: return "HK$"
         case .us, .global: return "$"
+        case .crypto: return "USDT "
         }
     }
 }

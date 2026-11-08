@@ -69,6 +69,14 @@ Startup restoration owns a separate task from debounced pulls, so an immediate p
 
 Fee-bearing records encode `side` as `buy-fee-v1`, `sell-fee-v1`, or `dividend-fee-v1`, alongside `fee`; records without a fee keep the original labels. This is a new trade type within sync format 1. Clients with #74's preservation support (0.50.2 onward) retain fee-bearing records as opaque JSON through edits, backup and sync, so they cannot silently drop the fee field. Those clients do not display or calculate the opaque trades until upgraded. `TradeFeeSyncTests` exercise an actual legacy field/type schema and the original preservation mechanism.
 
+### Crypto market data
+
+`CryptoProvider` uses Binance's public spot market-data API, with a second host on the same exchange. Only the ten catalogued USDT pairs are requested; no account or API key is used. `ccBTCUSDT` is the stable sync identity, while `BTC/USDT` is the displayed pair. Explicit pairs parse as crypto, and bare `BTC` remains a US stock code in code actions; search offers distinct candidates.
+
+The app keeps Tencent/Sina failover for non-crypto symbols and injects a separate crypto provider. Both partitions run concurrently and publish successful data without waiting for the other source. Partial failures retain original quote timestamps and identify unavailable symbols. Crypto stays live on weekends, with independent provider backoff and global Retry-After handling. Charts are requested only while visible, with at most three crypto chart requests active, 288 five-minute points for the past 24 hours and bounded daily/weekly/monthly candles in UTC. Rolling ticker values never overwrite calendar K-line candles or enter stock holdings/P&L.
+
+Provider tests inject URLSession/URLProtocol and a controlled clock; store tests use separate fake stock and crypto providers and isolated defaults. Live datasource checks are separate from offline regressions and must be reported with their actual network outcome. To inspect the API using the production parser, use `swift run stox-cli quote ccBTCUSDT ccETHUSDT` or `swift run stox-cli raw ccBTCUSDT`; do not put personal API credentials into requests or fixtures.
+
 ### Quote invariant checks
 
 `swift run stox-cli check` checks the reviewed A-share, Hong Kong and US sample symbols against the field counts in `Sources/StoxCore/DatasourceSnapshots`, as well as price range, previous close, A-share turnover/volume, timestamp and 52-week high. Use `--source sina` for the backup source. `--save-raw response.bin` preserves original bytes even for HTTP errors; `--raw response.bin --at 2026-10-07T10:00:00Z` replays a response without networking. Exit status is 0 for success, 1 for response differences and 2 for invalid arguments. Symbols without a reviewed schema fail explicitly.

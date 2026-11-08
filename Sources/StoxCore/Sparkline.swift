@@ -44,6 +44,17 @@ public struct Sparkline: Equatable, Sendable {
     public func updating(with quote: Quote?, region: MarketRegion) -> Sparkline {
         guard let quote, quote.price > 0, let time = quote.timestamp else { return self }
         if let start {
+            if region == .crypto {
+                guard quote.symbol.isCrypto, !values.isEmpty else { return self }
+                // 数字货币每次取的是滚动 24 小时。下一轮分时前只让实时价格跟随尾点，
+                // 最多宽限两分钟；不移动历史时间轴，也不让老缓存无限延长。
+                let end = start.addingTimeInterval(TimeInterval(IntradayAxis.length(for: region) * 60))
+                if (0...120).contains(time.timeIntervalSince(end)) {
+                    var updated = self
+                    updated.values[values.count - 1] = quote.price
+                    return updated
+                }
+            }
             // 期货：离开盘多少分钟，在这个交易日的 24 小时里才算。
             let minute = Int(time.timeIntervalSince(start) / 60)
             guard (0..<IntradayAxis.length(for: region)).contains(minute) else { return self }

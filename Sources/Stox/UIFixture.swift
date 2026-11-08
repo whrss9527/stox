@@ -9,6 +9,7 @@ enum UIFixture {
     static let root = FileManager.default.temporaryDirectory.appendingPathComponent("StoxUIFixture-" + UUID().uuidString, isDirectory: true)
     static let defaults = UIFixtureDefaults(file: root.appendingPathComponent("preferences.plist"))
     static let provider = UIFixtureProvider()
+    static let launchOptions = UIFixtureLaunchOptions(arguments: ProcessInfo.processInfo.arguments)
     static let date = ISO8601DateFormatter().date(from: "2026-11-06T06:00:00Z")!
     @MainActor static var clock: QuoteStoreClock { QuoteStoreClock(now: { date }) }
 
@@ -22,10 +23,10 @@ enum UIFixture {
         defaults.set(false, forKey: "closeSummary")
         defaults.set(false, forKey: "hotKeyEnabled")
         defaults.set(false, forKey: "slowWhenIdle")
-        defaults.set(true, forKey: "tipsDismissed")
+        defaults.set(true, forKey: "tips.dismissed")
         defaults.set(true, forKey: "showAllocation")
-        defaults.set(try! JSONEncoder().encode(Array(UIFixtureProvider.items.prefix(5))), forKey: "watchlist.v1")
-        applyLanguage("en")
+        try! launchOptions.apply(to: defaults)
+        applyLanguage(launchOptions.language)
         print("STOX_UI_FIXTURE root=\(root.path) network=app-sandbox-denied provider=fake")
         fflush(stdout)
     }
@@ -95,6 +96,32 @@ enum UIFixture {
     }
 }
 
+/// Allowlisted fixture inputs only. Release builds do not compile this type or read these flags.
+struct UIFixtureLaunchOptions: Equatable {
+    var language = "en"
+    var cryptoOnly = false
+    var compact = false
+    var dark = false
+
+    init(arguments: [String]) {
+        if let index = arguments.firstIndex(of: "--fixture-language"), index + 1 < arguments.count,
+           ["en", "zh-Hans", "zh-Hant"].contains(arguments[index + 1]) {
+            language = arguments[index + 1]
+        }
+        cryptoOnly = arguments.contains("--fixture-crypto-only")
+        compact = arguments.contains("--fixture-compact")
+        dark = arguments.contains("--fixture-dark")
+    }
+
+    func apply(to defaults: UserDefaults) throws {
+        let items = cryptoOnly ? UIFixtureProvider.items.filter { $0.symbol.isCrypto } : UIFixtureProvider.initialItems
+        defaults.set(try JSONEncoder().encode(items), forKey: "watchlist.v1")
+        defaults.set(compact, forKey: "list.compact")
+        defaults.set(dark ? "dark" : "light", forKey: "appearance")
+        defaults.set(true, forKey: "tips.dismissed")
+    }
+}
+
 /// Never reads or writes a CFPreferences domain. Every fixture model uses this adapter.
 final class UIFixtureDefaults: UserDefaults, @unchecked Sendable {
     private let file: URL
@@ -139,7 +166,13 @@ actor UIFixtureProvider: QuoteProvider {
         WatchItem(symbol: Symbol("sz000858")!, name: "五粮液"), // l10n-ignore: synthetic market data
         WatchItem(symbol: Symbol("usGOOGL")!, name: "Alphabet"),
         WatchItem(symbol: Symbol("hk09988")!, name: "阿里巴巴"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("ccBTCUSDT")!, name: "比特币"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("ccDOGEUSDT")!, name: "狗狗币"), // l10n-ignore: synthetic low-price market data
+        WatchItem(symbol: Symbol("ccETHUSDT")!, name: "以太坊"), // l10n-ignore: synthetic stale market data
     ]
+    static var initialItems: [WatchItem] {
+        Array(items.prefix(5)) + items.filter { $0.symbol.isCrypto }
+    }
     private var fails = false
     func setFailure(_ value: Bool) { fails = value }
     private func delay(_ seconds: Double = 0.25) async throws {
@@ -147,6 +180,14 @@ actor UIFixtureProvider: QuoteProvider {
         if fails { throw URLError(.notConnectedToInternet) }
     }
     private func quote(_ symbol: Symbol) -> Quote {
+        if let entry = CryptoCatalog.entry(for: symbol) {
+            let price: Double = entry.baseAsset == "BTC" ? 76543.21 : (entry.baseAsset == "DOGE" ? 0.087654 : 2456.789)
+            let volume: Double = entry.baseAsset == "DOGE" ? 30_000_000_000 : 123456.78
+            return Quote(symbol: symbol, name: entry.name, price: price, previousClose: price / 1.0123,
+                         open: price / 1.0123, high: price * 1.04, low: price * 0.95, volume: volume,
+                         amount: price * volume, timestamp: UIFixture.date.addingTimeInterval(entry.baseAsset == "ETH" ? -600 : 0),
+                         priceDecimals: CryptoCatalog.priceDecimals(for: price), exchangeCode: entry.code, englishName: entry.english)
+        }
         let index = Self.items.firstIndex(where: { $0.symbol == symbol }) ?? 0
         let price = [1239.58, 435.2, 218.4, 3280.12, 415.7, 128.6, 180.3, 85.4][index]
         return Quote(symbol: symbol, name: Self.items[index].name, price: price, previousClose: price / 1.0123,
@@ -163,14 +204,39 @@ actor UIFixtureProvider: QuoteProvider {
         // "fixture" deliberately returns both saved and new symbols for keyboard/add checks.
         return Self.items.filter { query.lowercased() == "fixture" || $0.name.localizedCaseInsensitiveContains(query)
             || $0.symbol.rawValue.localizedCaseInsensitiveContains(query) }
-            .map { SearchResult(symbol: $0.symbol, name: $0.name, typeCode: "GP") }
+            .map { SearchResult(symbol: $0.symbol, name: $0.name, typeCode: $0.symbol.isCrypto ? "CRYPTO" : "GP") }
     }
     func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? {
         try await delay()
         let price = quote(symbol).price
-        let points = (0..<120).map { index in
-            IntradayPoint(minute: 570 + index, price: price * (0.99 + Double(index) * 0.00008 + sin(Double(index) / 8) * 0.002),
-                          average: price * 0.994, volume: Double(100 + index))
+        if symbol.isCrypto {
+            var points: [IntradayPoint] = []
+            points.reserveCapacity(289)
+            for index in 0...288 {
+                let offset: Double = Double(index)
+                let trend: Double = offset * 0.00003
+                let phase: Double = offset / 8
+                let wave: Double = sin(phase) * 0.002
+                let factor: Double = (0.99 + trend) + wave
+                let pointPrice: Double = price * factor
+                let volume: Double = Double(100 + index)
+                points.append(IntradayPoint(minute: index * 5, price: pointPrice, volume: volume))
+            }
+            return IntradaySeries(symbol: symbol, date: "20261106", points: points,
+                                  start: UIFixture.date.addingTimeInterval(-86400))
+        }
+        var points: [IntradayPoint] = []
+        points.reserveCapacity(120)
+        for index in 0..<120 {
+            let offset: Double = Double(index)
+            let trend: Double = offset * 0.00008
+            let phase: Double = offset / 8
+            let wave: Double = sin(phase) * 0.002
+            let factor: Double = (0.99 + trend) + wave
+            let pointPrice: Double = price * factor
+            let average: Double = price * 0.994
+            let volume: Double = Double(100 + index)
+            points.append(IntradayPoint(minute: 570 + index, price: pointPrice, average: average, volume: volume))
         }
         return IntradaySeries(symbol: symbol, date: "20261106", points: points)
     }
@@ -214,11 +280,38 @@ final class UIFixtureControls {
         window = NSWindow(contentViewController: NSHostingController(rootView: root))
         window.title = "Stox UI Fixture — synthetic data, offline"
         window.styleMask = [.titled, .closable, .miniaturizable]
-        window.setContentSize(NSSize(width: 520, height: 270))
+        window.setContentSize(NSSize(width: 620, height: 320))
         window.center()
         window.isReleasedWhenClosed = false
+        if ProcessInfo.processInfo.arguments.contains("--export-own-ax"),
+           ProcessInfo.processInfo.arguments.contains("--show-panel") {
+            Task { @MainActor [weak controller] in
+                for _ in 0..<180 {
+                    guard !Task.isCancelled, let controller else { return }
+                    if let panel = controller.panel, panel.isVisible, let view = panel.contentView,
+                       store.quotes.count == store.items.count {
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        guard panel.isVisible else { return }
+                        view.layoutSubtreeIfNeeded()
+                        UIFixture.exportAccessibility(of: view)
+                        print("STOX_FIXTURE ax_path=\(UIFixture.root.appendingPathComponent("accessibility.txt").path)")
+                        print("STOX_FIXTURE language=\(UIFixture.launchOptions.language) english=\(AppLanguage.isEnglish) compact=\(settings.compactRows) appearance=\(settings.appearance.rawValue) items=\(store.items.count) quotes=\(store.quotes.count)")
+                        for item in store.items where item.symbol.isCrypto {
+                            guard let quote = store.quotes[item.symbol] else { continue }
+                            print("STOX_FIXTURE symbol=\(item.symbol.rawValue) pair=\(item.symbol.displayCode) price=\(quote.price) decimals=\(quote.priceDecimals) stale=\(store.quoteIsStale(item.symbol)) quote_time=\(quote.timestamp.map(CryptoPresentation.timestamp) ?? "unknown")")
+                        }
+                        print("STOX_FIXTURE snapshot_ready=true")
+                        fflush(stdout)
+                        return
+                    }
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+            }
+        }
     }
     func show() {
+        // Automated CI scenes open the production panel through its existing CLI; no controls window covers it.
+        if ProcessInfo.processInfo.arguments.contains("--show-panel") { return }
         NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -229,7 +322,7 @@ private struct UIFixtureControlView: View {
     @ObservedObject var settings: SettingsStore
     let store: QuoteStore
     let controller: StatusItemController
-    @State private var language = "en"
+    @State private var language = UIFixture.launchOptions.language
     @State private var failure = false
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -238,6 +331,7 @@ private struct UIFixtureControlView: View {
                 Picker("Language", selection: $language) {
                     Text(verbatim: "English").tag("en")
                     Text(verbatim: "简体中文").tag("zh-Hans") // l10n-ignore: fixture language self-name
+                    Text(verbatim: "繁體中文").tag("zh-Hant") // l10n-ignore: fixture language self-name
                 }.onChange(of: language) { value in
                     UIFixture.applyLanguage(value)
                     controller.resetFixturePresentation()
@@ -256,6 +350,11 @@ private struct UIFixtureControlView: View {
                 Button("Details") { show(expand: Symbol("sh600519")) }
             }
             HStack {
+                Button("BTC · 24h") { show(expand: Symbol("ccBTCUSDT")) }
+                Button("DOGE · low price") { show(expand: Symbol("ccDOGEUSDT")) }
+                Button("ETH · stale 10m") { show(expand: Symbol("ccETHUSDT")) }
+            }
+            HStack {
                 Button("Settings (680px)") { SettingsWindowController.shared.showFixtureMinimum() }
                 Toggle("Fail requests", isOn: $failure).onChange(of: failure) { value in
                     Task { await UIFixture.provider.setFailure(value); await store.refresh() }
@@ -267,6 +366,7 @@ private struct UIFixtureControlView: View {
         }.padding(20)
     }
     private func show(route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil) {
+        if expand != nil { settings.listFilter = .all }
         controller.openPanel(route: route, expand: expand, search: search, printDiagnostics: true)
         settings.panelPinned = true
         if ProcessInfo.processInfo.arguments.contains("--export-own-ax") {

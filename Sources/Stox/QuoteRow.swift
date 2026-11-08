@@ -24,6 +24,9 @@ struct QuoteRow: View {
         if item.symbol.isFund {
             return (item.holding == nil ? 63 : 96) + note
         }
+        if item.symbol.isCrypto {
+            return 116 + QuoteChartSection.height + 6 + note
+        }
         if item.symbol.isGlobal {
             return 96 + (item.symbol.hasIntraday ? QuoteChartSection.height + 6 : 0) + note
         }
@@ -113,7 +116,19 @@ struct QuoteRow: View {
         return sparkline.updating(with: quote, region: item.symbol.market.region)
     }
 
+    @ViewBuilder
     private var summary: some View {
+        if item.symbol.isCrypto {
+            ViewThatFits(in: .horizontal) {
+                summaryContent(showsSparkline: true)
+                summaryContent(showsSparkline: false)
+            }
+        } else {
+            summaryContent(showsSparkline: true)
+        }
+    }
+
+    private func summaryContent(showsSparkline: Bool) -> some View {
         HStack(spacing: 10) {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(spacing: 4) {
@@ -145,12 +160,17 @@ struct QuoteRow: View {
                         .font(.system(size: 10.5).monospacedDigit())
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
+                        .fixedSize(horizontal: item.symbol.isCrypto, vertical: false)
+                        .layoutPriority(item.symbol.isCrypto ? 3 : 0)
                     if let tag = statusTag {
                         Text(tag)
                             .font(.system(size: 9.5))
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 3)
                             .background(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.4)))
+                            .help(item.symbol.isCrypto ? L("行情暂未更新") : tag)
+                            .fixedSize(horizontal: item.symbol.isCrypto, vertical: false)
+                            .layoutPriority(item.symbol.isCrypto ? 3 : 0)
                     }
                     if let extended {
                         // 美股盘前盘后：标签加涨跌幅，价格放在提示和详情里。
@@ -165,10 +185,11 @@ struct QuoteRow: View {
             // 名称、代码这一列排在现价后面，迷你分时让着它们。
             .layoutPriority(1)
             Spacer(minLength: 6)
-            if let sparkline = rowSparkline {
+            if showsSparkline, let sparkline = rowSparkline {
                 SparklineView(sparkline: sparkline, reference: quote?.previousClose ?? 0, color: color)
                     .frame(minWidth: Self.sparklineMinimumWidth, idealWidth: Self.sparklineWidth, maxWidth: Self.sparklineWidth)
                     .frame(height: 20)
+                    .layoutPriority(item.symbol.isCrypto ? -1 : 0)
             }
             VStack(alignment: .trailing, spacing: 1) {
                 priceLabel(size: 14)
@@ -192,22 +213,41 @@ struct QuoteRow: View {
     }
 
     /// 紧凑列表的一行：市场、名称、代码、状态标签、现价和色块。持仓盈亏、盘前盘后价在展开后看。
+    @ViewBuilder
     private var compactSummary: some View {
+        if item.symbol.isCrypto {
+            ViewThatFits(in: .horizontal) {
+                compactSummaryContent(showsName: true)
+                compactSummaryContent(showsName: false)
+            }
+        } else {
+            compactSummaryContent(showsName: true)
+        }
+    }
+
+    private func compactSummaryContent(showsName: Bool) -> some View {
         HStack(spacing: 6) {
             MarketBadge(market: item.symbol.market)
-            Text(item.displayName(with: quote))
-                .font(.system(size: 12.5, weight: .medium))
-                .lineLimit(1)
+            if showsName {
+                Text(item.displayName(with: quote))
+                    .font(.system(size: 12.5, weight: .medium))
+                    .lineLimit(1)
+            }
             Text(item.symbol.displayCode)
                 .font(.system(size: 10).monospacedDigit())
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+                .fixedSize(horizontal: item.symbol.isCrypto, vertical: false)
+                .layoutPriority(item.symbol.isCrypto ? 3 : 0)
             if let tag = statusTag {
                 Text(tag)
                     .font(.system(size: 9))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 3)
                     .background(RoundedRectangle(cornerRadius: 3).stroke(Color.secondary.opacity(0.4)))
+                    .help(item.symbol.isCrypto ? L("行情暂未更新") : tag)
+                    .fixedSize(horizontal: item.symbol.isCrypto, vertical: false)
+                    .layoutPriority(item.symbol.isCrypto ? 3 : 0)
             }
             if !item.alert.isEmpty {
                 Image(systemName: "bell.fill")
@@ -217,6 +257,7 @@ struct QuoteRow: View {
             }
             Spacer(minLength: 6)
             priceLabel(size: 13)
+                .layoutPriority(item.symbol.isCrypto ? 2 : 0)
             pill(width: 64, height: 20, fontSize: 11.5)
         }
     }
@@ -227,6 +268,7 @@ struct QuoteRow: View {
             .font(.system(size: size, weight: .medium).monospacedDigit())
             .foregroundStyle(color)
             .lineLimit(1)
+            .fixedSize(horizontal: item.symbol.isCrypto, vertical: false)
             .padding(.horizontal, 3)
             .background(
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -253,7 +295,8 @@ struct QuoteRow: View {
                 .contentShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
         }
         .buttonStyle(.plain)
-        .help(L("%@。点一下切换涨跌幅、涨跌额、总市值", settings.changeDisplay.title))
+        .help((item.symbol.isCrypto ? L("滚动24小时涨跌，价格单位 USDT。") + " " : "")
+              + L("%@。点一下切换涨跌幅、涨跌额、总市值", settings.changeDisplay.title))
     }
 
     /// 读屏软件念的内容：名称、代码、现价、涨跌，有持仓时加上持仓盈亏。
@@ -261,6 +304,10 @@ struct QuoteRow: View {
         var text = L("%@，%@", item.displayName(with: quote), item.symbol.displayCode)
         guard let quote else { return text + L("，暂无行情") }
         text += L("，现价 %@", QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))
+        if item.symbol.isCrypto {
+            text += " USDT · " + L("滚动24小时")
+            if store.quoteIsStale(item.symbol) { text += " · " + L("行情暂未更新") }
+        }
         switch quote.direction {
         case .up: text += L("，上涨 %@%", QuoteFormatter.fixed(abs(quote.changePercent), decimals: 2))
         case .down: text += L("，下跌 %@%", QuoteFormatter.fixed(abs(quote.changePercent), decimals: 2))
@@ -305,6 +352,7 @@ struct QuoteRow: View {
     /// 停牌、涨停、跌停等状态标签。
     private var statusTag: String? {
         guard let quote else { return nil }
+        if item.symbol.isCrypto { return store.quoteIsStale(item.symbol) ? L("未更新") : nil }
         if quote.isLimitUp { return L("涨停") }
         if quote.isLimitDown { return L("跌停") }
         let phase = store.phase(for: item.symbol.market.region)
@@ -384,6 +432,18 @@ struct QuoteDetailView: View {
                     cell(L("累计净值"), quote.cumulativeNAV.map(price) ?? "--")
                     cell(L("日涨跌"), QuoteFormatter.change(quote.change, decimals: quote.priceDecimals))
                     cell(L("日涨幅"), QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
+                }
+            } else if item.symbol.isCrypto {
+                QuoteChartSection(item: item, quote: quote)
+                HStack(spacing: 0) {
+                    cell(L("24小时开盘"), price(quote.open))
+                    cell(L("24小时最高"), price(quote.high))
+                    cell(L("24小时最低"), price(quote.low))
+                    cell(L("24小时涨跌"), QuoteFormatter.percent(quote.changePercent), color: profitColor(quote.change))
+                }
+                HStack(spacing: 0) {
+                    cell(L("24小时量（%@）", CryptoPresentation.baseAsset(item.symbol)), CryptoPresentation.quantity(quote.volume))
+                    cell(L("24小时额（USDT）"), CryptoPresentation.quantity(quote.amount))
                 }
             } else if item.symbol.isGlobal {
                 // 环球的品种没有成交量：开高低收、买价卖价；外汇有 52 周最高最低，期货写振幅，环球股指写涨跌幅和振幅。
@@ -469,6 +529,31 @@ struct QuoteDetailView: View {
                     .truncationMode(.tail)
                     .help(note)
             }
+            footer
+                .buttonStyle(.borderless)
+                .font(.system(size: 11))
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private var footer: some View {
+        if item.symbol.isCrypto {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(timeText)
+                    .font(.system(size: 10).monospacedDigit())
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .help(timeText)
+                    .accessibilityLabel(timeText)
+                HStack(spacing: 10) {
+                    Spacer()
+                    detailActions
+                }
+            }
+        } else {
             HStack(spacing: 10) {
                 Text(timeText)
                     .font(.system(size: 10).monospacedDigit())
@@ -477,16 +562,17 @@ struct QuoteDetailView: View {
                     .minimumScaleFactor(0.85)
                     .help(item.symbol.isFund ? L("场外基金的净值每个交易日晚上更新，白天看到的是上一个交易日的") : "")
                 Spacer()
-                Button(item.symbol.canHold ? L("持仓与提醒") : L("提醒")) { router.route = .edit(item.symbol) }
-                if let web = QuoteLinks.web(item.symbol) {
-                    Button(web.title) { NSWorkspace.shared.open(web.url) }
-                }
+                detailActions
             }
-            .buttonStyle(.borderless)
-            .font(.system(size: 11))
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+    }
+
+    @ViewBuilder
+    private var detailActions: some View {
+        Button(item.symbol.canHold ? L("持仓与提醒") : L("提醒")) { router.route = .edit(item.symbol) }
+        if let web = QuoteLinks.web(item.symbol) {
+            Button(web.title) { NSWorkspace.shared.open(web.url) }
+        }
     }
 
     private func price(_ value: Double) -> String {
@@ -534,6 +620,10 @@ struct QuoteDetailView: View {
 
     private var timeText: String {
         let region = item.symbol.market.region
+        if item.symbol.isCrypto {
+            let time = quote.timestamp.map(CryptoPresentation.timestamp) ?? L("行情时间未知")
+            return L("Binance · USDT现货") + " · " + time
+        }
         // 场外基金写净值是哪天的，每个交易日晚上才出当天的。
         if item.symbol.isFund {
             guard let timestamp = quote.timestamp else { return L("净值每个交易日晚上更新") }
@@ -556,6 +646,7 @@ struct QuoteDetailView: View {
         case .hk: return L("港股时间 %@", time) + L(" · 延时约 15 分钟")
         case .us: return L("美股时间 %@", time)
         case .global: return L("北京时间 %@", time)
+        case .crypto: return CryptoPresentation.timestamp(timestamp)
         }
     }
 }
@@ -591,5 +682,38 @@ struct ExtendedQuote {
         var text = L("%@ %@，相对收盘 %@", label, priceText, QuoteFormatter.percent(percent))
         if let timeText { text += L("，美东时间 %@", timeText) }
         return text
+    }
+}
+
+/// Crypto values keep the exchange's base/quote units and UTC time, independently of stock formatting.
+enum CryptoPresentation {
+    static func baseAsset(_ symbol: Symbol) -> String {
+        CryptoCatalog.entry(for: symbol)?.baseAsset ?? L("币")
+    }
+
+    /// Small base-asset quantities must not round to an integer like stock volumes.
+    static func quantity(_ value: Double) -> String {
+        guard value.isFinite, value >= 0 else { return "--" }
+        guard value < 10_000 else { return QuoteFormatter.largeNumber(value) }
+        var text = QuoteFormatter.fixed(value, decimals: 8)
+        while text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        return text == "-0" ? "0" : text
+    }
+
+    static func volume(_ value: Double, symbol: Symbol) -> String {
+        let text = quantity(value)
+        return text == "--" ? text : text + " " + baseAsset(symbol)
+    }
+
+    static func timestamp(_ date: Date) -> String {
+        let components = MarketRegion.crypto.calendar.dateComponents([.month, .day, .hour, .minute, .second], from: date)
+        return String(format: "%02d-%02d %02d:%02d:%02d UTC", components.month ?? 0, components.day ?? 0,
+                      components.hour ?? 0, components.minute ?? 0, components.second ?? 0)
+    }
+
+    static func intradayTime(minute: Int, start: Date?) -> String {
+        guard let start else { return IntradayAxis.timeLabel(of: minute, start: nil, region: .crypto) + " UTC" }
+        return timestamp(start.addingTimeInterval(Double(minute) * 60))
     }
 }

@@ -6,6 +6,8 @@ import Foundation
 /// zn 是环球股指（znb_NKY 日经225、znb_UKX 英国富时100，腾讯没有，用新浪的代码和行情），都算在“环球”里。
 public enum Market: String, Codable, CaseIterable, Sendable {
     case sh, sz, bj, hk, us, jj, hf, wh, zn
+    /// 内置目录中的 USDT 数字货币现货；不是腾讯代码。
+    case crypto = "cc"
 
     public var region: MarketRegion {
         switch self {
@@ -13,6 +15,7 @@ public enum Market: String, Codable, CaseIterable, Sendable {
         case .hk: return .hk
         case .us: return .us
         case .hf, .wh, .zn: return .global
+        case .crypto: return .crypto
         }
     }
 
@@ -28,6 +31,7 @@ public enum Market: String, Codable, CaseIterable, Sendable {
         case .hf: return L("期")
         case .wh: return L("汇")
         case .zn: return L("指")
+        case .crypto: return L("币")
         }
     }
 }
@@ -35,7 +39,7 @@ public enum Market: String, Codable, CaseIterable, Sendable {
 /// 交易时段相同的一组市场：A 股（沪深北）、港股、美股，以及环球（期货外汇和环球股指）。
 /// 环球工作日几乎全天都在交易，不能填持仓，时间按北京时间算（行情接口给的就是北京时间）。
 public enum MarketRegion: String, Codable, CaseIterable, Sendable {
-    case cn, hk, us, global
+    case cn, hk, us, global, crypto
 
     public var displayName: String {
         switch self {
@@ -43,6 +47,7 @@ public enum MarketRegion: String, Codable, CaseIterable, Sendable {
         case .hk: return L("港股")
         case .us: return L("美股")
         case .global: return L("环球")
+        case .crypto: return L("数字货币")
         }
     }
 
@@ -52,6 +57,8 @@ public enum MarketRegion: String, Codable, CaseIterable, Sendable {
         case .hk: return TimeZone(identifier: "Asia/Hong_Kong") ?? TimeZone(secondsFromGMT: 8 * 3600)!
         case .us: return TimeZone(identifier: "America/New_York") ?? TimeZone(secondsFromGMT: -5 * 3600)!
         case .global: return TimeZone(identifier: "Asia/Shanghai") ?? TimeZone(secondsFromGMT: 8 * 3600)!
+        // 现货全天交易，分时与 K 线统一使用 UTC，不套用股票交易日。
+        case .crypto: return TimeZone(secondsFromGMT: 0)!
         }
     }
 
@@ -61,6 +68,7 @@ public enum MarketRegion: String, Codable, CaseIterable, Sendable {
         case .hk: return "HKD"
         // 期货外汇不能填持仓，用不到；报价大多是美元。
         case .us, .global: return "USD"
+        case .crypto: return "USDT"
         }
     }
 
