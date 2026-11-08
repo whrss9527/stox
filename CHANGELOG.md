@@ -6,11 +6,15 @@
 
 ### 中文
 
+- 数字货币价格提醒编辑保留八位小数，避免重新打开并保存时改变阈值。
+
 - 新增数字货币行情：搜索 BTC/USDT、ETH/USDT、SOL/USDT 等常用现货交易对，加入自选与菜单栏；明确标注 Binance 来源、USDT 单位和滚动 24 小时涨跌。
 - 提供最近 24 小时走势及日、周、月 K 线，按需加载；数字货币全天候刷新，周末也保持更新。
 - 数字货币与股票行情独立请求、独立恢复；接口暂不可用时保留原报价和时间并提示未更新，支持受限并发、取消和失败退避。
 
 ### English
+
+- Preserve eight decimal places when editing crypto price alerts so reopening and saving does not change thresholds.
 
 - Add common crypto spot pairs such as BTC/USDT, ETH/USDT and SOL/USDT to search, the watchlist and menu bar, with Binance attribution, USDT units and rolling 24-hour changes.
 - View the past 24 hours and daily, weekly or monthly candles, loaded on demand. Crypto refreshes around the clock, including weekends.

@@ -576,8 +576,8 @@ struct StockEditorPanel: View {
         loaded = true
         pinned = item.pinned
         alias = item.alias ?? ""
-        priceAbove = format(item.alert.priceAbove)
-        priceBelow = format(item.alert.priceBelow)
+        priceAbove = QuoteFormatter.alertPriceInput(item.alert.priceAbove, market: symbol.market)
+        priceBelow = QuoteFormatter.alertPriceInput(item.alert.priceBelow, market: symbol.market)
         riseAbove = format(item.alert.riseAbove)
         fallBelow = format(item.alert.fallBelow)
         profitAbove = format(item.alert.profitAbove)
