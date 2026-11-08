@@ -11,22 +11,26 @@ final class CryptoProviderTests: XCTestCase {
     private let eth = Symbol(market: .crypto, code: "ETHUSDT")!
     private static let at = Date(timeIntervalSince1970: 1_794_096_000)
 
-    private func session(_ handler: @escaping CryptoTestProtocol.Handler) -> URLSession {
-        let id = UUID().uuidString
-        CryptoTestProtocol.registry.add(id, handler: handler)
+    private func session(_ handler: @escaping CryptoTestProtocol.Handler) -> (session: URLSession, port: Int) {
+        let port = CryptoTestProtocol.registry.add(handler: handler)
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [CryptoTestProtocol.self]
-        config.httpAdditionalHeaders = ["X-Stox-Crypto-Test": id]
         let session = URLSession(configuration: config)
-        addTeardownBlock { session.invalidateAndCancel(); CryptoTestProtocol.registry.remove(id) }
-        return session
+        addTeardownBlock { session.invalidateAndCancel(); CryptoTestProtocol.registry.remove(port) }
+        return (session, port)
     }
 
     private func provider(_ handler: @escaping CryptoTestProtocol.Handler, clock: CryptoTestClock? = nil,
                           chartConcurrency: Int = 3, fallback: Bool = true) -> CryptoProvider {
         let date = Self.at
-        return CryptoProvider(session: session(handler), timeout: 80,
-            fallbackURL: fallback ? CryptoProvider.fallbackEndpoint : nil,
+        let fixture = session(handler)
+        func endpoint(_ original: URL) -> URL {
+            var components = URLComponents(url: original, resolvingAgainstBaseURL: false)!
+            components.port = fixture.port
+            return components.url!
+        }
+        return CryptoProvider(session: fixture.session, timeout: 80, baseURL: endpoint(CryptoProvider.endpoint),
+            fallbackURL: fallback ? endpoint(CryptoProvider.fallbackEndpoint) : nil,
             now: { clock?.now() ?? date }, chartConcurrency: chartConcurrency)
     }
 
@@ -197,6 +201,7 @@ final class CryptoProviderTests: XCTestCase {
         }
         let symbol = btc
         let task = Task { try await provider.fetchQuotes(for: [symbol]) }
+        defer { task.cancel() }
         await fulfillment(of: [started], timeout: 2)
         task.cancel()
         do { _ = try await task.value; XCTFail() } catch { XCTAssertTrue(error is CancellationError) }
@@ -250,8 +255,10 @@ final class CryptoProviderTests: XCTestCase {
         let provider = provider { request in held.add(request); started.fulfill() }
         let symbols = Array(CryptoCatalog.symbols.prefix(4))
         let tasks = symbols.prefix(3).map { symbol in Task { try await provider.fetchIntraday(for: symbol) } }
+        defer { tasks.forEach { $0.cancel() } }
         await fulfillment(of: [started], timeout: 2)
         let fourth = Task { try await provider.fetchIntraday(for: symbols[3]) }
+        defer { fourth.cancel() }
         fourth.cancel()
         do { _ = try await fourth.value; XCTFail() } catch { XCTAssertTrue(error is CancellationError) }
         XCTAssertEqual(held.requests.count, 3)
@@ -290,15 +297,18 @@ final class CryptoProviderTests: XCTestCase {
         let provider = provider { request in held.add(request); started.fulfill() }
         let symbol = btc
         let first = Task { try await provider.fetchQuotes(for: [symbol]) }
+        defer { first.cancel() }
         await fulfillment(of: [started], timeout: 2)
         let second = Task { try await provider.fetchQuotes(for: [symbol]) }
+        defer { second.cancel() }
         let noDuplicate = expectation(description: "no simultaneous ticker")
         noDuplicate.isInverted = true
         await fulfillment(of: [noDuplicate], timeout: 0.05)
         second.cancel()
         do { _ = try await second.value; XCTFail() } catch { XCTAssertTrue(error is CancellationError) }
         XCTAssertEqual(held.requests.count, 1)
-        held.requests[0].reply(Self.data([Self.ticker()]))
+        let request = try XCTUnwrap(held.requests.first)
+        request.reply(Self.data([Self.ticker()]))
         _ = try await first.value
         XCTAssertEqual(held.requests.count, 1)
     }
@@ -351,7 +361,9 @@ private final class CryptoTestProtocol: URLProtocol, @unchecked Sendable {
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
-        guard let id = request.value(forHTTPHeaderField: "X-Stox-Crypto-Test"), let handler = Self.registry.get(id) else {
+        // FoundationNetworking 不保证把 configuration 附加 header 合并给自定义 URLProtocol。
+        // 唯一端口随 URL 保留；canInit 始终拦截，未注册请求也绝不落到真实网络。
+        guard let port = request.url?.port, let handler = Self.registry.get(port) else {
             fail(URLError(.unsupportedURL)); return
         }
         handler(self)
@@ -371,9 +383,17 @@ private final class CryptoTestProtocol: URLProtocol, @unchecked Sendable {
 
     final class Registry: @unchecked Sendable {
         private let lock = NSLock()
-        private var handlers: [String: Handler] = [:]
-        func add(_ id: String, handler: @escaping Handler) { lock.lock(); handlers[id] = handler; lock.unlock() }
-        func get(_ id: String) -> Handler? { lock.lock(); defer { lock.unlock() }; return handlers[id] }
-        func remove(_ id: String) { lock.lock(); handlers.removeValue(forKey: id); lock.unlock() }
+        private var handlers: [Int: Handler] = [:]
+        private var nextPort = 49_152
+        func add(handler: @escaping Handler) -> Int {
+            lock.lock(); defer { lock.unlock() }
+            precondition(nextPort <= 65_535, "Crypto test fixture port range exhausted")
+            let port = nextPort
+            nextPort += 1
+            handlers[port] = handler
+            return port
+        }
+        func get(_ port: Int) -> Handler? { lock.lock(); defer { lock.unlock() }; return handlers[port] }
+        func remove(_ port: Int) { lock.lock(); handlers.removeValue(forKey: port); lock.unlock() }
     }
 }

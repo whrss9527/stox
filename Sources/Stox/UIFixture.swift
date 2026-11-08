@@ -210,16 +210,33 @@ actor UIFixtureProvider: QuoteProvider {
         try await delay()
         let price = quote(symbol).price
         if symbol.isCrypto {
-            let points = (0...288).map { index in
-                IntradayPoint(minute: index * 5, price: price * (0.99 + Double(index) * 0.00003 + sin(Double(index) / 8) * 0.002),
-                              volume: Double(100 + index))
+            var points: [IntradayPoint] = []
+            points.reserveCapacity(289)
+            for index in 0...288 {
+                let offset: Double = Double(index)
+                let trend: Double = offset * 0.00003
+                let phase: Double = offset / 8
+                let wave: Double = sin(phase) * 0.002
+                let factor: Double = (0.99 + trend) + wave
+                let pointPrice: Double = price * factor
+                let volume: Double = Double(100 + index)
+                points.append(IntradayPoint(minute: index * 5, price: pointPrice, volume: volume))
             }
             return IntradaySeries(symbol: symbol, date: "20261106", points: points,
                                   start: UIFixture.date.addingTimeInterval(-86400))
         }
-        let points = (0..<120).map { index in
-            IntradayPoint(minute: 570 + index, price: price * (0.99 + Double(index) * 0.00008 + sin(Double(index) / 8) * 0.002),
-                          average: price * 0.994, volume: Double(100 + index))
+        var points: [IntradayPoint] = []
+        points.reserveCapacity(120)
+        for index in 0..<120 {
+            let offset: Double = Double(index)
+            let trend: Double = offset * 0.00008
+            let phase: Double = offset / 8
+            let wave: Double = sin(phase) * 0.002
+            let factor: Double = (0.99 + trend) + wave
+            let pointPrice: Double = price * factor
+            let average: Double = price * 0.994
+            let volume: Double = Double(100 + index)
+            points.append(IntradayPoint(minute: 570 + index, price: pointPrice, average: average, volume: volume))
         }
         return IntradaySeries(symbol: symbol, date: "20261106", points: points)
     }
