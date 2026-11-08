@@ -123,8 +123,14 @@ public final class CryptoProvider: QuoteProvider, @unchecked Sendable {
                 do {
                     try Task.checkCancellation()
                     var components = URLComponents(url: endpoints[host], resolvingAgainstBaseURL: false)
-                    components?.path = endpoints[host].path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                        .split(separator: "/").map(String.init).reduce("") { $0 + "/" + $1 } + "/" + path
+                    let trimmedPath: String = endpoints[host].path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+                    let segments: [Substring] = trimmedPath.split(separator: "/")
+                    var normalizedPath: String = ""
+                    for segment in segments {
+                        normalizedPath += "/" + String(segment)
+                    }
+                    let requestPath: String = normalizedPath + "/" + path
+                    components?.path = requestPath
                     components?.queryItems = query
                     guard let url = components?.url else { throw URLError(.badURL) }
                     var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
