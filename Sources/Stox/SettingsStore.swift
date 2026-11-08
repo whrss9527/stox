@@ -43,6 +43,7 @@ extension WatchlistFilter {
         case .hk: return L("港股")
         case .us: return L("美股")
         case .global: return L("环球")
+        case .crypto: return L("数字货币")
         case .holdings: return L("持仓")
         case .group(let name): return name
         }
@@ -107,7 +108,8 @@ enum ChartPeriod: String, CaseIterable, Identifiable {
             switch period {
             case .orderBook: return quote?.orderBook != nil
             case .fundFlow: return quote.map { TencentFundFlow.supports($0.symbol) } ?? false
-            case .fiveDay, .day, .week, .month: return quote?.symbol.hasKline ?? true
+            case .fiveDay: return quote?.symbol.hasFiveDay ?? true
+            case .day, .week, .month: return quote?.symbol.hasKline ?? true
             case .intraday: return true
             }
         }

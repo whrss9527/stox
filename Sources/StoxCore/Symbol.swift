@@ -40,7 +40,7 @@ public struct Symbol: Hashable, Sendable {
         case .hk: return !code.allSatisfy(\.isASCIIDigit)
         case .us: return code.hasPrefix(".")
         case .zn: return true
-        case .jj, .hf, .wh: return false
+        case .jj, .hf, .wh, .crypto: return false
         }
     }
 
@@ -50,14 +50,19 @@ public struct Symbol: Hashable, Sendable {
     /// 环球：国际期货、贵金属现货、外汇和环球股指。
     public var isGlobal: Bool { market.region == .global }
 
-    /// 能不能填持仓、记买卖：指数和环球的品种不能。
-    public var canHold: Bool { !isIndex && !isGlobal }
+    public var isCrypto: Bool { market == .crypto }
+
+    /// 能不能填持仓、记买卖：指数、环球和数字货币不能。
+    public var canHold: Bool { !isIndex && !isGlobal && !isCrypto }
 
     /// 有没有分时（和列表里的迷你分时）：场外基金、外汇、环球股指没有；国际期货的分时来自新浪。
     public var hasIntraday: Bool { !isFund && market != .wh && market != .zn }
 
-    /// 有没有五日和 K 线：场外基金和环球的品种没有（数据源不提供）。
+    /// 有没有 K 线：场外基金和环球的品种没有（数据源不提供）。
     public var hasKline: Bool { !isFund && !isGlobal }
+
+    /// 首版数字货币提供分时和 K 线，不把股票五交易日接口套用到连续交易市场。
+    public var hasFiveDay: Bool { hasKline && !isCrypto }
 
     /// 科创板（上交所 688、689 开头）：腾讯接口里它的成交量、K 线的量是股，别的 A 股是手。
     public var isStarMarket: Bool {
@@ -66,6 +71,7 @@ public struct Symbol: Hashable, Sendable {
 
     /// 界面上展示的代码：美股指数去掉前导的点。
     public var displayCode: String {
+        if isCrypto { return String(code.dropLast(4)) + "/USDT" }
         if market == .us, code.hasPrefix(".") { return String(code.dropFirst()) }
         return code
     }
@@ -111,6 +117,8 @@ public struct Symbol: Hashable, Sendable {
                   upper.contains(where: \.isASCIILetter)
             else { return nil }
             return upper
+        case .crypto:
+            return CryptoCatalog.normalizedCode(code)
         }
     }
 }
@@ -165,8 +173,10 @@ public enum SymbolInput {
                 case .hf: accept = rest.hasPrefix("_")
                 case .wh: accept = prefix == "wh"
                 case .zn: accept = prefix == "zn" && rest.hasPrefix("b_")
+                case .crypto: accept = true
                 }
                 if accept, let symbol = Symbol(market: market, code: rest) { return symbol }
+                // 未匹配的 cc 不能抢走 ccl/ccep 等股票；完整但未知的 USDT 对在下面拒绝。
             }
         }
 
@@ -187,6 +197,10 @@ public enum SymbolInput {
             if let market, let symbol = Symbol(market: market, code: code) { return symbol }
         }
 
+        // 明确的 USDT 交易对才解析为数字货币；裸 BTC/ETH 仍按原来的美股规则。
+        if let symbol = CryptoCatalog.symbol(for: text) { return symbol }
+        if text.contains("/") || text.uppercased().hasSuffix("USDT") { return nil }
+
         // 3. 纯数字：6 位按 A 股号段推断，5 位及以内当作港股。
         if text.allSatisfy(\.isASCIIDigit) {
             if text.count == 6 { return Symbol(market: inferAShareMarket(text), code: text) }
@@ -203,7 +217,7 @@ public enum SymbolInput {
     public static func isExplicitCode(_ input: String) -> Bool {
         let text = input.filter { !$0.isWhitespace }
         guard !text.isEmpty, let symbol = parse(text) else { return false }
-        if symbol.isGlobal || text.contains(where: \.isASCIIDigit) { return true }
+        if symbol.isGlobal || symbol.isCrypto || text.contains(where: \.isASCIIDigit) { return true }
         if text.count > 2, text.hasPrefix("us") || text.hasPrefix("hk") { return true }
         if let dot = text.lastIndex(of: ".") {
             let suffix = text[text.index(after: dot)...].uppercased()

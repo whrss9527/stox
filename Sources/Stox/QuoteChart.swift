@@ -60,7 +60,7 @@ struct QuoteChartSection: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(Self.chartName(period))
+        .accessibilityLabel(chartName)
         .accessibilityValue(summary ?? "")
         .task(id: TrackID(symbol: item.symbol, period: period)) {
             switch period {
@@ -285,7 +285,7 @@ struct QuoteChartSection: View {
             settings.chartPeriod = period
         } label: {
             // A 股个股有七项，留白小一点，右边的均价、委比、主力净流入才放得下。
-            Text(period.title)
+            Text(item.symbol.isCrypto && period == .intraday ? L("24小时") : period.title)
                 .font(.system(size: 10, weight: selected ? .semibold : .regular))
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
                 .padding(.horizontal, 4)
@@ -299,11 +299,19 @@ struct QuoteChartSection: View {
     }
 
     private func tabHelp(_ period: ChartPeriod) -> String {
+        if item.symbol.isCrypto {
+            return (period == .intraday ? L("滚动24小时走势，横轴为 UTC，成交量以基础币计。") : L("UTC 自然周期K线，不复权，成交量以基础币计。"))
+                + L("（展开时也可以用 ← → 切换）")
+        }
         switch period {
         case .orderBook: return L("买卖五档和内外盘（展开时也可以用 ← → 切换）")
         case .fundFlow: return L("资金流向：主力（超大单、大单）当天净流入多少，逐分钟累计（展开时也可以用 ← → 切换）")
         default: return Self.chartName(period) + L("（展开时也可以用 ← → 切换）")
         }
+    }
+
+    private var chartName: String {
+        item.symbol.isCrypto ? (period == .intraday ? L("滚动24小时走势，横轴为 UTC，成交量以基础币计。") : L("UTC 自然周期K线，不复权，成交量以基础币计。")) : Self.chartName(period)
     }
 
     /// 图的名字，读屏和鼠标停在切换按钮上时用。英文里按钮上的字很短（Day、Week），这里写全。
@@ -325,8 +333,16 @@ struct QuoteChartSection: View {
         return lots ? L("%@手", number) : L("%@股", number)
     }
 
+    private func volumeText(_ volume: Double) -> String {
+        item.symbol.isCrypto ? CryptoPresentation.volume(volume, symbol: item.symbol)
+            : Self.volumeText(volume, lots: region == .cn && !item.symbol.isStarMarket)
+    }
+
     /// 没有指着图时，右边显示这一段的涨跌，例如“近 60 日 -8.12%”；分时图上是最新的成交均价，五档是委比，资金是主力净流入。
     private var summary: String? {
+        if item.symbol.isCrypto {
+            return period == .intraday ? L("UTC · 滚动24小时") : L("UTC · 不复权")
+        }
         if period == .fundFlow {
             // 上面一排放了七项，写短一点：主力净流入。
             guard let flow = store.fundFlows[item.symbol] else { return nil }
@@ -386,7 +402,10 @@ struct QuoteChartSection: View {
         }
         if period.klinePeriod == nil {
             guard let point = hoveredPoint else { return nil }
-            var text = IntradayAxis.timeLabel(of: point.minute, start: intradaySeries?.start, region: region) + "  " + price(point.price)
+            let time = item.symbol.isCrypto
+                ? CryptoPresentation.intradayTime(minute: point.minute, start: intradaySeries?.start)
+                : IntradayAxis.timeLabel(of: point.minute, start: intradaySeries?.start, region: region)
+            var text = time + "  " + price(point.price)
             if quote.previousClose > 0 {
                 text += "  " + QuoteFormatter.percent((point.price - quote.previousClose) / quote.previousClose * 100)
             }
@@ -395,20 +414,20 @@ struct QuoteChartSection: View {
             }
             // 分时接口里 A 股的量是手，科创板和港股、美股是股。
             if let volume = point.volume, volume > 0 {
-                text += L("  量 ") + Self.volumeText(volume, lots: region == .cn && !item.symbol.isStarMarket)
+                text += L("  量 ") + volumeText(volume)
             }
             return text
         }
         guard let data = klineData, let index = hoveredCandle(in: data) else { return nil }
         let candle = data.candles[index]
-        let date = data.period == .month ? String(candle.date.prefix(7)) : candle.date
+        let date = (data.period == .month ? String(candle.date.prefix(7)) : candle.date) + (item.symbol.isCrypto ? " UTC" : "")
         var text = L("%@ 开%@ 高%@ 低%@ 收%@", date, price(candle.open), price(candle.high), price(candle.low), price(candle.close))
         if let change = data.changes[index] {
             text += " " + QuoteFormatter.percent(change)
         }
         // K 线接口里 A 股的成交量是手，科创板和港股、美股是股。
         if let volume = candle.volume, volume > 0 {
-            text += L(" 量") + Self.volumeText(volume, lots: region == .cn && !item.symbol.isStarMarket)
+            text += L(" 量") + volumeText(volume)
         }
         if let mark = tradeMarks(in: data).first(where: { $0.index == index }) {
             text += mark.bought && mark.sold ? L(" 有买卖") : (mark.bought ? L(" 有买入") : L(" 有卖出"))

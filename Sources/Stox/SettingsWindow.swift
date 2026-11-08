@@ -762,7 +762,7 @@ struct AboutPage: View {
             Divider()
             #endif
             HStack {
-                FormNote(L("行情数据来自腾讯财经与新浪财经公开接口；新浪提供环球股指与备用行情。仅供参考，港股延时约 15 分钟。"))
+                FormNote(L("行情数据来自腾讯财经、新浪财经与 Binance 公开接口；新浪提供环球股指与备用行情，Binance 提供 USDT 现货数字货币。仅供参考，港股延时约 15 分钟。"))
                 Spacer()
                 Button(copiedDiagnostics ? L("诊断信息已复制") : L("复制诊断信息")) {
                     let snapshot = Diagnostics.snapshot(store: store, sync: sync)

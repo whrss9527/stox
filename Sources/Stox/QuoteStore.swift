@@ -10,6 +10,8 @@ final class QuoteStore: ObservableObject {
     @Published private(set) var quotes: [Symbol: Quote] = [:]
     @Published private(set) var lastUpdated: Date?
     @Published private(set) var lastError: String?
+    /// 本轮没有返回行情的代码；缓存仍显示原始时间，不冒充新报价。
+    @Published private(set) var unavailableSymbols: Set<Symbol> = []
     /// 两个行情源都失败时，面板显示下一次重试的倒计时。
     @Published private(set) var retryAt: Date?
     private var retryBackoff = QuoteRetryBackoff()
@@ -76,6 +78,9 @@ final class QuoteStore: ObservableObject {
     var onLocalEdit: (() -> Void)?
 
     let provider: QuoteProvider
+    private let cryptoProvider: QuoteProvider
+    private var stockAttemptAt = Date.distantPast
+    private var stockAttemptSymbols: Set<Symbol> = []
     /// 腾讯的行情接口取不到时改用的备用数据源（新浪），只用来取实时行情。
     private let backup: QuoteProvider?
     /// 最近一次行情来自备用数据源。
@@ -112,12 +117,14 @@ final class QuoteStore: ObservableObject {
         settings: SettingsStore,
         provider: QuoteProvider = TencentProvider(),
         backup: QuoteProvider? = SinaProvider(),
+        cryptoProvider: QuoteProvider = CryptoProvider.shared,
         defaults: UserDefaults = .standard,
         clock: QuoteStoreClock? = nil
     ) {
         self.settings = settings
         self.provider = provider
         self.backup = backup
+        self.cryptoProvider = cryptoProvider
         self.defaults = defaults
         self.clock = clock ?? QuoteStoreClock()
 
@@ -165,9 +172,11 @@ final class QuoteStore: ObservableObject {
     func start() {
         guard loopTask == nil else { return }
         loopTask = Task { [weak self] in
+            var first = true
             while !Task.isCancelled {
                 guard let self else { return }
-                await self.refresh()
+                await self.refresh(forceStock: first)
+                first = false
                 let delay = self.effectiveInterval
                 self.retryAt = self.lastError == nil ? nil : self.clock.now().addingTimeInterval(delay)
                 try? await self.clock.sleep(delay)
@@ -176,6 +185,8 @@ final class QuoteStore: ObservableObject {
     }
 
     func stop() {
+        generation &+= 1
+        isRefreshing = false
         loopTask?.cancel()
         loopTask = nil
     }
@@ -205,10 +216,11 @@ final class QuoteStore: ObservableObject {
         }
     }
 
-    func refresh() async {
+    func refresh(forceStock: Bool = true) async {
         let symbols = items.map(\.symbol)
         guard !symbols.isEmpty else {
             quotes = [:]
+            unavailableSymbols = []
             lastError = nil
             retryAt = nil
             retryBackoff.reset()
@@ -221,16 +233,32 @@ final class QuoteStore: ObservableObject {
             if current == generation { isRefreshing = false }
         }
         do {
-            let (result, source) = try await fetchQuotes(symbols)
+            let (result, source, unavailable, fetched) = try await fetchQuotes(symbols, owner: current, forceStock: forceStock, onPartial: { [weak self] partial in
+                guard let self, current == self.generation, !Task.isCancelled else { return }
+                // 快的市场先显示，慢接口的超时不延迟已经拿到的新报价。
+                let currentSymbols = Set(self.items.map(\.symbol))
+                self.quotes.merge(partial.quotes.filter { currentSymbols.contains($0.key) }) { _, new in new }
+                self.unavailableSymbols.subtract(partial.quotes.keys)
+            })
             guard current == generation, !Task.isCancelled else { return }
             if result.isEmpty { throw URLError(.cannotParseResponse) }
+            if symbols.allSatisfy(\.isCrypto) { usingBackup = false }
             retryBackoff.reset()
             retryAt = nil
             var merged = quotes.filter { symbols.contains($0.key) }
             merged.merge(result) { _, new in new }
             quotes = merged
-            lastUpdated = clock.now()
-            lastError = result.isEmpty ? L("没有取到行情数据") : nil
+            unavailableSymbols = unavailable
+            if fetched { lastUpdated = clock.now() }
+            if unavailable.isEmpty {
+                lastError = nil
+            } else if unavailable.allSatisfy(\.isCrypto) {
+                lastError = L("数字货币行情暂不可用，正在重试")
+            } else if unavailable.allSatisfy({ !$0.isCrypto }) {
+                lastError = L("部分市场行情暂不可用，正在重试")
+            } else {
+                lastError = L("部分行情暂不可用，正在重试")
+            }
             // 名称只从主数据源记：两家的叫法有细微差别，来回改会让 iCloud 同步个不停。
             if source == .primary {
                 cacheNames(from: result)
@@ -242,6 +270,7 @@ final class QuoteStore: ObservableObject {
             await refreshRatesIfNeeded()
         } catch {
             guard current == generation, !Task.isCancelled else { return }
+            unavailableSymbols = Set(symbols)
             retryBackoff.failed()
             lastError = error.localizedDescription
             Log.info("行情请求失败，\(Int(effectiveInterval)) 秒后重试")
@@ -379,7 +408,7 @@ final class QuoteStore: ObservableObject {
         defer { endChartRequest(request) }
         while isCurrentChartRequest(request) {
             do {
-                let series = try await provider.fetchIntraday(for: symbol)
+                let series = try await chartProvider(for: symbol).fetchIntraday(for: symbol)
                 guard isCurrentChartRequest(request) else { return }
                 if let series {
                     intraday[symbol] = series
@@ -406,7 +435,7 @@ final class QuoteStore: ObservableObject {
         while isCurrentChartRequest(request) {
             do {
                 // 比图上显示的多要一些，均线从图的最左边就有。
-                let series = try await provider.fetchKline(
+                let series = try await chartProvider(for: symbol).fetchKline(
                     for: symbol, period: period, count: KlineChartData.fetchCount, exchangeCode: quotes[symbol]?.exchangeCode
                 )
                 guard isCurrentChartRequest(request) else { return }
@@ -439,7 +468,7 @@ final class QuoteStore: ObservableObject {
                 let maxAge: TimeInterval = phase(for: symbol.market.region).isLive ? 110 : 600
                 if let fetched = sparklineFetched[symbol], clock.now().timeIntervalSince(fetched) < maxAge { continue }
                 do {
-                    let series = try await provider.fetchIntraday(for: symbol)
+                    let series = try await chartProvider(for: symbol).fetchIntraday(for: symbol)
                     guard isCurrentChartRequest(request) else { continue }
                     if let series {
                         updateSparkline(symbol, from: series)
@@ -517,7 +546,7 @@ final class QuoteStore: ObservableObject {
 
     /// 切到五日时调用：和分时一样，交易时段内每分钟刷新，休市时半小时一次。
     func trackFiveDay(_ symbol: Symbol) async {
-        guard contains(symbol), !Task.isCancelled else { return }
+        guard symbol.hasFiveDay, contains(symbol), !Task.isCancelled else { return }
         let request = beginChartRequest(symbol, kind: .fiveDay)
         defer { endChartRequest(request) }
         while isCurrentChartRequest(request) {
@@ -677,11 +706,16 @@ final class QuoteStore: ObservableObject {
             save()
             restart()
         }
+        // 已知交易对缺报价是数据源失败，不能在批量输入里报告成“不存在”。
+        if wanted.contains(where: { $0.isCrypto && result[$0] == nil }) {
+            throw ProviderError.emptyResponse
+        }
         return wanted.filter { result[$0] == nil }
     }
 
     func remove(_ symbol: Symbol) {
         items.removeAll { $0.symbol == symbol }
+        unavailableSymbols.remove(symbol)
         quotes[symbol] = nil
         pruneChartCaches(keeping: Set(items.map(\.symbol)))
         extendedHours[symbol] = nil
@@ -693,6 +727,7 @@ final class QuoteStore: ObservableObject {
         alertEngine.reset(symbol)
         save()
         saveAlertState()
+        restart()
     }
 
     /// 拖动排序。visible 是列表里看得见的那几只，筛选着的时候只在它们之间换位置，看不见的原地不动。
@@ -737,6 +772,7 @@ final class QuoteStore: ObservableObject {
         let oldItems = Dictionary(items.map { ($0.symbol, $0) }, uniquingKeysWith: { first, _ in first })
         let symbols = Set(newItems.map(\.symbol))
         items = newItems
+        unavailableSymbols.formIntersection(symbols)
         quotes = quotes.filter { symbols.contains($0.key) }
         extendedHours = extendedHours.filter { symbols.contains($0.key) }
         extendedHoursMembership = extendedHoursMembership.filter { symbols.contains($0.key) }
@@ -754,7 +790,7 @@ final class QuoteStore: ObservableObject {
     }
 
     func search(_ query: String) async throws -> [SearchResult] {
-        try await provider.search(query)
+        try await MarketDataProvider(stock: provider, crypto: cryptoProvider).search(query)
     }
 
     /// 搜索结果的行情：只查不存，不影响自选。
@@ -763,16 +799,93 @@ final class QuoteStore: ObservableObject {
     }
 
     /// 取实时行情：先用腾讯，取不到时改用新浪。主数据源失败后两分钟内直接用备用的，之后再试主数据源。
-    private func fetchQuotes(_ symbols: [Symbol]) async throws -> (quotes: [Symbol: Quote], source: QuoteSource) {
+    private func fetchStockQuotes(_ symbols: [Symbol], owner: Int?) async throws -> (quotes: [Symbol: Quote], source: QuoteSource) {
+        guard !symbols.isEmpty else { return ([:], .primary) }
         let skipPrimary = failover.skipsPrimary(at: clock.now())
         let result = try await QuoteFailover.fetchQuotes(symbols, primary: provider, backup: backup, skipPrimary: skipPrimary)
-        let backupNow = result.source == .backup
-        failover.record(source: result.source, skippedPrimary: skipPrimary, at: clock.now())
-        if backupNow != usingBackup {
-            usingBackup = backupNow
-            Log.info(backupNow ? "腾讯行情取不到，改用新浪行情" : "腾讯行情恢复了")
+        try Task.checkCancellation()
+        if let owner {
+            guard owner == generation else { throw CancellationError() }
+            let backupNow = result.source == .backup
+            failover.record(source: result.source, skippedPrimary: skipPrimary, at: clock.now())
+            if backupNow != usingBackup {
+                usingBackup = backupNow
+                Log.info(backupNow ? "腾讯行情取不到，改用新浪行情" : "腾讯行情恢复了")
+            }
         }
         return result
+    }
+
+    private func chartProvider(for symbol: Symbol) -> QuoteProvider {
+        symbol.isCrypto ? cryptoProvider : provider
+    }
+
+    /// 两组请求并发，股票保留原主备切换，任一市场失败不丢弃另一组的成功结果。
+    private func fetchQuotes(_ symbols: [Symbol], owner: Int? = nil, forceStock: Bool = true, onPartial: ((CapturedQuotes) -> Void)? = nil) async throws -> (quotes: [Symbol: Quote], source: QuoteSource, unavailable: Set<Symbol>, fetched: Bool) {
+        let stockSymbols = symbols.filter { !$0.isCrypto }
+        let cryptoSymbols = symbols.filter(\.isCrypto)
+        async let stockResult = captureStockQuotes(stockSymbols, owner: owner, forceStock: forceStock, onPartial: onPartial)
+        async let cryptoResult = captureCryptoQuotes(cryptoSymbols, onPartial: onPartial)
+        let (stock, crypto) = await (stockResult, cryptoResult)
+        try Task.checkCancellation()
+        var merged = stock.quotes
+        merged.merge(crypto.quotes) { _, new in new }
+        if merged.isEmpty, let error = stock.error ?? crypto.error { throw error }
+        return (merged, stock.source, Set(symbols).subtracting(merged.keys), stock.fetched || crypto.fetched)
+    }
+
+    private struct CapturedQuotes {
+        var quotes: [Symbol: Quote] = [:]
+        var source: QuoteSource = .primary
+        var error: Error?
+        var fetched = false
+    }
+
+    private func captureStockQuotes(_ symbols: [Symbol], owner: Int?, forceStock: Bool, onPartial: ((CapturedQuotes) -> Void)?) async -> CapturedQuotes {
+        let requested = Set(symbols)
+        let stockAge = clock.now().timeIntervalSince(stockAttemptAt)
+        if !forceStock, owner == generation, settings.slowWhenIdle, !symbols.isEmpty,
+           requested == stockAttemptSymbols, stockAge >= 0, stockAge < RefreshPolicy.idleInterval,
+           symbols.allSatisfy({ !phase(for: $0.market.region).isLive }) {
+            // 数字货币的全天候节奏不增加休市股票的网络请求；失败的旧值仍保持不可用状态。
+            return CapturedQuotes(quotes: quotes.filter { requested.contains($0.key) && !unavailableSymbols.contains($0.key) },
+                                  source: usingBackup ? .backup : .primary)
+        }
+        do {
+            let result = try await fetchStockQuotes(symbols, owner: owner)
+            if owner == generation, !Task.isCancelled {
+                stockAttemptAt = clock.now()
+                stockAttemptSymbols = requested
+            }
+            let captured = CapturedQuotes(quotes: result.quotes.filter { symbols.contains($0.key) }, source: result.source,
+                                          fetched: !result.quotes.isEmpty)
+            if !Task.isCancelled { onPartial?(captured) }
+            return captured
+        } catch {
+            if owner == generation, !Task.isCancelled, !(error is CancellationError),
+               (error as? URLError)?.code != .cancelled {
+                stockAttemptAt = clock.now()
+                stockAttemptSymbols = requested
+            }
+            return CapturedQuotes(error: error)
+        }
+    }
+
+    private func captureCryptoQuotes(_ symbols: [Symbol], onPartial: ((CapturedQuotes) -> Void)?) async -> CapturedQuotes {
+        guard !symbols.isEmpty else { return CapturedQuotes() }
+        do {
+            let values = try await cryptoProvider.fetchQuotes(for: symbols)
+            let captured = CapturedQuotes(quotes: values.filter { symbols.contains($0.key) }, fetched: !values.isEmpty)
+            if !Task.isCancelled { onPartial?(captured) }
+            return captured
+        } catch { return CapturedQuotes(error: error) }
+    }
+
+    func quoteIsStale(_ symbol: Symbol) -> Bool {
+        guard symbol.isCrypto, let quote = quotes[symbol] else { return false }
+        guard !unavailableSymbols.contains(symbol), let timestamp = quote.timestamp else { return true }
+        let age = clock.now().timeIntervalSince(timestamp)
+        return age > 120 || age < -60
     }
 
     // MARK: - 内部
@@ -886,7 +999,7 @@ final class QuoteStore: ObservableObject {
         guard settings.alertsEnabled, threshold > 0 else { return }
         let now = clock.now()
         for item in items {
-            guard let quote = fresh[item.symbol], quote.hasTraded,
+            guard let quote = fresh[item.symbol], quote.hasTraded, !quoteIsStale(item.symbol),
                   phase(for: item.symbol.market.region) == .trading,
                   let move = rapidMoves.record(quote, at: now, threshold: threshold)
             else { continue }
@@ -904,7 +1017,7 @@ final class QuoteStore: ObservableObject {
     private func evaluateAlerts() {
         guard settings.alertsEnabled else { return }
         let triggers = alertEngine.evaluate(
-            items: items, quotes: quotes, now: clock.now(), limitAlerts: settings.limitAlerts, yearAlerts: settings.yearHighLowAlerts
+            items: items, quotes: quotes.filter { !quoteIsStale($0.key) }, now: clock.now(), limitAlerts: settings.limitAlerts, yearAlerts: settings.yearHighLowAlerts
         )
         guard !triggers.isEmpty else { return }
         firedAlertCount += triggers.count

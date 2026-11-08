@@ -108,7 +108,7 @@ public enum TencentQuoteParser {
         case .us:
             // 美股指数的成交额字段数值不可靠，不展示。
             amount = isIndex ? 0 : (number(37) ?? 0)
-        case .global:
+        case .global, .crypto:
             return nil  // 上面已经交给 GlobalQuoteParser
         }
         if !volume.isFinite { volume = 0 }

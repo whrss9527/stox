@@ -44,7 +44,7 @@ public final class SinaProvider: QuoteProvider, @unchecked Sendable {
 
     public func fetchQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote] {
         // 场外基金新浪这里没有，外汇的代码不一样，都不请求。
-        let symbols = symbols.filter { !$0.isFund && $0.market != .wh }
+        let symbols = symbols.filter { !$0.isFund && !$0.isCrypto && $0.market != .wh }
         guard !symbols.isEmpty, let url = Self.quoteURL(for: symbols, endpoint: endpointURL) else { return [:] }
         let data = try await HTTP.get(url, session: session, timeout: timeout, headers: ["Referer": Self.referer])
         return SinaQuoteParser.parse(Self.decodeText(data), symbols: symbols)
@@ -192,6 +192,8 @@ public enum SinaQuoteParser {
             case .zn: return GlobalQuoteParser.index(symbol: symbol, fields: fields)
             default: return nil
             }
+        case .crypto:
+            return nil  // 数字货币使用独立现货数据源，不能套用证券字段。
         }
     }
 

@@ -161,6 +161,7 @@ struct MarketStatusLine: View {
         case .hk: return L("港股%@", phase.displayName)
         case .us: return L("美股%@", phase.displayName)
         case .global: return L("环球%@", phase.displayName)
+        case .crypto: return L("数字货币 24/7")
         }
     }
 
@@ -1234,13 +1235,15 @@ struct MarketBadge: View {
 
     var body: some View {
         let tint = Theme.marketTint(market, convention: settings.colorConvention)
-        Text(market.label)
+        Text(market == .crypto && AppLanguage.isEnglish ? "CC" : market.label)
             .font(.system(size: 9, weight: .semibold))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
             .foregroundStyle(tint)
             .frame(width: 15, height: 13)
             .background(RoundedRectangle(cornerRadius: 3).fill(tint.opacity(0.14)))
+            .help(market.label)
+            .accessibilityLabel(market.label)
     }
 }
 

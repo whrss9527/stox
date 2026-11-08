@@ -65,6 +65,7 @@ The three at the top show the expanded detail (intraday chart and average price 
 - **Quotes at a glance**: click the menu bar icon and the glass panel appears; click again, click elsewhere or press Esc and it's gone.
 - **Gone in a click**: right-click and only the icon is left in the menu bar, so nobody looking over your shoulder sees your stocks.
 - **Three markets**: China A-shares, Hong Kong and US stocks, plus indices, ETFs, mutual funds, global indices such as the Nikkei 225, FTSE 100 and DAX, international futures and FX; intraday and candlestick charts, order book and fund flow.
+- **Crypto quotes**: common Binance spot pairs including BTC/USDT, ETH/USDT and SOL/USDT, with rolling 24-hour changes, charts and weekend refreshes. USDT is labeled separately from USD; crypto positions and trading are not supported.
 - **Holdings and P&L**: enter your holdings and today's and total P&L are worked out for you, with a P&L calendar.
 - **Alerts when they matter**: price targets, % change, take profit and stop loss, limit up and down, new highs and lows, all as notifications.
 - **Light**: about 3.6 MB zipped and about 30 MB of memory; no sign-up and no API key.
@@ -98,6 +99,7 @@ How to open older ad-hoc signed versions, how to build from source and how the G
 | Click a row | Expand / collapse details and charts |
 | ← → | When expanded, switch between 1D, 5D, daily, weekly and monthly (plus order book and fund flow for A-shares) |
 | Type a symbol, a name or pinyin initials in the search box | `600519`, `腾讯`, `gzmt`, `aapl`; Return adds it |
+| Search a crypto pair or name | `BTC/USDT`, `ETHUSDT`, `Bitcoin` or `比特币`; pin it for menu bar quotes |
 
 ## Docs
 
@@ -137,4 +139,4 @@ Open `stox://show` to show the panel, `stox://add?code=600519` to add a symbol, 
 
 ## Shortcuts
 
-In the macOS Shortcuts app, add Stox’s “Get Stock Price” action, enter a code such as `600519`, `0700.HK` or `usAAPL`, and connect its numeric price to the next action. Queries use the existing Tencent/Sina fallback without adding to the watchlist or writing the clipboard. Invalid codes, missing quotes and cancellation report an error. “Open Quotes Panel” opens the watchlist panel after initialization, including a cold launch. Spotlight discovery depends on the OS and indexing state; the app includes both AppShortcuts metadata entries.
+In the macOS Shortcuts app, add Stox’s “Get Stock Price” action, enter a code such as `600519`, `0700.HK`, `usAAPL` or `BTC/USDT`, and connect its numeric price to the next action. Stock queries use the Tencent/Sina fallback; crypto queries use Binance and return USDT prices. Neither adds to the watchlist or writes the clipboard. Invalid codes, missing quotes and cancellation report an error. “Open Quotes Panel” opens the watchlist panel after initialization, including a cold launch. Spotlight discovery depends on the OS and indexing state; the app includes both AppShortcuts metadata entries.

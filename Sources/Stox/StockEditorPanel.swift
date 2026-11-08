@@ -133,8 +133,8 @@ struct StockEditorPanel: View {
                             }
                             numberField(L("价格高于"), text: $priceAbove, unit: currency)
                             numberField(L("价格低于"), text: $priceBelow, unit: currency)
-                            numberField(L("涨幅达到"), text: $riseAbove, unit: "%")
-                            numberField(L("跌幅达到"), text: $fallBelow, unit: "%")
+                            numberField(symbol.isCrypto ? L("24小时涨幅达到") : L("涨幅达到"), text: $riseAbove, unit: "%")
+                            numberField(symbol.isCrypto ? L("24小时跌幅达到") : L("跌幅达到"), text: $fallBelow, unit: "%")
                             // 止盈止损按持仓成本算，填了持仓才有。
                             if case .valid(let holding) = holdingState, holding.cost > 0 {
                                 numberField(L("持仓盈利达到"), text: $profitAbove, unit: "%")
@@ -476,8 +476,20 @@ struct StockEditorPanel: View {
     private var currency: String { symbol.isGlobal ? "" : symbol.market.region.currency }
 
     private var alertFooter: String {
+        Self.alertFooter(for: symbol, quote: store.quotes[symbol])
+    }
+
+    static func alertFooter(for symbol: Symbol, quote: Quote?) -> String {
+        if symbol.isCrypto {
+            var text = L("价格单位为 USDT。留空表示不提醒；价格条件按现价触发，涨跌幅按滚动24小时计算。每个条件每个 UTC 自然日最多提醒一次。")
+            if let quote {
+                text += L("现价 %@，", QuoteFormatter.price(quote.price, decimals: quote.priceDecimals) + " USDT")
+                    + L("24小时涨跌 %@", QuoteFormatter.percent(quote.changePercent))
+            }
+            return text
+        }
         var text = L("留空表示不提醒。每个条件每个交易日最多提醒一次。")
-        if let quote = store.quotes[symbol] {
+        if let quote {
             text += L("现价 %@，", QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))
                 + L("今日 %@。", QuoteFormatter.percent(quote.changePercent))
         }

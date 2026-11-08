@@ -85,6 +85,15 @@ jobs:
         if: always() && steps.live-data-0.outcome == 'failure'
         run: echo '::warning::真实行情接口冒烟失败；构建继续，请检查 Live data smoke test 日志。'
 
+      - name: Crypto live data smoke test
+        if: (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation))
+        id: crypto-live-data
+        continue-on-error: true
+        run: swift run --skip-build stox-cli quote ccBTCUSDT ccETHUSDT ccSOLUSDT
+      - name: Warn about crypto live data failures
+        if: always() && steps.crypto-live-data.outcome == 'failure'
+        run: echo '::warning::数字货币真实接口检查失败，请检查 Crypto live data smoke test；离线测试不代表当前网络可达。'
+
 
   app:
     name: macOS app
@@ -153,6 +162,15 @@ jobs:
       - name: Launch smoke test
         # 分支跑九个中英文面板、详情、搜索、批量输入与设置用例；main 跑包含更多功能和截图的全量。
         run: scripts/ci-e2e.sh ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.full_validation)) && 'smoke' || 'quick' }}
+      - name: Offline crypto UI fixture screenshots
+        # Dedicated fake provider/preferences and a network-denied fixture bundle; no live quote dependency.
+        run: scripts/check-crypto-ui-fixture.sh
+      - uses: actions/upload-artifact@v5
+        if: always()
+        with:
+          name: crypto-ui-fixture
+          path: shots/crypto-fixture/
+          if-no-files-found: error
       - name: iCloud sync test
         # 用一个假的 iCloud 云盘文件夹走一遍同步：启动时拉取、运行中收到改动、文件被删后写回。
         run: scripts/ci-e2e.sh sync

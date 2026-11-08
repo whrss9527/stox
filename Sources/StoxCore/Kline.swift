@@ -5,7 +5,8 @@ public enum KlinePeriod: String, CaseIterable, Codable, Sendable {
     case day, week, month
 }
 
-/// 一根 K 线。日期是这根 K 线的最后一个交易日（周 K、月 K 也是），例如 `2026-09-28`。
+/// 一根 K 线。证券日期是最后一个交易日（周 K、月 K 也是）；数字货币是 UTC 周期起始日。
+/// 例如 `2026-09-28`，未完成的数字货币周/月线不会因跨午夜而更换日期。
 public struct Candle: Equatable, Sendable {
     public var date: String
     public var open: Double
@@ -51,6 +52,8 @@ public struct KlineSeries: Equatable, Sendable {
     /// 用最新行情更新最后一根 K 线，或者在新的交易日、新的一周、新的一月补上一根。
     /// 这样 K 线和列表里的价格一致，不用等下一次请求 K 线接口。
     public func merging(_ quote: Quote) -> KlineSeries {
+        // 数字货币的 ticker 是滚动 24 小时，不是 UTC 日/周/月蜡烛，不能用它的开高低量覆盖 K 线。
+        guard !symbol.isCrypto else { return self }
         guard let last = candles.last, quote.price > 0, let timestamp = quote.timestamp else { return self }
         let region = symbol.market.region
         let day = KlineCalendar.dayString(timestamp, region: region)

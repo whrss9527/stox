@@ -1,12 +1,12 @@
 import Foundation
 
-/// 分时走势里的一个点：交易所当地时间（自零点起的分钟数）、价格和到这一分钟为止的成交均价。
+/// 分时走势里的一个点：当地时间分钟数，或有 start 时离起点的分钟数、价格与成交均价。
 public struct IntradayPoint: Equatable, Sendable {
     public var minute: Int
     public var price: Double
     /// 当天到这一分钟为止的成交均价；指数、算不出来时为 nil。
     public var average: Double?
-    /// 这一分钟的成交量，单位和接口一样（A 股是手，科创板、港股、美股是股）；接口没给时为 nil。
+    /// 这一分钟的成交量，单位和接口一样（A 股是手，科创板、港股、美股是股，数字货币是基础币）；接口没给时为 nil。
     public var volume: Double?
 
     public init(minute: Int, price: Double, average: Double? = nil, volume: Double? = nil) {
@@ -24,7 +24,8 @@ public struct IntradaySeries: Equatable, Sendable {
     public var date: String?
     public var points: [IntradayPoint]
     /// 国际期货的交易日跨过半夜、各个品种开盘的时刻也不一样，这时点的 minute 是离这个时刻多少分钟，
-    /// 横轴从它开始画 24 小时（见 IntradayAxis）。股票是 nil，minute 是交易所当地时间。
+    /// 横轴从它开始画 24 小时（见 IntradayAxis）。数字货币同样用此起点，时区是 UTC。
+    /// 股票是 nil，minute 是交易所当地时间。
     public var start: Date?
 
     public init(symbol: Symbol, date: String?, points: [IntradayPoint], start: Date? = nil) {
@@ -168,7 +169,7 @@ public enum IntradayAxis {
         case .hk: return [(9 * 60 + 30)...(12 * 60), (13 * 60)...(16 * 60)]
         case .us: return [(9 * 60 + 30)...(16 * 60)]
         // 期货的分时从开盘那一刻算起（见 IntradaySeries.start），一天 24 小时算一段。
-        case .global: return [0...(24 * 60)]
+        case .global, .crypto: return [0...(24 * 60)]
         }
     }
 
@@ -180,7 +181,7 @@ public enum IntradayAxis {
     /// 横轴下面标的时刻：开盘、午休（美股是中间）、收盘，位置是 0 到 1。
     /// 期货从 start（北京时间）起标开头、12 小时后和 24 小时后；没有 start 时不标。
     public static func ticks(for region: MarketRegion, start: Date? = nil) -> [AxisTick] {
-        if region == .global {
+        if region == .global || (region == .crypto && start != nil) {
             guard let start else { return [] }
             let origin = clockMinute(of: 0, start: start, region: region)
             return [0, 0.5, 1].map { AxisTick(position: $0, label: time((origin + Int($0 * 1440)) % 1440)) }
@@ -209,7 +210,7 @@ public enum IntradayAxis {
 
     /// 分时点的时刻（自零点起的分钟数）：股票就是 minute；期货的 minute 是离 start 多少分钟，换算成北京时间。
     public static func clockMinute(of minute: Int, start: Date?, region: MarketRegion) -> Int {
-        guard region == .global, let start else { return minute }
+        guard region == .global || region == .crypto, let start else { return minute }
         let c = region.calendar.dateComponents([.hour, .minute], from: start.addingTimeInterval(TimeInterval(minute * 60)))
         return (c.hour ?? 0) * 60 + (c.minute ?? 0)
     }

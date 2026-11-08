@@ -55,9 +55,9 @@ final class AppTestContext {
             try await Task.sleep(nanoseconds: 3_600_000_000_000)
         })
     }
-    func store(provider: QuoteProvider, backup: QuoteProvider? = nil, items: [WatchItem]) throws -> QuoteStore {
+    func store(provider: QuoteProvider, backup: QuoteProvider? = nil, cryptoProvider: QuoteProvider? = nil, items: [WatchItem]) throws -> QuoteStore {
         defaults.set(try JSONEncoder().encode(items), forKey: "watchlist.v1")
-        return QuoteStore(settings: settings, provider: provider, backup: backup, defaults: defaults, clock: clock)
+        return QuoteStore(settings: settings, provider: provider, backup: backup, cryptoProvider: cryptoProvider ?? provider, defaults: defaults, clock: clock)
     }
     func quote(_ symbol: Symbol, price: Double = 110) -> Quote {
         Quote(symbol: symbol, name: "Fixture", price: price, previousClose: 100, open: 100, high: 120, low: 90,
