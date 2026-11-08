@@ -22,13 +22,21 @@ final class Notifier: NSObject, ObservableObject, UNUserNotificationCenterDelega
     /// 系统给的通知权限。启动时、打开面板时、App 回到前台时、请求授权以后和通知发不出去时都重新读一次，
     /// 用户在系统设置里关掉通知再回来，设置、编辑页和面板上的提示跟着变。
     @Published private(set) var permission: NotificationPermission = .unknown
+    #if STOX_UI_FIXTURE
+    private let testPermission: NotificationPermission? = .denied
+    #else
     private let testPermission = ProcessInfo.processInfo.environment[Notifier.testPermissionVariable]
         .flatMap(NotificationPermission.init(rawValue:))
+    #endif
     private var activeObserver: NSObjectProtocol?
 
     /// 通知中心要求进程是一个 .app 包；`swift run` 直接运行可执行文件时调用会崩溃，所以先判断。
     var isAvailable: Bool {
+        #if STOX_UI_FIXTURE
+        return false
+        #else
         Bundle.main.bundleIdentifier != nil && Bundle.main.bundleURL.pathExtension == "app"
+        #endif
     }
 
     func setUp() {
@@ -156,19 +164,29 @@ extension NotificationPermission {
 /// 开机自启动（macOS 13+ 的 SMAppService）。
 enum LoginItem {
     static var isAvailable: Bool {
+        #if STOX_UI_FIXTURE
+        return false
+        #else
         Bundle.main.bundleURL.pathExtension == "app"
+        #endif
     }
 
     static var isEnabled: Bool {
+        #if STOX_UI_FIXTURE
+        return false
+        #else
         SMAppService.mainApp.status == .enabled
+        #endif
     }
 
     static func setEnabled(_ enabled: Bool) throws {
+        #if !STOX_UI_FIXTURE
         if enabled {
             try SMAppService.mainApp.register()
         } else {
             try SMAppService.mainApp.unregister()
         }
+        #endif
     }
 }
 

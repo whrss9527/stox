@@ -1,0 +1,380 @@
+#if STOX_UI_FIXTURE
+import AppKit
+import SwiftUI
+import StoxCore
+
+/// Compile-time-only adapters. The controls below open the production panel and settings.
+/// Build with scripts/build-ui-fixture.sh; this code is absent from release builds.
+enum UIFixture {
+    static let root = FileManager.default.temporaryDirectory.appendingPathComponent("StoxUIFixture-" + UUID().uuidString, isDirectory: true)
+    static let defaults = UIFixtureDefaults(file: root.appendingPathComponent("preferences.plist"))
+    static let provider = UIFixtureProvider()
+    static let launchOptions = UIFixtureLaunchOptions(arguments: ProcessInfo.processInfo.arguments)
+    static let date = ISO8601DateFormatter().date(from: "2026-11-06T06:00:00Z")!
+    @MainActor static var clock: QuoteStoreClock { QuoteStoreClock(now: { date }) }
+
+    @MainActor static func prepare() {
+        precondition(["io.github.whrss9527.stox.uifixture20261107", "io.github.whrss9527.stox.uifixture20261107.final"].contains(Bundle.main.bundleIdentifier ?? "")
+                     && Bundle.main.object(forInfoDictionaryKey: "StoxUIFixture") as? Bool == true,
+                     "UI fixture must run inside its separate, network-disabled app bundle")
+        defaults.set(false, forKey: "update.autoCheck")
+        defaults.set(false, forKey: "sync.enabled")
+        defaults.set(false, forKey: "alertsEnabled")
+        defaults.set(false, forKey: "closeSummary")
+        defaults.set(false, forKey: "hotKeyEnabled")
+        defaults.set(false, forKey: "slowWhenIdle")
+        defaults.set(true, forKey: "tips.dismissed")
+        defaults.set(true, forKey: "showAllocation")
+        try! launchOptions.apply(to: defaults)
+        applyLanguage(launchOptions.language)
+        print("STOX_UI_FIXTURE root=\(root.path) network=app-sandbox-denied provider=fake")
+        fflush(stdout)
+    }
+
+    @MainActor static func applyLanguage(_ language: String) {
+        guard let resources = Bundle.main.resourceURL,
+              let bundle = try? languageBundle(language, resources: resources, directory: root.appendingPathComponent("languages")) else { return }
+        AppLanguage.bundle = bundle
+        defaults.set([language], forKey: InterfaceLanguage.defaultsKey)
+        #if !APP_STORE
+        _ = StoxUpdates.configuration(defaults: defaults)
+        #endif
+    }
+
+    /// An lproj alone reports English as preferredLocalizations, even for Chinese.
+    /// A complete temporary bundle keeps production number/date formatting in the chosen language too.
+    static func languageBundle(_ language: String, resources: URL, directory: URL) throws -> Bundle {
+        let target = directory.appendingPathComponent(language + ".bundle", isDirectory: true)
+        let contents = target.appendingPathComponent("Contents", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: target.path) {
+            let translations = contents.appendingPathComponent("Resources", isDirectory: true)
+            try FileManager.default.createDirectory(at: translations, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: resources.appendingPathComponent(language + ".lproj"),
+                                            to: translations.appendingPathComponent(language + ".lproj"))
+            let info: [String: Any] = ["CFBundleIdentifier": "stox.fixture.language." + language,
+                                       "CFBundleDevelopmentRegion": language, "CFBundleLocalizations": [language],
+                                       "CFBundlePackageType": "BNDL"]
+            try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
+                .write(to: contents.appendingPathComponent("Info.plist"))
+        }
+        guard let bundle = Bundle(url: target) else { throw CocoaError(.fileReadCorruptFile) }
+        return bundle
+    }
+
+    /// Read only this process's own production view tree, independently of a CUA formatter.
+    @MainActor static func exportAccessibility(of view: NSView) {
+        var lines = ["Stox fixture: own-process NSAccessibility tree", "AX root: " + String(describing: type(of: view))]
+        var seen = Set<ObjectIdentifier>()
+        var remaining = 400
+        func walk(_ value: Any, depth: Int) {
+            guard depth < 30, remaining > 0 else { return }
+            let object = value as AnyObject
+            guard seen.insert(ObjectIdentifier(object)).inserted else { return }
+            guard let element = value as? NSAccessibilityProtocol else {
+                lines.append(String(repeating: "  ", count: depth) + "non-NSAccessibility " + String(describing: type(of: value)))
+                return
+            }
+            remaining -= 1
+            let children = element.accessibilityChildren() ?? []
+            let role = element.accessibilityRole()?.rawValue ?? "nil"
+            let label = element.accessibilityLabel() ?? ""
+            let value = String(describing: element.accessibilityValue() ?? "").prefix(600)
+            lines.append(String(repeating: "  ", count: depth) + "\(role) children=\(children.count) label=\(label) value=\(value)")
+            for child in children { walk(child, depth: depth + 1) }
+        }
+        walk(view, depth: 0)
+        func nativeViews(_ current: NSView) {
+            if current is NSTableView {
+                lines.append("Native table: " + String(describing: type(of: current)))
+                seen.removeAll()
+                walk(current, depth: 0)
+            }
+            current.subviews.forEach(nativeViews)
+        }
+        nativeViews(view)
+        try? lines.joined(separator: "\n").write(to: root.appendingPathComponent("accessibility.txt"), atomically: true, encoding: .utf8)
+    }
+}
+
+/// Allowlisted fixture inputs only. Release builds do not compile this type or read these flags.
+struct UIFixtureLaunchOptions: Equatable {
+    var language = "en"
+    var cryptoOnly = false
+    var compact = false
+    var dark = false
+
+    init(arguments: [String]) {
+        if let index = arguments.firstIndex(of: "--fixture-language"), index + 1 < arguments.count,
+           ["en", "zh-Hans", "zh-Hant"].contains(arguments[index + 1]) {
+            language = arguments[index + 1]
+        }
+        cryptoOnly = arguments.contains("--fixture-crypto-only")
+        compact = arguments.contains("--fixture-compact")
+        dark = arguments.contains("--fixture-dark")
+    }
+
+    func apply(to defaults: UserDefaults) throws {
+        let items = cryptoOnly ? UIFixtureProvider.items.filter { $0.symbol.isCrypto } : UIFixtureProvider.initialItems
+        defaults.set(try JSONEncoder().encode(items), forKey: "watchlist.v1")
+        defaults.set(compact, forKey: "list.compact")
+        defaults.set(dark ? "dark" : "light", forKey: "appearance")
+        defaults.set(true, forKey: "tips.dismissed")
+    }
+}
+
+/// Never reads or writes a CFPreferences domain. Every fixture model uses this adapter.
+final class UIFixtureDefaults: UserDefaults, @unchecked Sendable {
+    private let file: URL
+    private var values: [String: Any] = [:]
+    private let lock = NSRecursiveLock()
+    init(file: URL) {
+        self.file = file
+        super.init(suiteName: "StoxUIFixture-" + UUID().uuidString)!
+    }
+    override func object(forKey key: String) -> Any? {
+        lock.lock(); defer { lock.unlock() }
+        return values[key]
+    }
+    override func set(_ value: Any?, forKey key: String) {
+        lock.lock(); defer { lock.unlock() }
+        values[key] = value
+        if let data = try? PropertyListSerialization.data(fromPropertyList: values, format: .binary, options: 0) {
+            try? FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? data.write(to: file, options: .atomic)
+        }
+    }
+    override func removeObject(forKey key: String) { set(nil, forKey: key) }
+    override func string(forKey key: String) -> String? { object(forKey: key) as? String }
+    override func data(forKey key: String) -> Data? { object(forKey: key) as? Data }
+    override func bool(forKey key: String) -> Bool { (object(forKey: key) as? NSNumber)?.boolValue ?? false }
+    override func double(forKey key: String) -> Double { (object(forKey: key) as? NSNumber)?.doubleValue ?? 0 }
+    override func integer(forKey key: String) -> Int { (object(forKey: key) as? NSNumber)?.intValue ?? 0 }
+    override func array(forKey key: String) -> [Any]? { object(forKey: key) as? [Any] }
+    override func dictionaryRepresentation() -> [String: Any] {
+        lock.lock(); defer { lock.unlock() }
+        return values
+    }
+}
+
+actor UIFixtureProvider: QuoteProvider {
+    static let items: [WatchItem] = [
+        WatchItem(symbol: Symbol("sh600519")!, name: "贵州茅台", pinned: true, holding: Holding(shares: 10, cost: 1200), group: "示例"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("hk00700")!, name: "腾讯控股", holding: Holding(shares: 20, cost: 420), group: "示例"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("usAAPL")!, name: "苹果", holding: Holding(shares: 5, cost: 200)), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("sh000001")!, name: "上证指数"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("usMSFT")!, name: "微软"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("sz000858")!, name: "五粮液"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("usGOOGL")!, name: "Alphabet"),
+        WatchItem(symbol: Symbol("hk09988")!, name: "阿里巴巴"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("ccBTCUSDT")!, name: "比特币"), // l10n-ignore: synthetic market data
+        WatchItem(symbol: Symbol("ccDOGEUSDT")!, name: "狗狗币"), // l10n-ignore: synthetic low-price market data
+        WatchItem(symbol: Symbol("ccETHUSDT")!, name: "以太坊"), // l10n-ignore: synthetic stale market data
+    ]
+    static var initialItems: [WatchItem] {
+        Array(items.prefix(5)) + items.filter { $0.symbol.isCrypto }
+    }
+    private var fails = false
+    func setFailure(_ value: Bool) { fails = value }
+    private func delay(_ seconds: Double = 0.25) async throws {
+        try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        if fails { throw URLError(.notConnectedToInternet) }
+    }
+    private func quote(_ symbol: Symbol) -> Quote {
+        if let entry = CryptoCatalog.entry(for: symbol) {
+            let price: Double = entry.baseAsset == "BTC" ? 76543.21 : (entry.baseAsset == "DOGE" ? 0.087654 : 2456.789)
+            let volume: Double = entry.baseAsset == "DOGE" ? 30_000_000_000 : 123456.78
+            return Quote(symbol: symbol, name: entry.name, price: price, previousClose: price / 1.0123,
+                         open: price / 1.0123, high: price * 1.04, low: price * 0.95, volume: volume,
+                         amount: price * volume, timestamp: UIFixture.date.addingTimeInterval(entry.baseAsset == "ETH" ? -600 : 0),
+                         priceDecimals: CryptoCatalog.priceDecimals(for: price), exchangeCode: entry.code, englishName: entry.english)
+        }
+        let index = Self.items.firstIndex(where: { $0.symbol == symbol }) ?? 0
+        let price = [1239.58, 435.2, 218.4, 3280.12, 415.7, 128.6, 180.3, 85.4][index]
+        return Quote(symbol: symbol, name: Self.items[index].name, price: price, previousClose: price / 1.0123,
+                     open: price * 0.99, high: price * 1.01, low: price * 0.98, volume: 123456,
+                     amount: price * 123456, timestamp: UIFixture.date,
+                     englishName: ["sh600519": "Kweichow Moutai", "hk00700": "Tencent", "usAAPL": "Apple", "usMSFT": "Microsoft"][symbol.rawValue])
+    }
+    func fetchQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote] {
+        try await delay()
+        return Dictionary(uniqueKeysWithValues: symbols.map { ($0, quote($0)) })
+    }
+    func search(_ query: String) async throws -> [SearchResult] {
+        try await delay()
+        // "fixture" deliberately returns both saved and new symbols for keyboard/add checks.
+        return Self.items.filter { query.lowercased() == "fixture" || $0.name.localizedCaseInsensitiveContains(query)
+            || $0.symbol.rawValue.localizedCaseInsensitiveContains(query) }
+            .map { SearchResult(symbol: $0.symbol, name: $0.name, typeCode: $0.symbol.isCrypto ? "CRYPTO" : "GP") }
+    }
+    func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? {
+        try await delay()
+        let price = quote(symbol).price
+        if symbol.isCrypto {
+            var points: [IntradayPoint] = []
+            points.reserveCapacity(289)
+            for index in 0...288 {
+                let offset: Double = Double(index)
+                let trend: Double = offset * 0.00003
+                let phase: Double = offset / 8
+                let wave: Double = sin(phase) * 0.002
+                let factor: Double = (0.99 + trend) + wave
+                let pointPrice: Double = price * factor
+                let volume: Double = Double(100 + index)
+                points.append(IntradayPoint(minute: index * 5, price: pointPrice, volume: volume))
+            }
+            return IntradaySeries(symbol: symbol, date: "20261106", points: points,
+                                  start: UIFixture.date.addingTimeInterval(-86400))
+        }
+        var points: [IntradayPoint] = []
+        points.reserveCapacity(120)
+        for index in 0..<120 {
+            let offset: Double = Double(index)
+            let trend: Double = offset * 0.00008
+            let phase: Double = offset / 8
+            let wave: Double = sin(phase) * 0.002
+            let factor: Double = (0.99 + trend) + wave
+            let pointPrice: Double = price * factor
+            let average: Double = price * 0.994
+            let volume: Double = Double(100 + index)
+            points.append(IntradayPoint(minute: 570 + index, price: pointPrice, average: average, volume: volume))
+        }
+        return IntradaySeries(symbol: symbol, date: "20261106", points: points)
+    }
+    func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? {
+        try await delay()
+        let price = quote(symbol).price
+        let candles = (1...30).map { index in
+            let close = price * (0.94 + Double(index) * 0.002)
+            return Candle(date: String(format: "2026-10-%02d", index), open: close * 0.997, close: close,
+                          high: close * 1.01, low: close * 0.99, volume: Double(10000 + index * 100))
+        }
+        return KlineSeries(symbol: symbol, period: period, candles: candles)
+    }
+    func fetchExchangeRates() async throws -> ExchangeRates? { try await delay(); return ExchangeRates(hkdCNY: 0.92, usdCNY: 7.18) }
+    func fetchExtendedHours(for symbol: Symbol, exchangeCode: String?) async throws -> ExtendedHoursQuote? {
+        try await delay(0.8)
+        guard symbol.market.region == .us, !symbol.isIndex else { return nil }
+        // A synthetic, timestamp-free response exercises the production missing-time semantics.
+        return ExtendedHoursQuote(session: .afterHours, price: quote(symbol).price * 1.008)
+    }
+    func fetchRank(_ kind: RankKind, count: Int) async throws -> [RankEntry]? {
+        try await delay(kind == .gainers ? 1.2 : 0.15)
+        return Self.items.filter { $0.symbol.market.region == .cn }.enumerated().map { index, item in
+            RankEntry(symbol: item.symbol, name: item.name, price: quote(item.symbol).price,
+                      change: kind == .losers ? -2 : 2, changePercent: kind == .losers ? -3.2 : 3.2,
+                      amount: Double(index + 1) * 100_000_000, turnoverRate: 1.2)
+        }
+    }
+    func fetchIndustries(count: Int) async throws -> [IndustryEntry]? {
+        try await delay(0.15)
+        return [IndustryEntry(code: "a", name: "食品饮料", changePercent: 2.34), // l10n-ignore: synthetic market data
+                IndustryEntry(code: "b", name: "计算机", changePercent: -1.28)] // l10n-ignore: synthetic market data
+    }
+}
+
+@MainActor
+final class UIFixtureControls {
+    private var window: NSWindow!
+    init(settings: SettingsStore, store: QuoteStore, sync: SyncManager, controller: StatusItemController) {
+        let root = UIFixtureControlView(settings: settings, store: store, controller: controller)
+        window = NSWindow(contentViewController: NSHostingController(rootView: root))
+        window.title = "Stox UI Fixture — synthetic data, offline"
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.setContentSize(NSSize(width: 620, height: 320))
+        window.center()
+        window.isReleasedWhenClosed = false
+        if ProcessInfo.processInfo.arguments.contains("--export-own-ax"),
+           ProcessInfo.processInfo.arguments.contains("--show-panel") {
+            Task { @MainActor [weak controller] in
+                for _ in 0..<180 {
+                    guard !Task.isCancelled, let controller else { return }
+                    if let panel = controller.panel, panel.isVisible, let view = panel.contentView,
+                       store.quotes.count == store.items.count {
+                        try? await Task.sleep(nanoseconds: 1_500_000_000)
+                        guard panel.isVisible else { return }
+                        view.layoutSubtreeIfNeeded()
+                        UIFixture.exportAccessibility(of: view)
+                        print("STOX_FIXTURE ax_path=\(UIFixture.root.appendingPathComponent("accessibility.txt").path)")
+                        print("STOX_FIXTURE language=\(UIFixture.launchOptions.language) english=\(AppLanguage.isEnglish) compact=\(settings.compactRows) appearance=\(settings.appearance.rawValue) items=\(store.items.count) quotes=\(store.quotes.count)")
+                        for item in store.items where item.symbol.isCrypto {
+                            guard let quote = store.quotes[item.symbol] else { continue }
+                            print("STOX_FIXTURE symbol=\(item.symbol.rawValue) pair=\(item.symbol.displayCode) price=\(quote.price) decimals=\(quote.priceDecimals) stale=\(store.quoteIsStale(item.symbol)) quote_time=\(quote.timestamp.map(CryptoPresentation.timestamp) ?? "unknown")")
+                        }
+                        print("STOX_FIXTURE snapshot_ready=true")
+                        fflush(stdout)
+                        return
+                    }
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                }
+            }
+        }
+    }
+    func show() {
+        // Automated CI scenes open the production panel through its existing CLI; no controls window covers it.
+        if ProcessInfo.processInfo.arguments.contains("--show-panel") { return }
+        NSApp.setActivationPolicy(.regular)
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+}
+
+private struct UIFixtureControlView: View {
+    @ObservedObject var settings: SettingsStore
+    let store: QuoteStore
+    let controller: StatusItemController
+    @State private var language = UIFixture.launchOptions.language
+    @State private var failure = false
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(verbatim: "Production UI · fake data adapters · network denied").font(.headline)
+            HStack {
+                Picker("Language", selection: $language) {
+                    Text(verbatim: "English").tag("en")
+                    Text(verbatim: "简体中文").tag("zh-Hans") // l10n-ignore: fixture language self-name
+                    Text(verbatim: "繁體中文").tag("zh-Hant") // l10n-ignore: fixture language self-name
+                }.onChange(of: language) { value in
+                    UIFixture.applyLanguage(value)
+                    controller.resetFixturePresentation()
+                    SettingsWindowController.shared.resetFixturePresentation()
+                }
+                Picker("Theme", selection: $settings.appearance) {
+                    Text(verbatim: "System").tag(AppearanceMode.system)
+                    Text(verbatim: "Light").tag(AppearanceMode.light)
+                    Text(verbatim: "Dark").tag(AppearanceMode.dark)
+                }
+            }
+            HStack {
+                Button("Watchlist") { show() }
+                Button("Rankings") { show(route: .rank) }
+                Button("Search") { show(search: "fixture") }
+                Button("Details") { show(expand: Symbol("sh600519")) }
+            }
+            HStack {
+                Button("BTC · 24h") { show(expand: Symbol("ccBTCUSDT")) }
+                Button("DOGE · low price") { show(expand: Symbol("ccDOGEUSDT")) }
+                Button("ETH · stale 10m") { show(expand: Symbol("ccETHUSDT")) }
+            }
+            HStack {
+                Button("Settings (680px)") { SettingsWindowController.shared.showFixtureMinimum() }
+                Toggle("Fail requests", isOn: $failure).onChange(of: failure) { value in
+                    Task { await UIFixture.provider.setFailure(value); await store.refresh() }
+                }
+                Button("Refresh") { Task { await store.refresh() } }
+            }
+            Text(verbatim: "Preferences, holdings, logs and sync use only this temporary session:\n" + UIFixture.root.path)
+                .font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
+        }.padding(20)
+    }
+    private func show(route: PanelRoute = .list, expand: Symbol? = nil, search: String? = nil) {
+        if expand != nil { settings.listFilter = .all }
+        controller.openPanel(route: route, expand: expand, search: search, printDiagnostics: true)
+        settings.panelPinned = true
+        if ProcessInfo.processInfo.arguments.contains("--export-own-ax") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_500_000_000)
+                if let view = controller.panel?.contentView { UIFixture.exportAccessibility(of: view) }
+            }
+        }
+    }
+}
+#endif

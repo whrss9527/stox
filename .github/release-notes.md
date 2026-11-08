@@ -1,6 +1,6 @@
 ## 安装
 
-1. 下载下方附件里的 `Stox.zip`，解压后把 `Stox.app` 拖进“应用程序”文件夹。
+1. 下载下方附件里的 `Stox.dmg`，打开后把 `Stox.app` 拖到右侧“应用程序”文件夹。
 2. 这个版本使用临时签名（没有 Apple 开发者证书），第一次打开前在终端执行：
 
    ```bash
@@ -17,7 +17,7 @@
 
 ## Installation
 
-1. Download `Stox.zip` below, unzip it and move `Stox.app` into Applications.
+1. Download `Stox.dmg` below, open it and drag `Stox.app` to Applications on the right.
 2. This build uses ad-hoc signing. Before opening it for the first time, run:
 
    ```bash

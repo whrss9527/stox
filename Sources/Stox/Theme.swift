@@ -63,6 +63,7 @@ enum Theme {
         case .hf: return .brown
         case .wh: return .teal
         case .zn: return .indigo
+        case .crypto: return .orange
         }
     }
 }

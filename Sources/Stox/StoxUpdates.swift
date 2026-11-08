@@ -25,7 +25,11 @@ enum StoxUpdates {
 }
 
 extension FritUpdate.Updater {
+    #if STOX_UI_FIXTURE
+    static let shared = FritUpdate.Updater(configuration: StoxUpdates.configuration(defaults: UIFixture.defaults))
+    #else
     static let shared = FritUpdate.Updater(configuration: StoxUpdates.configuration())
+    #endif
 }
 
 /// 外层仍由面板注入同一个更新器，内部状态和操作采用共用视图。

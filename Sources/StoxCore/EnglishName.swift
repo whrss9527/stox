@@ -41,6 +41,7 @@ public enum EnglishName {
 
     /// 列表、搜索结果、提醒里的英文名。
     public static func name(_ symbol: Symbol, quote: Quote?) -> String? {
+        if let entry = CryptoCatalog.entry(for: symbol) { return entry.english }
         if let index = indices[symbol.rawValue] { return index.name }
         if let entry = GlobalCatalog.entry(for: symbol) { return entry.english }
         switch symbol.market {
@@ -53,6 +54,7 @@ public enum EnglishName {
 
     /// 菜单栏上的英文名：指数、环球的品种用简称，美股用代码，港股和表里没有的指数用英文名的前几个词。
     public static func shortName(_ symbol: Symbol, quote: Quote?) -> String? {
+        if symbol.isCrypto { return symbol.displayCode }
         if let index = indices[symbol.rawValue] { return index.short }
         if let entry = GlobalCatalog.entry(for: symbol) { return entry.short }
         switch symbol.market {

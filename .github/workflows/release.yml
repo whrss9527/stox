@@ -35,7 +35,7 @@ permissions:
 jobs:
   release:
     # Frit 固定在一个提交上；升级时 uses 的 @ 后面和 frit-ref 一起改。
-    uses: whrss9527/frit/.github/workflows/release-app.yml@2291523e16c91afae06868d7c4e188efc36cd70b
+    uses: whrss9527/frit/.github/workflows/release-app.yml@fd38175605b58e78d778c91ccaf1e336412dbf28
     with:
       app-name: Stox
       ref: ${{ github.sha }}
@@ -46,9 +46,10 @@ jobs:
       # App 窗口测试需要 Xcode 宿主，不能使用 Frit 默认的无宿主 swift test。
       test-command: make test
       archives: dist/Stox.zip
+      dmg-archive: dist/Stox.zip
       notes-command: scripts/release-notes.sh
       require-notarization: true
-      frit-ref: 2291523e16c91afae06868d7c4e188efc36cd70b
+      frit-ref: fd38175605b58e78d778c91ccaf1e336412dbf28
     secrets: inherit
   previous-upgrade:
     needs: release

@@ -13,6 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApplication.shared.run()
             return
         }
+        #if STOX_UI_FIXTURE
+        UIFixture.prepare()
+        #endif
         // 设置里点了“立即重新启动”打开的新实例：先等旧的退出。
         LanguageSetting.waitForPreviousInstance(arguments: ProcessInfo.processInfo.arguments)
         _ = LanguageSetting.atLaunch
@@ -24,12 +27,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         app.run()
     }
 
+    #if STOX_UI_FIXTURE
+    private let settings = SettingsStore(defaults: UIFixture.defaults)
+    private lazy var store = QuoteStore(settings: settings, provider: UIFixture.provider, backup: nil,
+                                        cryptoProvider: UIFixture.provider,
+                                        defaults: UIFixture.defaults, clock: UIFixture.clock)
+    private lazy var sync = SyncManager(store: store, settings: settings, defaults: UIFixture.defaults,
+                                       location: .override(UIFixture.root.appendingPathComponent("sync")), watchesChanges: false)
+    private var fixtureControls: UIFixtureControls?
+    #else
     private let settings = SettingsStore()
     private lazy var store = QuoteStore(settings: settings)
+    private lazy var sync = SyncManager(store: store, settings: settings)
+    #endif
     #if !APP_STORE
     private let updater = Updater.shared
     #endif
-    private lazy var sync = SyncManager(store: store, settings: settings)
     private var linkHandler: StoxLinkHandler?
     private let linkInbox = StoxIntentSupport.links
     private var statusController: StatusItemController?
@@ -46,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusController = controller
         SettingsWindowController.shared.configure(settings: settings, store: store, sync: sync)
 
+        #if !STOX_UI_FIXTURE
         Notifier.shared.setUp()
         Notifier.shared.onOpen = { [weak self] route in
             if route == Notifier.aboutRoute {
@@ -64,7 +78,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.onCloseSummary = { note in
             Notifier.shared.postSummary(note)
         }
-        #if !APP_STORE
+        #endif
+        #if !APP_STORE && !STOX_UI_FIXTURE
         updater.notify = { candidate in
             Notifier.shared.postUpdate(title: L("Stox 有新版本 %@", candidate.release.version?.description ?? candidate.release.tagName),
                                       body: L("打开行情面板点“更新”，自动下载安装并重新启动"))
@@ -74,6 +89,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         #endif
 
         store.start()
+        #if !STOX_UI_FIXTURE
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let available = path.status == .satisfied
             Task { @MainActor [weak self] in
@@ -94,6 +110,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates { $0 == $1 }
             .sink { [weak self] enabled, binding in self?.setHotKey(enabled: enabled, binding: binding) }
             .store(in: &cancellables)
+        #else
+        fixtureControls = UIFixtureControls(settings: settings, store: store, sync: sync, controller: controller)
+        fixtureControls?.show()
+        #endif
 
         let workspace = NSWorkspace.shared.notificationCenter
         workspace.addObserver(self, selector: #selector(systemWillSleep), name: NSWorkspace.willSleepNotification, object: nil)

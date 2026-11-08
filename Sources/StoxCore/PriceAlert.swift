@@ -55,13 +55,20 @@ public enum AlertCondition: String, Codable, CaseIterable, Sendable {
     case yearHigh, yearLow
 
     func isMet(by quote: Quote, holding: Holding?, threshold: Double) -> Bool {
+        if quote.symbol.isCrypto {
+            switch self {
+            case .profitAbove, .lossBelow, .limitUp, .limitDown, .yearHigh, .yearLow: return false
+            default: break
+            }
+        }
         switch self {
         case .priceAbove: return quote.alertHigh >= threshold
         case .priceBelow: return quote.alertLow <= threshold
         case .riseAbove: return quote.changePercent >= abs(threshold)
         case .fallBelow: return quote.changePercent <= -abs(threshold)
         case .profitAbove, .lossBelow:
-            guard let percent = holding.flatMap({ Portfolio.position($0, quote: quote)?.totalProfitPercent }) else { return false }
+            guard quote.symbol.canHold,
+                  let percent = holding.flatMap({ Portfolio.position($0, quote: quote)?.totalProfitPercent }) else { return false }
             return self == .profitAbove ? percent >= abs(threshold) : percent <= -abs(threshold)
         case .limitUp: return quote.isLimitUp
         case .limitDown: return quote.isLimitDown
@@ -127,6 +134,11 @@ public struct AlertTrigger: Sendable, Equatable {
     }
 
     public var body: String {
+        if symbol.isCrypto {
+            return L("现价 %@，", QuoteFormatter.price(quote.price, decimals: quote.priceDecimals) + " USDT")
+                + L("24小时涨跌 %@", QuoteFormatter.change(quote.change, decimals: quote.priceDecimals) + " USDT")
+                + L("（%@）", QuoteFormatter.percent(quote.changePercent))
+        }
         let price = L("现价 %@，", QuoteFormatter.price(quote.price, decimals: quote.priceDecimals))
         if condition == .profitAbove || condition == .lossBelow, let holding,
            let position = Portfolio.position(holding, quote: quote) {
@@ -232,10 +244,12 @@ public struct AlertEngine: Codable, Sendable, Equatable {
 private extension Quote {
     // 无日期或无有效最高/最低价的接口继续只判断现价，避免把 0 当作跌破阈值。
     var alertHigh: Double {
-        timestamp != nil && high.isFinite && high > 0 ? max(price, high) : price
+        if symbol.isCrypto { return price }
+        return timestamp != nil && high.isFinite && high > 0 ? max(price, high) : price
     }
 
     var alertLow: Double {
-        timestamp != nil && low.isFinite && low > 0 ? min(price, low) : price
+        if symbol.isCrypto { return price }
+        return timestamp != nil && low.isFinite && low > 0 ? min(price, low) : price
     }
 }

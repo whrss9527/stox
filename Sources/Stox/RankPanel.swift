@@ -43,8 +43,9 @@ struct RankPanel: View {
             .padding(.horizontal, 2)
         }
         .task(id: settings.rankKind) {
+            let kind = settings.rankKind
             while !Task.isCancelled {
-                await store.loadRank(settings.rankKind, count: Self.fetched)
+                await store.loadRank(kind, count: Self.fetched)
                 try? await Task.sleep(nanoseconds: Self.refreshInterval * 1_000_000_000)
             }
         }
@@ -137,17 +138,11 @@ struct RankPanel: View {
     }
 
     /// 行业榜的一行：行业名和涨跌幅，下面写领涨的那只。点一下加的是领涨股。
+    @ViewBuilder
     private func industryRow(_ index: Int, _ industry: IndustryEntry) -> some View {
         let leader = industry.leader
         let added = leader.map { store.contains($0.symbol) } ?? false
-        return Button {
-            guard let leader else { return }
-            if added {
-                reveal(leader.symbol)
-            } else {
-                store.add(leader.symbol, name: leader.name)
-            }
-        } label: {
+        let content =
             HStack(spacing: 8) {
                 Text("\(index + 1)")
                     .font(.system(size: 10.5).monospacedDigit())
@@ -166,18 +161,41 @@ struct RankPanel: View {
                 }
                 Spacer(minLength: 4)
                 pill(industry.changePercent, direction: industry.direction)
-                Image(systemName: leader == nil ? "minus" : (added ? "checkmark" : "plus"))
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(added || leader == nil ? Color.secondary : Color.accentColor)
-                    .frame(width: 14)
+                if leader != nil {
+                    Image(systemName: added ? "checkmark" : "plus")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(added ? Color.secondary : Color.accentColor)
+                        .frame(width: 14)
+                } else {
+                    Color.clear.frame(width: 14, height: 1)
+                }
             }
             .frame(height: Self.rowHeight)
             .contentShape(Rectangle())
+        if let leader {
+            let action = added ? L("%@已在自选里，点一下回到列表并展开", leader.name) : L("把领涨的%@加到自选", leader.name)
+            Button {
+                if added { reveal(leader.symbol) }
+                else { store.add(leader.symbol, name: leader.name) }
+            } label: { content }
+                .buttonStyle(.plain)
+                .help(action)
+                .accessibilityLabel(Self.industryAccessibilityLabel(index, industry))
+                .accessibilityHint(action)
+        } else {
+            // 行业本身仍是可读行情；缺少领涨股只意味着没有添加动作，不应淡化整行。
+            content.accessibilityRepresentation {
+                Text(Self.industryAccessibilityLabel(index, industry))
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(leader == nil)
-        .help(leader.map { added ? L("%@已在自选里，点一下回到列表并展开", $0.name) : L("把领涨的%@加到自选", $0.name) } ?? "")
-        .accessibilityLabel("\(index + 1) \(AppLanguage.securityName(industry.name)) \(QuoteFormatter.percent(industry.changePercent))")
+    }
+
+    static func industryAccessibilityLabel(_ index: Int, _ industry: IndustryEntry) -> String {
+        var label = L("第 %@ 名，%@，涨跌幅 %@", index + 1, AppLanguage.securityName(industry.name), QuoteFormatter.percent(industry.changePercent))
+        if let leader = industry.leader {
+            label += ", " + L("领涨 %@ %@", AppLanguage.securityName(leader.name), QuoteFormatter.percent(leader.changePercent))
+        }
+        return label
     }
 
     /// 涨跌幅色块。

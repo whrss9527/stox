@@ -78,6 +78,8 @@ public struct WatchItem: Hashable, Sendable, Identifiable {
     /// 没有设简称时菜单栏上的名字：截断全称；英文界面里是英文简称（S&P 500、AAPL、Gold）。
     public func automaticTickerName(with quote: Quote?, english: Bool = AppLanguage.isEnglish,
                                     traditional: Bool = AppLanguage.isTraditionalChinese) -> String {
+        // Keep the quote asset visible in every language; a bare BTC price can be mistaken for USD.
+        if symbol.isCrypto { return symbol.displayCode }
         if english, let name = EnglishName.shortName(symbol, quote: quote) { return name }
         return NameAbbreviator.abbreviate(AppLanguage.securityName(name.isEmpty ? symbol.displayCode : name,
                                                                   traditional: traditional && !english))
@@ -354,6 +356,9 @@ public enum MenuBarTicker {
             let price = priced.map { QuoteFormatter.price($0.price, decimals: $0.priceDecimals) } ?? "--"
             let percent = priced.flatMap { $0.changePercent.isFinite ? $0.changePercent : nil }
                 .map(QuoteFormatter.percent) ?? "--"
+            if item.symbol.isCrypto {
+                return "\(label)  \(price) USDT  24h \(percent) · Binance"
+            }
             return "\(label)  \(price)  \(percent)"
         }.joined(separator: "\n")
     }
@@ -454,7 +459,7 @@ public enum QuoteLinks {
         case .sh, .sz, .bj: path = symbol.market.rawValue.uppercased() + symbol.code
         case .hk: path = symbol.isIndex ? "HK" + symbol.code : symbol.code
         case .us: path = symbol.code
-        case .jj, .hf, .wh, .zn: return nil
+        case .jj, .hf, .wh, .zn, .crypto: return nil
         }
         return URL(string: "https://xueqiu.com/S/" + path)
     }
@@ -463,6 +468,9 @@ public enum QuoteLinks {
     /// 返回按钮上写的名字和地址。
     public static func web(_ symbol: Symbol) -> (title: String, url: URL)? {
         switch symbol.market {
+        case .crypto:
+            guard let entry = CryptoCatalog.entry(for: symbol) else { return nil }
+            return URL(string: "https://www.binance.com/en/trade/\(entry.baseAsset)_\(entry.quoteAsset)?type=spot").map { ("Binance", $0) }
         case .jj:
             return URL(string: "https://fund.eastmoney.com/\(symbol.code).html").map { (L("天天基金"), $0) }
         case .hf:
@@ -514,7 +522,7 @@ public enum WatchlistSort: String, CaseIterable, Sendable {
 /// 自选列表的筛选：全部、某个市场、有持仓的。
 /// 列表上方的筛选：全部、某个市场、有持仓的，或者某个分组。
 public enum WatchlistFilter: Hashable, Sendable {
-    case all, cn, hk, us, global, holdings
+    case all, cn, hk, us, global, crypto, holdings
     case group(String)
 
     /// 存进设置里的写法：`all`、`cn`、`hk`、`us`、`global`、`holdings`，分组是 `group:名字`。
@@ -525,6 +533,7 @@ public enum WatchlistFilter: Hashable, Sendable {
         case .hk: return "hk"
         case .us: return "us"
         case .global: return "global"
+        case .crypto: return "crypto"
         case .holdings: return "holdings"
         case .group(let name): return "group:" + name
         }
@@ -537,6 +546,7 @@ public enum WatchlistFilter: Hashable, Sendable {
         case "hk": self = .hk
         case "us": self = .us
         case "global": self = .global
+        case "crypto": self = .crypto
         case "holdings": self = .holdings
         default:
             guard id.hasPrefix("group:"), let name = WatchItem.normalizedGroup(String(id.dropFirst(6))) else { return nil }
@@ -551,6 +561,7 @@ public enum WatchlistFilter: Hashable, Sendable {
         case .hk: return items.filter { $0.symbol.market.region == .hk }
         case .us: return items.filter { $0.symbol.market.region == .us }
         case .global: return items.filter { $0.symbol.market.region == .global }
+        case .crypto: return items.filter { $0.symbol.isCrypto }
         case .holdings: return items.filter { $0.holding != nil }
         case .group(let name): return items.filter { $0.group == name }
         }
@@ -567,6 +578,7 @@ public enum WatchlistFilter: Hashable, Sendable {
             if regions.contains(.hk) { result.append(.hk) }
             if regions.contains(.us) { result.append(.us) }
             if regions.contains(.global) { result.append(.global) }
+            if regions.contains(.crypto) { result.append(.crypto) }
         }
         let held = items.filter { $0.holding != nil }.count
         if held > 0, held < items.count {

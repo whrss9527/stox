@@ -75,7 +75,9 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public static func quoteURL(for symbols: [Symbol], endpoint: String = quoteEndpoint) -> URL? {
-        URL(string: endpoint + symbols.map(\.rawValue).joined(separator: ","))
+        let supported = symbols.filter { !$0.isCrypto }
+        guard !supported.isEmpty else { return nil }
+        return URL(string: endpoint + supported.map(\.rawValue).joined(separator: ","))
     }
 
     public static let minuteEndpoint = "https://web.ifzq.gtimg.cn/appstock/app/minute/query?code="
@@ -83,6 +85,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
 
     /// 分时接口：美股（含指数）用单独的地址。
     public static func minuteURL(for symbol: Symbol) -> URL? {
+        guard !symbol.isCrypto else { return nil }
         let endpoint = symbol.market.region == .us ? usMinuteEndpoint : minuteEndpoint
         return URL(string: endpoint + symbol.rawValue)
     }
@@ -110,6 +113,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
 
     /// 五日分时：A 股、港股是 `day/query`，美股是 `dayus/query`，美股个股同样要带交易所后缀。
     public static func fiveDayURL(for symbol: Symbol, exchangeCode: String? = nil) -> URL? {
+        guard symbol.hasFiveDay else { return nil }
         var code = symbol.rawValue
         var endpoint = "https://web.ifzq.gtimg.cn/appstock/app/day/query?code="
         if symbol.market.region == .us {
@@ -137,7 +141,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     public func fetchQuotes(for symbols: [Symbol]) async throws -> [Symbol: Quote] {
         var unique: [Symbol] = []
         var seen = Set<Symbol>()
-        for symbol in symbols where seen.insert(symbol).inserted { unique.append(symbol) }
+        for symbol in symbols where !symbol.isCrypto && seen.insert(symbol).inserted { unique.append(symbol) }
         guard !unique.isEmpty else { return [:] }
 
         let indices = unique.filter { $0.market == .zn }
@@ -192,7 +196,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchIntraday(for symbol: Symbol) async throws -> IntradaySeries? {
-        guard symbol.hasIntraday else { return nil }
+        guard symbol.hasIntraday, !symbol.isCrypto else { return nil }
         // 腾讯的分时接口不认期货（code param error），用新浪的。
         if symbol.market == .hf {
             guard let url = SinaFuturesMinuteParser.url(for: symbol) else { throw URLError(.badURL) }
@@ -219,7 +223,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchKline(for symbol: Symbol, period: KlinePeriod, count: Int, exchangeCode: String?) async throws -> KlineSeries? {
-        guard symbol.hasKline else { return nil }
+        guard symbol.hasKline, !symbol.isCrypto else { return nil }
         var code = exchangeCode
         // 美股个股不带交易所后缀时取不到正确的 K 线，调用方没给就先查一次行情。
         if code == nil, symbol.market.region == .us, !symbol.isIndex {
@@ -230,7 +234,7 @@ public final class TencentProvider: QuoteProvider, @unchecked Sendable {
     }
 
     public func fetchFiveDay(for symbol: Symbol, exchangeCode: String?) async throws -> MultiDaySeries? {
-        guard symbol.hasKline else { return nil }
+        guard symbol.hasFiveDay else { return nil }
         var code = exchangeCode
         if code == nil, symbol.market.region == .us, !symbol.isIndex {
             code = try await fetchQuotes(for: [symbol])[symbol]?.exchangeCode

@@ -1,6 +1,6 @@
 ## 安装
 
-1. 下载下方附件里的 `Stox.zip`，解压后把 `Stox.app` 拖进“应用程序”文件夹。
+1. 下载下方附件里的 `Stox.dmg`，打开后把 `Stox.app` 拖到右侧“应用程序”文件夹。
 2. 双击打开。这个版本用 Developer ID 签名并通过了苹果公证，不会被系统拦下。
 3. 打开后 Stox 只出现在菜单栏：左键单击打开 / 关闭行情面板，右键单击在“显示行情”和“只显示图标”之间切换，⌃⌥S 在任何 App 里开关面板。设置和退出在面板底部。
 
@@ -11,7 +11,7 @@
 
 ## Installation
 
-1. Download `Stox.zip` below, unzip it and move `Stox.app` into Applications.
+1. Download `Stox.dmg` below, open it and drag `Stox.app` to Applications on the right.
 2. Double-click to open. This build is signed with Developer ID and notarized by Apple.
 3. Stox lives in the menu bar. Click to toggle the quotes panel, right-click to switch between quotes and the icon, or press ⌃⌥S from any app. Settings and Quit are at the bottom of the panel.
 

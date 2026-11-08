@@ -2,7 +2,7 @@
 
 每个版本发布时，对应的这一节会放在 GitHub 发布说明的最前面，App 里“关于与更新”页显示的也是这一节。
 
-## 1.8.0（未发布）
+## 1.9.1（未发布）
 
 ### 中文
 
@@ -11,6 +11,46 @@
 ### English
 
 - Add a WeChat support button in About & Updates to open the same code shown in the README.
+
+## 1.9.0（2026-11-08）
+
+### 中文
+
+- 新增数字货币行情：搜索 BTC/USDT、ETH/USDT、SOL/USDT 等常用现货交易对，加入自选与菜单栏；明确标注 Binance 来源、USDT 单位和滚动 24 小时涨跌。
+- 提供最近 24 小时走势及日、周、月 K 线，按需加载；数字货币全天候刷新，周末也保持更新。
+- 数字货币与股票行情独立请求、独立恢复；接口暂不可用时保留原报价和时间并提示未更新，支持受限并发、取消和失败退避。
+
+### English
+
+- Add common crypto spot pairs such as BTC/USDT, ETH/USDT and SOL/USDT to search, the watchlist and menu bar, with Binance attribution, USDT units and rolling 24-hour changes.
+- View the past 24 hours and daily, weekly or monthly candles, loaded on demand. Crypto refreshes around the clock, including weekends.
+- Fetch and recover crypto independently from stocks. Unavailable data keeps its original price and timestamp with a warning; requests have bounded concurrency, cancellation and failure backoff.
+
+## 1.8.1（2026-11-07）
+
+### 中文
+
+- 榜单切换：忽略旧请求较晚返回的结果与错误，加载新榜单时清除上次的错误提示；离开页面后不再接纳已取消请求的结果。
+- 修正行情数据的异常数字处理，避免无效价格、成交量或单位换算溢出影响行情与持仓显示。
+- 行业榜：没有领涨股时仍清晰显示行业行情，并向屏幕阅读器提供名次、行业与涨跌幅。
+- 盘前盘后行情：分批获取美股价格，快速关闭面板、切换自选或移除证券时，不再让旧请求回填数据。
+
+### English
+
+- Keep ranking results and errors tied to the current request when switching lists, clear stale errors when loading a new list, and discard results from canceled requests after leaving the page.
+- Reject invalid quote prices and omit non-finite optional fields or overflowing unit conversions before they reach quote and portfolio views.
+- Keep industry rankings readable when no leading stock is available, with rank, industry and change announced to screen readers.
+- Fetch extended-hours quotes in small batches and discard stale results after closing the panel, changing the watchlist or removing a symbol.
+
+## 1.8.0（2026-11-03）
+
+### 中文
+
+- 提供 DMG 拖拽安装包，打开后把 Stox 拖到「应用程序」即可安装；应用内更新继续自动完成。
+
+### English
+
+- Install from a DMG by dragging Stox to Applications. In-app updates continue to install automatically.
 
 ## 1.7.2（2026-10-19）
 

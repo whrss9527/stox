@@ -133,6 +133,81 @@ final class TencentQuoteParserTests: XCTestCase {
         XCTAssertTrue(TencentQuoteParser.parse(#"v_sh600519="1~贵州茅台~600519";"#).isEmpty)
     }
 
+    private func quote(changing replacements: [Int: String]) throws -> Quote? {
+        let record = try XCTUnwrap(TencentQuoteParser.records(in: Fixtures.aShares).first { $0.0 == "sh600519" })
+        var fields = record.1.components(separatedBy: "~")
+        for (index, value) in replacements { fields[index] = value }
+        return TencentQuoteParser.parseRecord(symbol: Symbol("sh600519")!, payload: fields.joined(separator: "~"))
+    }
+
+    func testNonFiniteRequiredPricesAreRejected() throws {
+        for field in [3, 4] {
+            for value in ["NaN", "inf", "-inf", "1e309"] {
+                XCTAssertNil(try quote(changing: [field: value]), "field=\(field) value=\(value)")
+            }
+        }
+        let records = TencentQuoteParser.records(in: Fixtures.aShares)
+        let mixed = records.map { key, payload in
+            var fields = payload.components(separatedBy: "~")
+            if key == "sh600519" { fields[3] = "NaN" }
+            return "v_\(key)=\"\(fields.joined(separator: "~"))\";"
+        }.joined(separator: "\n")
+        let expected = Set(TencentQuoteParser.parse(Fixtures.aShares).keys).subtracting([Symbol("sh600519")!])
+        XCTAssertEqual(Set(TencentQuoteParser.parse(mixed).keys), expected)
+    }
+
+    func testNonFiniteOptionalValuesUseMissingFieldBehavior() throws {
+        let q = try XCTUnwrap(quote(changing: [5: "NaN", 6: "inf", 7: "inf", 8: "NaN", 31: "NaN", 32: "inf",
+                                               33: "NaN", 34: "inf", 38: "NaN", 39: "inf", 45: "inf",
+                                               46: "NaN", 47: "inf", 48: "NaN", 49: "inf", 67: "inf", 68: "NaN"]))
+        XCTAssertEqual(q.price, 1239.58)
+        XCTAssertEqual(q.open, 0)
+        XCTAssertEqual(q.high, 0)
+        XCTAssertEqual(q.low, 0)
+        XCTAssertEqual(q.volume, 0)
+        XCTAssertEqual(q.change, q.price - q.previousClose)
+        XCTAssertEqual(q.changePercent, (q.price - q.previousClose) / q.previousClose * 100)
+        for value in [q.turnoverRate, q.peRatio, q.marketCap, q.pbRatio, q.limitUp, q.limitDown, q.volumeRatio,
+                      q.high52Week, q.low52Week, q.orderBook?.outerVolume, q.orderBook?.innerVolume] {
+            XCTAssertNil(value)
+        }
+    }
+
+    func testNonFiniteDetailedAmountFallsBackToAmountField() throws {
+        for value in ["NaN", "inf", "-inf"] {
+            let q = try XCTUnwrap(quote(changing: [35: "1/2/\(value)", 37: "12"]))
+            XCTAssertEqual(q.amount, 120_000)
+        }
+    }
+
+    func testUnitConversionOverflowDoesNotEnterTheQuote() throws {
+        let q = try XCTUnwrap(quote(changing: [6: "1e308", 7: "1e308", 8: "1e308", 35: "", 37: "1e308", 45: "1e308"]))
+        XCTAssertEqual(q.volume, 0)
+        XCTAssertEqual(q.amount, 0)
+        XCTAssertNil(q.marketCap)
+        XCTAssertNil(q.orderBook?.outerVolume)
+        XCTAssertNil(q.orderBook?.innerVolume)
+    }
+
+    func testUnrepresentableDerivedChangeIsRejectedButZeroPricesRemainSupported() throws {
+        XCTAssertNil(try quote(changing: [3: "1e308", 4: "1e-308", 31: "", 32: ""]))
+        let zero = try XCTUnwrap(quote(changing: [3: "0", 5: "0", 6: "0", 31: "", 32: ""]))
+        XCTAssertEqual(zero.price, 0)
+        XCTAssertTrue(zero.change.isFinite)
+        XCTAssertTrue(zero.changePercent.isFinite)
+    }
+
+    func testFundDerivedPriceAndCumulativeNAVMustBeFinite() throws {
+        let symbol = Symbol("jj161725")!
+        let invalid = "161725~fixture~0~0~~1e308~1~-99.99999999999999~2026-10-19~"
+        XCTAssertNil(TencentQuoteParser.parseRecord(symbol: symbol, payload: invalid))
+        for nav in ["NaN", "inf", "-inf"] {
+            let q = try XCTUnwrap(TencentQuoteParser.parseRecord(symbol: symbol,
+                payload: "161725~fixture~0~0~~1~\(nav)~0~2026-10-19~"))
+            XCTAssertNil(q.cumulativeNAV)
+        }
+    }
+
     func testComputesChangeWhenMissing() {
         let q = Quote(symbol: Symbol("sh600519")!, name: "x", price: 110, previousClose: 100)
         XCTAssertEqual(q.change, 10)

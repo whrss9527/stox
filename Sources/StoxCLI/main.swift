@@ -54,7 +54,7 @@ guard let command = arguments.first else {
     exit(2)
 }
 
-let provider = TencentProvider()
+let provider = MarketDataProvider()
 
 do {
     switch command {
@@ -62,7 +62,7 @@ do {
         exit(try await checkQuoteData(arguments.dropFirst()))
     case "quote", "sina":
         let symbols = parseSymbols(arguments.dropFirst())
-        let source: QuoteProvider = command == "sina" ? SinaProvider() : provider
+        let source: QuoteProvider = command == "sina" ? MarketDataProvider(stock: SinaProvider()) : provider
         let quotes = try await source.fetchQuotes(for: symbols)
         var missing = 0
         for symbol in symbols {
@@ -85,13 +85,23 @@ do {
                 pad("量 " + QuoteFormatter.volume(q.volume, market: symbol.market), 16),
                 pad("额 " + (q.amount > 0 ? QuoteFormatter.largeNumber(q.amount) : "--"), 13),
                 pad(q.marketCap.map { "市值 " + QuoteFormatter.largeNumber($0) } ?? "", 14),
-                "\(time) \(symbol.market.region.displayName)\(phase.displayName)",
+                "\(time) \(symbol.market.region.displayName)\(phase.displayName)" + (symbol.isCrypto ? " · Binance · USDT · 24h" : ""),
             ].joined(separator: " ") + english)
         }
         exit(missing == 0 ? 0 : 1)
 
     case "raw":
-        print(try await provider.fetchRaw(for: parseSymbols(arguments.dropFirst())))
+        let symbols = parseSymbols(arguments.dropFirst())
+        if !symbols.isEmpty, symbols.allSatisfy(\.isCrypto) {
+            let data = try await CryptoProvider.shared.fetchRaw(for: symbols)
+            FileHandle.standardOutput.write(data)
+            print("")
+        } else if symbols.contains(where: \.isCrypto) {
+            FileHandle.standardError.write(Data("raw 请分别查询数字货币和股票\n".utf8))
+            exit(2)
+        } else {
+            print(try await TencentProvider().fetchRaw(for: symbols))
+        }
 
     case "search":
         let query = arguments.dropFirst().joined(separator: " ")

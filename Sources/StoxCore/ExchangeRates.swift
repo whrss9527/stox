@@ -17,6 +17,8 @@ public struct ExchangeRates: Equatable, Sendable {
         case .hk: return hkdCNY
         // 期货外汇不能填持仓，用不到；报价大多是美元。
         case .us, .global: return usdCNY
+        // USDT 不是 USD，没有经过验证的折算率；数字货币本来也不支持持仓合计。
+        case .crypto: return .nan
         }
     }
 }
@@ -49,6 +51,7 @@ extension Portfolio {
         var total = PortfolioSummary(region: .cn, marketValue: 0, costValue: 0, dayProfit: 0, count: 0)
         for summary in summaries {
             let rate = rates.toCNY(summary.region)
+            guard rate.isFinite, rate > 0 else { return nil }
             total.marketValue += summary.marketValue * rate
             total.costValue += summary.costValue * rate
             total.dayProfit += summary.dayProfit * rate

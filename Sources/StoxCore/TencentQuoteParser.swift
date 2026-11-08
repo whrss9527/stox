@@ -66,7 +66,7 @@ public enum TencentQuoteParser {
 
         func number(_ index: Int) -> Double? {
             guard index < fields.count, !fields[index].isEmpty else { return nil }
-            return Double(fields[index])
+            return Double(fields[index]).flatMap { $0.isFinite ? $0 : nil }
         }
         func positive(_ index: Int) -> Double? {
             guard let value = number(index), value > 0 else { return nil }
@@ -75,6 +75,10 @@ public enum TencentQuoteParser {
 
         let name = fields[1]
         guard !name.isEmpty, let price = number(3), let previousClose = number(4) else { return nil }
+        let computedChange = price > 0 && previousClose > 0 ? price - previousClose : 0
+        let change = number(31) ?? computedChange
+        let changePercent = number(32) ?? (previousClose > 0 ? computedChange / previousClose * 100 : 0)
+        guard change.isFinite, changePercent.isFinite else { return nil }
 
         let region = symbol.market.region
         let isCN = region == .cn
@@ -88,7 +92,7 @@ public enum TencentQuoteParser {
         case .cn:
             volume *= lot  // 手 → 股
             let parts = fields[35].split(separator: "/")
-            if parts.count == 3, let yuan = Double(parts[2]) {
+            if parts.count == 3, let yuan = Double(parts[2]), yuan.isFinite {
                 amount = yuan
             } else {
                 amount = (number(37) ?? 0) * 10_000
@@ -104,9 +108,11 @@ public enum TencentQuoteParser {
         case .us:
             // 美股指数的成交额字段数值不可靠，不展示。
             amount = isIndex ? 0 : (number(37) ?? 0)
-        case .global:
+        case .global, .crypto:
             return nil  // 上面已经交给 GlobalQuoteParser
         }
+        if !volume.isFinite { volume = 0 }
+        if !amount.isFinite { amount = 0 }
 
         return Quote(
             symbol: symbol,
@@ -116,8 +122,8 @@ public enum TencentQuoteParser {
             open: number(5) ?? 0,
             high: number(33) ?? 0,
             low: number(34) ?? 0,
-            change: number(31),
-            changePercent: number(32),
+            change: change,
+            changePercent: changePercent,
             volume: volume,
             amount: amount,
             turnoverRate: positive(region == .hk ? 59 : 38),
@@ -125,7 +131,10 @@ public enum TencentQuoteParser {
             peRatio: isIndex ? positive(39) : number(39).flatMap { $0 == 0 ? nil : $0 },
             pbRatio: isCN && !isIndex ? positive(46) : nil,
             volumeRatio: isCN && !isIndex ? positive(49) : nil,
-            marketCap: isIndex ? nil : positive(45).map { $0 * 100_000_000 },
+            marketCap: isIndex ? nil : positive(45).flatMap {
+                let value = $0 * 100_000_000
+                return value.isFinite ? value : nil
+            },
             limitUp: isCN ? positive(47) : nil,
             limitDown: isCN ? positive(48) : nil,
             high52Week: positive(isCN ? 67 : 48),
@@ -152,6 +161,7 @@ public enum TencentQuoteParser {
         guard fields.count > 8, !fields[1].isEmpty, let nav = Double(fields[5]), nav > 0, nav.isFinite else { return nil }
         let percent = Double(fields[7]).flatMap { $0.isFinite && $0 > -100 ? $0 : nil } ?? 0
         let previous = nav / (1 + percent / 100)
+        guard previous > 0, previous.isFinite else { return nil }
         let date = fields[8].filter(\.isASCIIDigit)
         return Quote(
             symbol: symbol,
@@ -161,7 +171,7 @@ public enum TencentQuoteParser {
             changePercent: percent,
             timestamp: date.count == 8 ? parseTimestamp(date + "150000", timeZone: MarketRegion.cn.timeZone) : nil,
             priceDecimals: 4,
-            cumulativeNAV: Double(fields[6]).flatMap { $0 > 0 ? $0 : nil }
+            cumulativeNAV: Double(fields[6]).flatMap { $0 > 0 && $0.isFinite ? $0 : nil }
         )
     }
 
@@ -173,6 +183,11 @@ public enum TencentQuoteParser {
 
     /// A 股的五档和内外盘，量换算成股：挂单量总是手，内外盘和成交量一样（lot 是每单位多少股）。
     static func orderBook(_ number: (Int) -> Double?, lot: Double) -> OrderBook {
+        func scaledVolume(_ index: Int) -> Double? {
+            guard let value = number(index) else { return nil }
+            let scaled = value * lot
+            return scaled.isFinite ? scaled : nil
+        }
         func side(from start: Int) -> [OrderBook.Level] {
             OrderBook.levels(
                 (0..<OrderBook.depth).map { (price: number(start + $0 * 2), volume: number(start + $0 * 2 + 1)) },
@@ -182,8 +197,8 @@ public enum TencentQuoteParser {
         return OrderBook(
             bids: side(from: 9),
             asks: side(from: 19),
-            outerVolume: number(7).map { $0 * lot },
-            innerVolume: number(8).map { $0 * lot }
+            outerVolume: scaledVolume(7),
+            innerVolume: scaledVolume(8)
         )
     }
 

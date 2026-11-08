@@ -189,6 +189,19 @@ final class StatusItemController: NSObject {
         SettingsWindowController.shared.show(page: page)
     }
 
+    #if STOX_UI_FIXTURE
+    func resetFixturePresentation() {
+        closePanel()
+        if let resizeObserver { NotificationCenter.default.removeObserver(resizeObserver) }
+        if let moveObserver { NotificationCenter.default.removeObserver(moveObserver) }
+        resizeObserver = nil
+        moveObserver = nil
+        panel = nil
+        hostingView = nil
+        contentSize = .zero
+    }
+    #endif
+
     private func makePanel() {
         let actions = PanelActions(
             openSettings: { [weak self] page in self?.openSettings(page) },
@@ -840,7 +853,9 @@ final class PanelRouter: ObservableObject {
 
     /// 这条搜索结果查过行情但是查不到：多半是不存在的代码。
     func searchResultMissing(_ symbol: Symbol) -> Bool {
-        searchQuotesQuery == trimmedQuery && !searchQuotesQuery.isEmpty && searchQuotes[symbol] == nil
+        // 目录内的交易对已知有效；部分行情接口失败不能把它标为不存在。
+        guard !symbol.isCrypto else { return false }
+        return searchQuotesQuery == trimmedQuery && !searchQuotesQuery.isEmpty && searchQuotes[symbol] == nil
     }
 
     /// 回车要添加的证券：搜索结果已就绪时取第一条未添加的结果；
