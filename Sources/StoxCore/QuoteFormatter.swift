@@ -88,6 +88,17 @@ public enum QuoteFormatter {
         return text
     }
 
+    /// Price-alert input keeps eight decimals for crypto without abbreviations.
+    /// Other markets retain the existing four-decimal input behavior.
+    public static func alertPriceInput(_ value: Double?, market: Market) -> String {
+        guard let value else { return "" }
+        guard market == .crypto else { return plain(value) }
+        var text = String(format: "%.8f", locale: Locale(identifier: "en_US_POSIX"), value)
+        while text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        return text == "-0" ? "0" : text
+    }
+
     /// 成交量：A 股按“手”显示，港美股按“股”显示。
     public static func volume(_ shares: Double, market: Market) -> String {
         guard shares > 0 else { return "--" }
