@@ -27,7 +27,7 @@ final class QuoteDataCheckTests: XCTestCase {
         let record = try XCTUnwrap(TencentQuoteParser.records(in: raw).first)
         let fields = record.1.split(separator: "~", omittingEmptySubsequences: false).map(String.init)
         for (index, value, expected) in [(3, "999999", "price"), (4, "0", "previousClose"), (35, "1/1/1", "amount/volume"),
-                                          (30, "20200101120000", "timestamp"), (67, "1", "high52Week"), (67, "", "high52Week")] {
+                                          (30, "20200101120000", "timestamp"), (67, "Infinity", "high52Week"), (67, "", "high52Week")] {
             var changed = fields
             changed[index] = value
             let modified = "v_\(record.0)=\"\(changed.joined(separator: "~"))\";"
