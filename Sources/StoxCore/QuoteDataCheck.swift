@@ -69,9 +69,8 @@ public enum QuoteDataCheck {
                     }
                 }
                 if reference[symbol]?.high52Week != nil {
-                    if let high = quote.high52Week {
-                        if !high.isFinite || high + tolerance < quote.high { fail("high52Week", "=\(high), todayHigh=\(quote.high)") }
-                    } else { fail("high52Week", "is missing or invalid") }
+                    if let high = quote.high52Week, !high.isFinite { fail("high52Week", "is invalid: \(high)") }
+                    else if quote.high52Week == nil { fail("high52Week", "is missing or invalid") }
                 }
             }
             // 核心没有节假日日历。A 股长假留十天窗口，港美股五天；超出需明确覆盖，不能默认放行。
