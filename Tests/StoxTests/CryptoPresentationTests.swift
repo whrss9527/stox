@@ -61,6 +61,45 @@ final class CryptoPresentationTests: XCTestCase {
         XCTAssertEqual(stockText, L("留空表示不提醒。每个条件每个交易日最多提醒一次。"))
     }
 
+    func testCryptoPriceThresholdTextPreservesEightDecimalRoundTrip() throws {
+        let symbol = Symbol("ccBTCUSDT")!
+        let cases: [(Double, String)] = [
+            (0.00000001, "0.00000001"),
+            (0.087654, "0.087654"),
+            (1.23456789, "1.23456789"),
+            (76543.12345678, "76543.12345678"),
+        ]
+        for (value, expected) in cases {
+            let text = StockEditorPanel.priceThresholdText(value, for: symbol)
+            XCTAssertEqual(text, expected)
+            let restored = try XCTUnwrap(Double(text))
+            XCTAssertEqual(restored, value, "Opening and saving a price threshold must preserve the stored number")
+            XCTAssertGreaterThan(restored, 0)
+        }
+    }
+
+    func testCryptoPriceThresholdTextKeepsEmptyAndIntegerInputsWithoutAbbreviation() {
+        let symbol = Symbol("ccDOGEUSDT")!
+        XCTAssertEqual(StockEditorPanel.priceThresholdText(nil, for: symbol), "")
+        XCTAssertNil(Double(StockEditorPanel.priceThresholdText(nil, for: symbol)))
+        XCTAssertEqual(StockEditorPanel.priceThresholdText(0, for: symbol), "0")
+        XCTAssertEqual(StockEditorPanel.priceThresholdText(100, for: symbol), "100")
+        XCTAssertEqual(StockEditorPanel.priceThresholdText(10_000, for: symbol), "10000")
+        XCTAssertEqual(StockEditorPanel.priceThresholdText(1_000_000, for: symbol), "1000000")
+        XCTAssertEqual(StockEditorPanel.priceThresholdText(76543.21, for: symbol), "76543.21")
+    }
+
+    func testStockAndForexPriceThresholdTextKeepTheExistingFourDecimalFormat() {
+        for symbol in [Symbol("usAAPL")!, Symbol("whUSDCNY")!] {
+            XCTAssertEqual(StockEditorPanel.priceThresholdText(nil, for: symbol), "")
+            XCTAssertEqual(StockEditorPanel.priceThresholdText(0.087654, for: symbol), "0.0877")
+            XCTAssertEqual(StockEditorPanel.priceThresholdText(0.00000001, for: symbol), "0")
+            for value in [0.0, 100, 10_000, 76543.12345678] {
+                XCTAssertEqual(StockEditorPanel.priceThresholdText(value, for: symbol), QuoteFormatter.plain(value))
+            }
+        }
+    }
+
     func testFilterSelectionRestoresFromIsolatedPreferences() {
         let context = AppTestContext()
         defer { context.cleanup() }

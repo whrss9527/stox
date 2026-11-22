@@ -576,8 +576,8 @@ struct StockEditorPanel: View {
         loaded = true
         pinned = item.pinned
         alias = item.alias ?? ""
-        priceAbove = format(item.alert.priceAbove)
-        priceBelow = format(item.alert.priceBelow)
+        priceAbove = Self.priceThresholdText(item.alert.priceAbove, for: symbol)
+        priceBelow = Self.priceThresholdText(item.alert.priceBelow, for: symbol)
         riseAbove = format(item.alert.riseAbove)
         fallBelow = format(item.alert.fallBelow)
         profitAbove = format(item.alert.profitAbove)
@@ -592,6 +592,16 @@ struct StockEditorPanel: View {
     /// 输入框里显示的数字。不用 %g：它只保留 6 位有效数字，大数还会变成科学计数法。
     private func format(_ value: Double?) -> String {
         value.map(QuoteFormatter.plain) ?? ""
+    }
+
+    /// 价格阈值输入保留数字货币的八位小数；不能使用成交量缩写或行情显示位数。
+    static func priceThresholdText(_ value: Double?, for symbol: Symbol) -> String {
+        guard let value else { return "" }
+        guard symbol.isCrypto else { return QuoteFormatter.plain(value) }
+        var text = QuoteFormatter.fixed(value, decimals: 8)
+        while text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        return text
     }
 
     private func save(_ item: WatchItem) {
